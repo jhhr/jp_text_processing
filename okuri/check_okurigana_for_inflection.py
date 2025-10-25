@@ -1,21 +1,29 @@
 from typing import Optional
-from main_types import (
-    PartOfSpeech,
-)
-from get_conjugatable_okurigana_stem import (
+from .get_conjugatable_okurigana_stem import (
     CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH,
     get_conjugatable_okurigana_stem,
 )
-from starts_with_okurigana_conjugation import (
+from .starts_with_okurigana_conjugation import (
     OkuriResults,
     starts_with_okurigana_conjugation,
 )
-from main_types import HighlightArgs, WordData
 
+try:
+    from all_types.main_types import (
+        PartOfSpeech,
+        HighlightArgs,
+        WordData,
+    )
+except ImportError:
+    from ..all_types.main_types import (
+        PartOfSpeech,
+        HighlightArgs,
+        WordData,
+    )
 try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger
+    from ..utils.logger import Logger
 
 
 def check_okurigana_for_inflection(

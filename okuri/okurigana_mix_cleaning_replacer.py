@@ -1,6 +1,9 @@
 import re
 
-from regex import KANJI_RE, KANJI_RE_OPT
+try:
+    from regex.regex import KANJI_RE, KANJI_RE_OPT
+except ImportError:
+    from ..regex.regex import KANJI_RE, KANJI_RE_OPT
 
 # Regex for lone kanji with some hiragana to their right, then some kanji,
 # then furigana that includes the hiragana in the middle

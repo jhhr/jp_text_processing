@@ -1,13 +1,18 @@
 from typing import Optional, Union, Tuple
 
 try:
+    from all_types.main_types import PartOfSpeech
+except ImportError:
+    from ..all_types.main_types import PartOfSpeech
+try:
+    from regex.regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+except ImportError:
+    from ..regex.regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger
+    from ..utils.logger import Logger
 
-from regex import RENDAKU_CONVERSION_DICT_HIRAGANA
-
-from main_types import PartOfSpeech
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.

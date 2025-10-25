@@ -2,20 +2,34 @@ import sys
 from typing import Literal
 
 try:
+    from all_types.main_types import (
+        OkuriResults,
+    )
+except ImportError:
+    from ..all_types.main_types import (
+        OkuriResults,
+    )
+try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger
+    from ..utils.logger import Logger
 
-from mecab_controller.mecab_controller import MecabController
-from mecab_controller.basic_types import (
-    Inflection,
-    MecabParsedToken,
-    PartOfSpeech,
-)
-
-from main_types import (
-    OkuriResults,
-)
+try:
+    from mecab_controller.mecab_controller import MecabController
+except ImportError:
+    from ..mecab_controller.mecab_controller import MecabController
+try:
+    from mecab_controller.basic_types import (
+        Inflection,
+        MecabParsedToken,
+        PartOfSpeech,
+    )
+except ImportError:
+    from ..mecab_controller.basic_types import (
+        Inflection,
+        MecabParsedToken,
+        PartOfSpeech,
+    )
 
 OkuriPrefix = Literal["kanji", "kanji_reading"]
 

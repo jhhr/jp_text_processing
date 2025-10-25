@@ -2,9 +2,14 @@ import sys
 import re
 from dataclasses import dataclass
 
-from regex import (
-    KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
-)
+try:
+    from regex.regex import (
+        KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
+    )
+except ImportError:
+    from ..regex.regex import (
+        KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
+    )
 
 WORD_SPLIT_RE = rf"^(.*?) ?{KANJI_AND_FURIGANA_AND_OKURIGANA_RE}$"
 WORD_SPLIT_REC = re.compile(WORD_SPLIT_RE)

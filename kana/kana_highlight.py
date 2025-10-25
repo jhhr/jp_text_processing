@@ -2,56 +2,107 @@ from functools import partial
 import re
 from typing import Literal, Optional, Tuple, NamedTuple, cast, Union
 
-from number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
-from kana_conv import to_katakana, to_hiragana
-from check_okurigana_for_inflection import (
-    check_okurigana_for_inflection,
-)
-from starts_with_okurigana_conjugation import (
-    OkuriResults,
-)
-from okurigana_dict import (
-    ONYOMI_GODAN_SU_FIRST_KANA,
-)
-
-from construct_wrapped_furi_word import (
+from .kana_conv import to_katakana, to_hiragana
+from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
     FuriReconstruct,
 )
-from okurigana_dict import get_verb_noun_form_okuri
-from okurigana_mix_cleaning_replacer import (
-    OKURIGANA_MIX_CLEANING_REC,
-    okurigana_mix_cleaning_replacer,
-)
-from get_conjugated_okuri_with_mecab import (
-    get_conjugated_okuri_with_mecab,
-)
-from regex import (
-    KANJI_REC,
-    DOUBLE_KANJI_REC,
-    KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
-    FURIGANA_REC,
-    KATAKANA_REC,
-    ALL_MORA_REC,
-    RENDAKU_CONVERSION_DICT_HIRAGANA,
-    RENDAKU_CONVERSION_DICT_KATAKANA,
-)
-from main_types import (
-    WordData,
-    HighlightArgs,
-    Edge,
-    WithTagsDef,
-    FuriganaParts,
-    YomiMatchResult,
-    PartialResult,
-    FinalResult,
-)
-from all_kanji_data import all_kanji_data
 
 try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger  # type: ignore[no-redef]
+    from ..utils.logger import Logger
+try:
+    from kanji.number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
+except ImportError:
+    from ..kanji.number_to_kanji import NUMBER_TO_KANJI, number_to_kanji
+try:
+    from okuri.check_okurigana_for_inflection import (
+        check_okurigana_for_inflection,
+    )
+except ImportError:
+    from ..okuri.check_okurigana_for_inflection import (
+        check_okurigana_for_inflection,
+    )
+try:
+    from okuri.okurigana_dict import (
+        ONYOMI_GODAN_SU_FIRST_KANA,
+        get_verb_noun_form_okuri,
+    )
+except ImportError:
+    from ..okuri.okurigana_dict import (
+        ONYOMI_GODAN_SU_FIRST_KANA,
+        get_verb_noun_form_okuri,
+    )
+try:
+    from okuri.okurigana_mix_cleaning_replacer import (
+        OKURIGANA_MIX_CLEANING_REC,
+        okurigana_mix_cleaning_replacer,
+    )
+except ImportError:
+    from ..okuri.okurigana_mix_cleaning_replacer import (
+        OKURIGANA_MIX_CLEANING_REC,
+        okurigana_mix_cleaning_replacer,
+    )
+try:
+    from okuri.get_conjugated_okuri_with_mecab import (
+        get_conjugated_okuri_with_mecab,
+    )
+except ImportError:
+    from ..okuri.get_conjugated_okuri_with_mecab import (
+        get_conjugated_okuri_with_mecab,
+    )
+try:
+    from regex.regex import (
+        KANJI_REC,
+        DOUBLE_KANJI_REC,
+        KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+        FURIGANA_REC,
+        KATAKANA_REC,
+        ALL_MORA_REC,
+        RENDAKU_CONVERSION_DICT_HIRAGANA,
+        RENDAKU_CONVERSION_DICT_KATAKANA,
+    )
+except ImportError:
+
+    from ..regex.regex import (
+        KANJI_REC,
+        DOUBLE_KANJI_REC,
+        KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+        FURIGANA_REC,
+        KATAKANA_REC,
+        ALL_MORA_REC,
+        RENDAKU_CONVERSION_DICT_HIRAGANA,
+        RENDAKU_CONVERSION_DICT_KATAKANA,
+    )
+try:
+    from all_types.main_types import (
+        WordData,
+        HighlightArgs,
+        Edge,
+        WithTagsDef,
+        FuriganaParts,
+        YomiMatchResult,
+        PartialResult,
+        FinalResult,
+        OkuriResults,
+    )
+except ImportError:
+    from ..all_types.main_types import (
+        WordData,
+        HighlightArgs,
+        Edge,
+        WithTagsDef,
+        FuriganaParts,
+        YomiMatchResult,
+        PartialResult,
+        FinalResult,
+        OkuriResults,
+    )
+try:
+    from kanji.all_kanji_data import all_kanji_data
+except ImportError:
+    from ..kanji.all_kanji_data import all_kanji_data
 
 
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]

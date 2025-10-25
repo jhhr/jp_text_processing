@@ -5,7 +5,7 @@ from typing import NamedTuple, Tuple, Union, Optional, Literal
 try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger  # type: ignore[no-redef]
+    from ..utils.logger import Logger  # type: ignore[no-redef]
 
 TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
 

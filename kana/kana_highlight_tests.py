@@ -1,13 +1,18 @@
 import sys
 
 from typing import Optional, Tuple
-from kana_highlight import kana_highlight, FuriReconstruct
-from main_types import WithTagsDef
+
+from .kana_highlight import kana_highlight, FuriReconstruct
+
+try:
+    from all_types.main_types import WithTagsDef
+except ImportError:
+    from ..all_types.main_types import WithTagsDef
 
 try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger  # type: ignore[no-redef]
+    from ..utils.logger import Logger
 
 
 def test(

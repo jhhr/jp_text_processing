@@ -1,9 +1,11 @@
 try:
+    from okuri.starts_with_okurigana_conjugation import starts_with_okurigana_conjugation
+except ImportError:
+    from ..okuri.starts_with_okurigana_conjugation import starts_with_okurigana_conjugation
+try:
     from utils.logger import Logger
 except ImportError:
-    from utils.logger import Logger  # type: ignore[no-redef]
-
-from starts_with_okurigana_conjugation import starts_with_okurigana_conjugation
+    from ..utils.logger import Logger
 
 
 def word_highlight(text: str, word: str, logger: Logger) -> list[tuple[int, int]]:
