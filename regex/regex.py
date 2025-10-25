@@ -1,9 +1,9 @@
 import re
 
 try:
-    from kana.kana_conv import to_katakana
+    from mecab_controller.kana_conv import to_katakana
 except ImportError:
-    from ..kana.kana_conv import to_katakana
+    from ..mecab_controller.kana_conv import to_katakana
 
 # Regex matching any kanji characters
 # Include the kanji repeater punctuation as something that will be cleaned off

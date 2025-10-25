@@ -2,12 +2,15 @@ from functools import partial
 import re
 from typing import Literal, Optional, Tuple, NamedTuple, cast, Union
 
-from .kana_conv import to_katakana, to_hiragana
 from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
     FuriReconstruct,
 )
 
+try:
+    from mecab_controller.kana_conv import to_katakana, to_hiragana
+except ImportError:
+    from ..mecab_controller.kana_conv import to_katakana, to_hiragana
 try:
     from utils.logger import Logger
 except ImportError:
