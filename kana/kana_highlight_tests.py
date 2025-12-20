@@ -928,6 +928,21 @@ def main():
         expected_furikanji_with_tags_merged="<b><kun> くち[口]</kun></b><kun> べに[紅]</kun>",
     )
     test(
+        test_name="Should match the full reading match when there are multiple 3/",
+        kanji="主",
+        # Both シュ (on) and シュウ (on) are in the furigana but the correct match is シュウ
+        sentence="主従[しゅうじゅう]",
+        expected_kana_only="<b>シュウ</b>ジュウ",
+        expected_furigana="<b> 主[シュウ]</b> 従[ジュウ]",
+        expected_furikanji="<b> シュウ[主]</b> ジュウ[従]",
+        expected_kana_only_with_tags_split="<b><on>シュウ</on></b><on>ジュウ</on>",
+        expected_furigana_with_tags_split="<b><on> 主[シュウ]</on></b><on> 従[ジュウ]</on>",
+        expected_furikanji_with_tags_split="<b><on> シュウ[主]</on></b><on> ジュウ[従]</on>",
+        expected_kana_only_with_tags_merged="<b><on>シュウ</on></b><on>ジュウ</on>",
+        expected_furigana_with_tags_merged="<b><on> 主[シュウ]</on></b><on> 従[ジュウ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> シュウ[主]</on></b><on> ジュウ[従]</on>",
+    )
+    test(
         test_name="small tsu 1/",
         kanji="剔",
         sentence="剔抉[てっけつ]",

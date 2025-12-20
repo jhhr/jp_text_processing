@@ -1,4 +1,4 @@
-from typing import Optional, Literal, TypedDict, NamedTuple
+from typing import Optional, Literal, TypedDict, NamedTuple, NotRequired
 
 
 class WithTagsDef(NamedTuple):
@@ -72,6 +72,7 @@ class YomiMatchResult(TypedDict):
     :param match_edge
     :param actual_match
     :param matched_reading
+    :param all_readings_processed: True when the loop over readings reached the last reading
     """
 
     text: str
@@ -79,6 +80,7 @@ class YomiMatchResult(TypedDict):
     match_edge: Edge
     actual_match: str
     matched_reading: str
+    all_readings_processed: NotRequired[bool]
 
 
 class PartialResult(TypedDict):
@@ -90,6 +92,8 @@ class PartialResult(TypedDict):
     :param okurigana
     :param rest_kana
     :param edge
+    :param matched_reading: The reading that was matched for this kanji
+    :param all_readings_processed: True when all readings for this kanji have been checked
     """
 
     matched_furigana: str
@@ -98,6 +102,8 @@ class PartialResult(TypedDict):
     okurigana: str
     rest_kana: str
     edge: Edge
+    matched_reading: NotRequired[str]
+    all_readings_processed: NotRequired[bool]
 
 
 class FinalResult(TypedDict):
