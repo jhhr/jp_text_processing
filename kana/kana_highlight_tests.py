@@ -1833,6 +1833,24 @@ def main():
         expected_furikanji_with_tags_merged="<juk> ぼろぼろ[襤褸襤褸]</juk>",
     )
     test(
+        test_name="jukujikun test 襤褸襤褸 as katakana not matched",
+        kanji="",
+        sentence="襤褸襤褸[ボロボロ]",
+        expected_kana_only="ボロボロ",
+        expected_furigana=" 襤褸襤褸[ボロボロ]",
+        expected_furikanji=" ボロボロ[襤褸襤褸]",
+        expected_kana_only_with_tags_split="<juk>ボ</juk><juk>ロ</juk><juk>ボ</juk><juk>ロ</juk>",
+        expected_furigana_with_tags_split=(
+            "<juk> 襤[ボ]</juk><juk> 褸[ロ]</juk><juk> 襤[ボ]</juk><juk> 褸[ロ]</juk>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> ボ[襤]</juk><juk> ロ[褸]</juk><juk> ボ[襤]</juk><juk> ロ[褸]</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ボロボロ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸襤褸[ボロボロ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ボロボロ[襤褸襤褸]</juk>",
+    )
+    test(
         test_name="jukujikun test with other readings after juku word /1",
         kanji="買",
         sentence="風邪薬[かぜぐすり]を買[か]った",

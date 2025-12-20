@@ -1667,11 +1667,11 @@ def handle_partial_word_case(
     # This includes both direct matches and doubled jukujikun patterns (e.g., 襤褸襤褸[ぼろぼろ])
     if len(cur_word) >= 2:
         # Check if this is a direct jukujikun match
-        if (
-            juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(cur_word[:2])
-        ) and cur_furigana.startswith(juku_reading):
-            # Force these into the jukujikun processing
-            return None
+        if juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(cur_word[:2]):
+            # Compare in hiragana to handle both hiragana and katakana furigana
+            if to_hiragana(cur_furigana).startswith(juku_reading):
+                # Force these into the jukujikun processing
+                return None
 
         # Check if this is a doubled jukujikun pattern (e.g., ABAB where AB is jukujikun)
         if len(cur_word) >= 4 and len(cur_word) % 2 == 0:
@@ -1686,7 +1686,8 @@ def handle_partial_word_case(
                     # Check if the furigana is also doubled
                     # The furigana should be the juku_reading repeated twice
                     expected_doubled_reading = juku_reading * 2
-                    if cur_furigana.startswith(expected_doubled_reading):
+                    # Compare in hiragana to handle both hiragana and katakana furigana
+                    if to_hiragana(cur_furigana).startswith(expected_doubled_reading):
                         # This is a doubled jukujikun word, force it into jukujikun processing
                         return None
 
@@ -2418,7 +2419,8 @@ def kana_highlight(
             if first_half == second_half:
                 if juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(first_half):
                     expected_doubled_reading = juku_reading * 2
-                    if cur_furigana_section == expected_doubled_reading:
+                    # Compare in hiragana to handle both hiragana and katakana furigana
+                    if to_hiragana(cur_furigana_section) == expected_doubled_reading:
                         # This is a complete doubled jukujikun word
                         is_complete_doubled_jukujikun = True
                         juku_word_end = len(cur_word) - 1
