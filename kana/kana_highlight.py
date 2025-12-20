@@ -1090,6 +1090,9 @@ def check_kunyomi_readings(
         ("すがすが", None, "清"),
         # 田圃[たんぼ] where 田[たん] should be a jukujikun, but た is a kunyomi for 田
         ("たんぼ", "田圃", None),
+        # 袋小路[ふくろこうじ] where 小[こう] should be a jukujikun, but こ is a kunyomi for 小
+        # The exception is after we've matched ふくろ for 袋
+        ("こうじ", None, "小"),
     ]
     for ex_furigana, ex_word, ex_kanji in no_match_exceptions:
         logger.debug(

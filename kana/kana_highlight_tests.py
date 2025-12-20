@@ -1832,6 +1832,26 @@ def main():
         expected_furikanji_with_tags_merged="<juk> ばら[薔薇]</juk><b><kun> いろ[色]</kun></b>",
     )
     test(
+        test_name="jukujikun test with other readings after juku word /3",
+        kanji="",
+        # 路 has the kunyomi じ so this should be used to match over こうじ, so that that only juku
+        # portion becomes うじ that would be assigned to 小
+        sentence="袋小路[ふくろこうじ]",
+        expected_kana_only="ふくろこうじ",
+        expected_furigana=" 袋小路[ふくろこうじ]",
+        expected_furikanji=" ふくろこうじ[袋小路]",
+        expected_kana_only_with_tags_split="<kun>ふくろ</kun><juk>こう</juk><kun>じ</kun>",
+        expected_furigana_with_tags_split="<kun> 袋[ふくろ]</kun><juk> 小[こう]</juk><kun> 路[じ]</kun>",
+        expected_furikanji_with_tags_split=(
+            "<kun> ふくろ[袋]</kun><juk> こう[小]</juk><kun> じ[路]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<kun>ふくろ</kun><juk>こう</juk><kun>じ</kun>",
+        expected_furigana_with_tags_merged="<kun> 袋[ふくろ]</kun><juk> 小[こう]</juk><kun> 路[じ]</kun>",
+        expected_furikanji_with_tags_merged=(
+            "<kun> ふくろ[袋]</kun><juk> こう[小]</juk><kun> じ[路]</kun>"
+        ),
+    )
+    test(
         test_name="multi-kanji jukujikun word with other readings after juku word non-matched",
         kanji="目",
         sentence="真面目[まじめ]",
