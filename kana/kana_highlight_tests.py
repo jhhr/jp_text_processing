@@ -3055,6 +3055,7 @@ def main():
     test(
         test_name="correct onyomi for 不 in 不都合",
         kanji="不",
+        # The shorter onyomi フ should be matched instead of フツ
         sentence="不都合[ふつごう]",
         expected_kana_only="<b>フ</b>ツゴウ",
         expected_furigana="<b> 不[フ]</b> 都合[ツゴウ]",
