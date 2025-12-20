@@ -1786,6 +1786,53 @@ def main():
         ),
     )
     test(
+        test_name="jukujikun test 襤褸 matched",
+        kanji="襤",
+        # 襤 has the kunyomi ぼろ, but 襤褸 should be read as the jukujikun ぼろ
+        sentence="襤褸[ぼろ]",
+        expected_kana_only="<b>ぼ</b>ろ",
+        expected_furigana="<b> 襤[ぼ]</b> 褸[ろ]",
+        expected_furikanji="<b> ぼ[襤]</b> ろ[褸]",
+        expected_kana_only_with_tags_split="<b><juk>ぼ</juk></b><juk>ろ</juk>",
+        expected_furigana_with_tags_split="<b><juk> 襤[ぼ]</juk></b><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_split="<b><juk> ぼ[襤]</juk></b><juk> ろ[褸]</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>ぼ</juk></b><juk>ろ</juk>",
+        expected_furigana_with_tags_merged="<b><juk> 襤[ぼ]</juk></b><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_merged="<b><juk> ぼ[襤]</juk></b><juk> ろ[褸]</juk>",
+    )
+    test(
+        test_name="jukujikun test 襤褸 not matched",
+        kanji="",
+        sentence="襤褸[ぼろ]",
+        expected_kana_only="ぼろ",
+        expected_furigana=" 襤褸[ぼろ]",
+        expected_furikanji=" ぼろ[襤褸]",
+        expected_kana_only_with_tags_split="<juk>ぼ</juk><juk>ろ</juk>",
+        expected_furigana_with_tags_split="<juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_split="<juk> ぼ[襤]</juk><juk> ろ[褸]</juk>",
+        expected_kana_only_with_tags_merged="<juk>ぼろ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸[ぼろ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ぼろ[襤褸]</juk>",
+    )
+    test(
+        test_name="jukujikun test 襤褸襤褸 not matched",
+        kanji="",
+        sentence="襤褸襤褸[ぼろぼろ]",
+        expected_kana_only="ぼろぼろ",
+        expected_furigana=" 襤褸襤褸[ぼろぼろ]",
+        expected_furikanji=" ぼろぼろ[襤褸襤褸]",
+        expected_kana_only_with_tags_split="<juk>ぼ</juk><juk>ろ</juk><juk>ぼ</juk><juk>ろ</juk>",
+        expected_furigana_with_tags_split=(
+            "<juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk><juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> ぼ[襤]</juk><juk> ろ[褸]</juk><juk> ぼ[襤]</juk><juk> ろ[褸]</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ぼろぼろ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸襤褸[ぼろぼろ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ぼろぼろ[襤褸襤褸]</juk>",
+    )
+    test(
         test_name="jukujikun test with other readings after juku word /1",
         kanji="買",
         sentence="風邪薬[かぜぐすり]を買[か]った",

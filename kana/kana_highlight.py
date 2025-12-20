@@ -130,6 +130,7 @@ JUKUJIKUN_KUNYOMI_OVERLAP: dict[str, str] = {
     "薔薇": "ばら",
     "真面": "まじ",
     "蕎麦": "そば",
+    "襤褸": "ぼろ",
 }
 
 
@@ -1663,14 +1664,31 @@ def handle_partial_word_case(
     )
 
     # Handle cases that should be a jukujikun reading but the first kanji has a matching kunyomi
-    if (
-        # All these cases are 2-kanji long
-        len(cur_word) >= 2
-        and (juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(cur_word[:2]))
-        and cur_furigana.startswith(juku_reading)
-    ):
-        # Force these into the jukujikun processing
-        return None
+    # This includes both direct matches and doubled jukujikun patterns (e.g., 襤褸襤褸[ぼろぼろ])
+    if len(cur_word) >= 2:
+        # Check if this is a direct jukujikun match
+        if (
+            juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(cur_word[:2])
+        ) and cur_furigana.startswith(juku_reading):
+            # Force these into the jukujikun processing
+            return None
+
+        # Check if this is a doubled jukujikun pattern (e.g., ABAB where AB is jukujikun)
+        if len(cur_word) >= 4 and len(cur_word) % 2 == 0:
+            half_len = len(cur_word) // 2
+            first_half = cur_word[:half_len]
+            second_half = cur_word[half_len:]
+
+            # Check if the word is composed of two identical halves
+            if first_half == second_half:
+                # Check if the first half is a known jukujikun word
+                if juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(first_half):
+                    # Check if the furigana is also doubled
+                    # The furigana should be the juku_reading repeated twice
+                    expected_doubled_reading = juku_reading * 2
+                    if cur_furigana.startswith(expected_doubled_reading):
+                        # This is a doubled jukujikun word, force it into jukujikun processing
+                        return None
 
     res = process_readings(
         highlight_args,
@@ -2388,6 +2406,27 @@ def kana_highlight(
         # for each one, highlight the kanji_to_match and reconstruct the furigana
         # Note: The loop has already been executed in process_kanji_loop above
 
+        # Check if this is a complete doubled jukujikun pattern before entering the reversing loop
+        # For patterns like 襤褸襤褸[ぼろぼろ], we should process the entire word as jukujikun
+        # without doing the reversing loop
+        is_complete_doubled_jukujikun = False
+        if cur_word and juku_word_start == 0 and len(cur_word) >= 4 and len(cur_word) % 2 == 0:
+            half_len = len(cur_word) // 2
+            first_half = cur_word[:half_len]
+            second_half = cur_word[half_len:]
+
+            if first_half == second_half:
+                if juku_reading := JUKUJIKUN_KUNYOMI_OVERLAP.get(first_half):
+                    expected_doubled_reading = juku_reading * 2
+                    if cur_furigana_section == expected_doubled_reading:
+                        # This is a complete doubled jukujikun word
+                        is_complete_doubled_jukujikun = True
+                        juku_word_end = len(cur_word) - 1
+                        logger.debug(
+                            f"Detected complete doubled jukujikun pattern: {cur_word},"
+                            f" juku_word_start: {juku_word_start}, juku_word_end: {juku_word_end}"
+                        )
+
         # If cur_word is not empty, we need to handle the rest of the word as jukujikun
         # Process backward until we once more get to a non-match marking the juku_word_end
         # the kanji from juku_word_start to juku_word_end is what is considered jukujikun
@@ -2403,170 +2442,174 @@ def kana_highlight(
             f"partial_result is None - juku_word_start: {juku_word_start}, juku_furigana:"
             f" {juku_furigana} juku_word_pos_to_highlight:"
             f" {juku_word_pos_to_highlight} juku_word_start_edge: {juku_word_start_edge},"
-            f" juku_word_reversed: {juku_word_reversed}"
+            f" juku_word_reversed: {juku_word_reversed}, is_complete_doubled_jukujikun:"
+            f" {is_complete_doubled_jukujikun}"
         )
-        for i, kanji in enumerate(juku_word_reversed):
-            logger.debug(f"reversing loop - i: {i}, kanji: {kanji}")
-            if kanji == "々":
-                # Skip repeater as this will be handled in the next iteration
-                continue
-            # The edge is reversed now, so the first kanji is the right edge
-            is_first_kanji = i == juku_word_length - 1
-            is_last_kanji = i == 0
-            original_word_index = len(full_word) - i - 1
-            # Last kanji is where we left off with the previous loop, so we can stop there
-            prev_kanji = juku_word_reversed[i - 1] if i > 0 else ""
-            prev_kanji_is_repeater_and_last = prev_kanji == "々" and i == 1
-            if is_first_kanji:
-                juku_word_end = original_word_index
-                if prev_kanji == "々" and juku_word_length >= 2:
-                    juku_word_end += 1
-                    juku_word_start = juku_word_end - 1
-                    juku_word_pos_to_highlight = "right" if juku_word_length == 2 else "middle"
-                    logger.debug(
-                        "reversing whole word is kanji + repeater - juku_word_start:"
-                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
-                        f" juku_word_start_edge: {juku_word_start_edge}"
-                    )
-                continue
 
-            is_middle_kanji = not is_first_kanji and not is_last_kanji
-            if is_first_kanji:
-                cur_edge = juku_word_start_edge
-            elif is_middle_kanji:
-                cur_edge = "middle"
-            kanji_to_match = NUMBER_TO_KANJI.get(kanji, kanji)
-            kanji_data = all_kanji_data.get(kanji_to_match)
-            if not kanji_data:
-                logger.error(
-                    f"Error in kana_highlight[]: reversing, kanji '{kanji}' not found in"
-                    " all_kanji_data"
-                )
-                return full_furigana + okurigana
-            is_kanji_to_highlight = kanji == kanji_to_highlight
-            highlight_args = {
-                "kanji_to_highlight": kanji_to_highlight,
-                "kanji_to_match": kanji,
-                "onyomi": kanji_data.get("onyomi", ""),
-                "kunyomi": kanji_data.get("kunyomi", ""),
-                "add_highlight": is_kanji_to_highlight,
-                # Right edge now, as we're going backwards
-                "edge": "right" if not is_first_kanji else "whole",
-                "full_word": full_word,
-                "full_furigana": full_furigana,
-            }
-            cur_word = kanji
-            partial_result = handle_partial_word_case(
-                highlight_args,
-                cur_word,
-                cur_furigana_section,
-                okurigana if (is_last_kanji or prev_kanji_is_repeater_and_last) else "",
-                with_tags_def=with_tags_def,
-                logger=logger,
-            )
-            logger.debug(
-                f"reversing, partial_result: {partial_result}, is_kanji_to_highlight:"
-                f" {is_kanji_to_highlight}, cur_word: {cur_word}, cur_furigana_section:"
-                f" {cur_furigana_section}, original_word_index: {original_word_index},"
-                f" prev_kanji_is_repeater_and_last: {prev_kanji_is_repeater_and_last}"
-            )
-            if partial_result is None:
-                # Found the end of the jukujikun part, this can be the same as juku_word_start
-                juku_word_end = original_word_index
-                logger.debug(
-                    f"reversing end by partial_result is None, juku_word_end: {juku_word_end}"
-                )
-                if prev_kanji == "々":
-                    juku_word_end += 1
-                    juku_word_start = juku_word_end - 1
-                    logger.debug(
-                        "reversing partial, prev_kanji was repeater - juku_word_start:"
-                        f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
-                    )
-                break
-            matched_furigana = partial_result["matched_furigana"]
-            wrapped_furigana = matched_furigana
+        # Skip the reversing loop if we've already determined this is a complete doubled jukujikun
+        if not is_complete_doubled_jukujikun:
+            for i, kanji in enumerate(juku_word_reversed):
+                logger.debug(f"reversing loop - i: {i}, kanji: {kanji}")
+                if kanji == "々":
+                    # Skip repeater as this will be handled in the next iteration
+                    continue
+                # The edge is reversed now, so the first kanji is the right edge
+                is_first_kanji = i == juku_word_length - 1
+                is_last_kanji = i == 0
+                original_word_index = len(full_word) - i - 1
+                # Last kanji is where we left off with the previous loop, so we can stop there
+                prev_kanji = juku_word_reversed[i - 1] if i > 0 else ""
+                prev_kanji_is_repeater_and_last = prev_kanji == "々" and i == 1
+                if is_first_kanji:
+                    juku_word_end = original_word_index
+                    if prev_kanji == "々" and juku_word_length >= 2:
+                        juku_word_end += 1
+                        juku_word_start = juku_word_end - 1
+                        juku_word_pos_to_highlight = "right" if juku_word_length == 2 else "middle"
+                        logger.debug(
+                            "reversing whole word is kanji + repeater - juku_word_start:"
+                            f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
+                            f" juku_word_start_edge: {juku_word_start_edge}"
+                        )
+                    continue
 
-            if prev_kanji == "々":
-                # Add the repeater to be processed as part of the current kanji
-                # kanji = f"{kanji}{prev_kanji}"
-                rep_kanji = prev_kanji
-                # if we had the repeater kanji, we should add more furigana to this result
-                # If this was a normal match, the furigana should be repeating
-                # For the furigana doubling, we'll need to use only the part of the furigana section
-                # that starts from the matched furigana, because the next furigana is currently
-                # to the left instead of the right due to the reversing
-                matched_furigana_start_index = cur_furigana_section.find(matched_furigana)
-                furigana_section_starting_from_matched = cur_furigana_section[
-                    matched_furigana_start_index:
-                ]
-                logger.debug(
-                    f"reversing, repeater kanji - doubling furigana: {matched_furigana},"
-                    f" cur_furigana_section: {cur_furigana_section}"
-                    f"reversing, matched_furigana_start_index: {matched_furigana_start_index},"
-                    " furigana_section_starting_from_matched:"
-                    f" {furigana_section_starting_from_matched}"
-                )
-                matched_furigana = handle_furigana_doubling(
-                    partial_result,
-                    furigana_section_starting_from_matched,
-                    matched_furigana,
-                    check_in_katakana=furigana_is_katakana,
-                    onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
+                is_middle_kanji = not is_first_kanji and not is_last_kanji
+                if is_first_kanji:
+                    cur_edge = juku_word_start_edge
+                elif is_middle_kanji:
+                    cur_edge = "middle"
+                kanji_to_match = NUMBER_TO_KANJI.get(kanji, kanji)
+                kanji_data = all_kanji_data.get(kanji_to_match)
+                if not kanji_data:
+                    logger.error(
+                        f"Error in kana_highlight[]: reversing, kanji '{kanji}' not found in"
+                        " all_kanji_data"
+                    )
+                    return full_furigana + okurigana
+                is_kanji_to_highlight = kanji == kanji_to_highlight
+                highlight_args = {
+                    "kanji_to_highlight": kanji_to_highlight,
+                    "kanji_to_match": kanji,
+                    "onyomi": kanji_data.get("onyomi", ""),
+                    "kunyomi": kanji_data.get("kunyomi", ""),
+                    "add_highlight": is_kanji_to_highlight,
+                    # Right edge now, as we're going backwards
+                    "edge": "right" if not is_first_kanji else "whole",
+                    "full_word": full_word,
+                    "full_furigana": full_furigana,
+                }
+                cur_word = kanji
+                partial_result = handle_partial_word_case(
+                    highlight_args,
+                    cur_word,
+                    cur_furigana_section,
+                    okurigana if (is_last_kanji or prev_kanji_is_repeater_and_last) else "",
+                    with_tags_def=with_tags_def,
                     logger=logger,
                 )
-                logger.debug(f"reversing, matched_furigana after doubling: {matched_furigana}")
+                logger.debug(
+                    f"reversing, partial_result: {partial_result}, is_kanji_to_highlight:"
+                    f" {is_kanji_to_highlight}, cur_word: {cur_word}, cur_furigana_section:"
+                    f" {cur_furigana_section}, original_word_index: {original_word_index},"
+                    f" prev_kanji_is_repeater_and_last: {prev_kanji_is_repeater_and_last}"
+                )
+                if partial_result is None:
+                    # Found the end of the jukujikun part, this can be the same as juku_word_start
+                    juku_word_end = original_word_index
+                    logger.debug(
+                        f"reversing end by partial_result is None, juku_word_end: {juku_word_end}"
+                    )
+                    if prev_kanji == "々":
+                        juku_word_end += 1
+                        juku_word_start = juku_word_end - 1
+                        logger.debug(
+                            "reversing partial, prev_kanji was repeater - juku_word_start:"
+                            f" {juku_word_start}, juku_word_end: {juku_word_end}, word: {full_word}"
+                        )
+                    break
+                matched_furigana = partial_result["matched_furigana"]
                 wrapped_furigana = matched_furigana
-            else:
-                rep_kanji = ""
 
-            if partial_result["match_type"] != "none" and is_kanji_to_highlight:
-                highlight_match_type = partial_result["match_type"]
-            if with_tags_def.with_tags:
-                if partial_result["match_type"] == "onyomi":
-                    wrapped_furigana = f"<on>{matched_furigana}</on>"
-                elif partial_result["match_type"] == "kunyomi":
-                    wrapped_furigana = f"<kun>{matched_furigana}</kun>"
+                if prev_kanji == "々":
+                    # Add the repeater to be processed as part of the current kanji
+                    # kanji = f"{kanji}{prev_kanji}"
+                    rep_kanji = prev_kanji
+                    # if we had the repeater kanji, we should add more furigana to this result
+                    # If this was a normal match, the furigana should be repeating
+                    # For the furigana doubling, we'll need to use only the part of the furigana section
+                    # that starts from the matched furigana, because the next furigana is currently
+                    # to the left instead of the right due to the reversing
+                    matched_furigana_start_index = cur_furigana_section.find(matched_furigana)
+                    furigana_section_starting_from_matched = cur_furigana_section[
+                        matched_furigana_start_index:
+                    ]
+                    logger.debug(
+                        f"reversing, repeater kanji - doubling furigana: {matched_furigana},"
+                        f" cur_furigana_section: {cur_furigana_section}"
+                        f"reversing, matched_furigana_start_index: {matched_furigana_start_index},"
+                        " furigana_section_starting_from_matched:"
+                        f" {furigana_section_starting_from_matched}"
+                    )
+                    matched_furigana = handle_furigana_doubling(
+                        partial_result,
+                        furigana_section_starting_from_matched,
+                        matched_furigana,
+                        check_in_katakana=furigana_is_katakana,
+                        onyomi_to_katakana=with_tags_def.onyomi_to_katakana,
+                        logger=logger,
+                    )
+                    logger.debug(f"reversing, matched_furigana after doubling: {matched_furigana}")
+                    wrapped_furigana = matched_furigana
+                else:
+                    rep_kanji = ""
 
-            if is_kanji_to_highlight and wrapped_furigana:
-                reverse_final_furigana = f"<b>{wrapped_furigana}</b>" + reverse_final_furigana
-            elif matched_furigana:
-                reverse_final_furigana = wrapped_furigana + reverse_final_furigana
+                if partial_result["match_type"] != "none" and is_kanji_to_highlight:
+                    highlight_match_type = partial_result["match_type"]
+                if with_tags_def.with_tags:
+                    if partial_result["match_type"] == "onyomi":
+                        wrapped_furigana = f"<on>{matched_furigana}</on>"
+                    elif partial_result["match_type"] == "kunyomi":
+                        wrapped_furigana = f"<kun>{matched_furigana}</kun>"
 
-            # Slice the furigana and word from the end to remove the part that was already processed
-            cur_furigana_section = cur_furigana_section[: -len(matched_furigana)]
-            # This is also the furigana to be eventually processed as jukujikun
-            juku_furigana = cur_furigana_section
-            logger.debug(
-                f"wrapped_furigana: {wrapped_furigana}, matched_furigana: {matched_furigana},"
-                f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}"
-            )
-            # If this was the kanji to highlight, this edge should be in the final_result as
-            # reconstructed furigana needs it
-            if is_kanji_to_highlight:
-                final_edge = cur_edge
-                kanji_to_highlight_passed = True
-                juku_word_pos_to_highlight = "left"
+                if is_kanji_to_highlight and wrapped_furigana:
+                    reverse_final_furigana = f"<b>{wrapped_furigana}</b>" + reverse_final_furigana
+                elif matched_furigana:
+                    reverse_final_furigana = wrapped_furigana + reverse_final_furigana
 
-            # The complex part is putting the furigana back together
-            # A bit more so now that we're going backwards
-            if is_last_kanji:
-                reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
-            elif is_middle_kanji and is_kanji_to_highlight:
-                # Same as before
-                reverse_final_middle_word = kanji + rep_kanji + reverse_final_middle_word
-            elif is_middle_kanji and not kanji_to_highlight_passed:
-                # Reversed to right word
-                reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
-            if is_middle_kanji and kanji_to_highlight_passed:
-                # Reversed to left word
-                reverse_final_left_word = kanji + rep_kanji + reverse_final_left_word
-            # Final kanji (at juku_word_start) should never be encountered here as we'll break out
-            # of the loop at latest on it due not finding a match
+                # Slice the furigana and word from the end to remove the part that was already processed
+                cur_furigana_section = cur_furigana_section[: -len(matched_furigana)]
+                # This is also the furigana to be eventually processed as jukujikun
+                juku_furigana = cur_furigana_section
+                logger.debug(
+                    f"wrapped_furigana: {wrapped_furigana}, matched_furigana: {matched_furigana},"
+                    f" cur_furigana_section: {cur_furigana_section}, cur_word: {cur_word}"
+                )
+                # If this was the kanji to highlight, this edge should be in the final_result as
+                # reconstructed furigana needs it
+                if is_kanji_to_highlight:
+                    final_edge = cur_edge
+                    kanji_to_highlight_passed = True
+                    juku_word_pos_to_highlight = "left"
 
-            if is_last_kanji or prev_kanji_is_repeater_and_last:
-                final_rest_kana = partial_result["rest_kana"]
-                final_okurigana = partial_result["okurigana"]
+                # The complex part is putting the furigana back together
+                # A bit more so now that we're going backwards
+                if is_last_kanji:
+                    reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
+                elif is_middle_kanji and is_kanji_to_highlight:
+                    # Same as before
+                    reverse_final_middle_word = kanji + rep_kanji + reverse_final_middle_word
+                elif is_middle_kanji and not kanji_to_highlight_passed:
+                    # Reversed to right word
+                    reverse_final_right_word = kanji + rep_kanji + reverse_final_right_word
+                if is_middle_kanji and kanji_to_highlight_passed:
+                    # Reversed to left word
+                    reverse_final_left_word = kanji + rep_kanji + reverse_final_left_word
+                # Final kanji (at juku_word_start) should never be encountered here as we'll break out
+                # of the loop at latest on it due not finding a match
+
+                if is_last_kanji or prev_kanji_is_repeater_and_last:
+                    final_rest_kana = partial_result["rest_kana"]
+                    final_okurigana = partial_result["okurigana"]
 
         logger.debug(
             f"reversing processed, juku_word_start: {juku_word_start}, juku_word_end:"
