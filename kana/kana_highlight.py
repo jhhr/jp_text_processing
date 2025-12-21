@@ -983,6 +983,8 @@ def check_onyomi_readings(
             if onyomi_reading == skip_reading:
                 skip_reading_found = True
                 logger.debug(f"check_onyomi_readings - skipping reading: {onyomi_reading}")
+            # We skip until we find the reading to skip, and the next reading will have
+            # skip_reading_found=True and won't be skipped
             continue
 
         furigana_is_katakana = word_data.get("furigana_is_katakana", False)
@@ -1120,7 +1122,7 @@ def check_kunyomi_readings(
             }
 
     kunyomi_readings = kunyomi.split("、")
-    skip_reading_found = False if skip_reading else True  # If no skip_reading, we start immediately
+    skip_reading_found = False
     stem_match_results: list[YomiMatchResult] = []
     kunyomi_stems: set[Tuple[str, str]] = set()
     kunyomi_stem_and_okuris: list[Tuple[str, str, str]] = []
@@ -1136,6 +1138,8 @@ def check_kunyomi_readings(
             if kunyomi_reading == skip_reading:
                 skip_reading_found = True
                 logger.debug(f"check_kunyomi_readings - skipping reading: {kunyomi_reading}")
+            # We skip until we find the reading to skip, and the next reading will have
+            # skip_reading_found=True and won't be skipped
             continue
 
         # Split the reading into the stem and the okurigana
