@@ -5,9 +5,9 @@ try:
 except ImportError:
     from ..all_types.main_types import PartOfSpeech
 try:
-    from regex.regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 except ImportError:
-    from ..regex.regex import RENDAKU_CONVERSION_DICT_HIRAGANA
+    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 try:
     from utils.logger import Logger
 except ImportError:

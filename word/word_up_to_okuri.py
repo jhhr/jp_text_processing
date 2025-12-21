@@ -3,11 +3,11 @@ import re
 from dataclasses import dataclass
 
 try:
-    from regex.regex import (
+    from regex.kanji_furi import (
         KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
     )
 except ImportError:
-    from ..regex.regex import (
+    from ..regex.kanji_furi import (
         KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
     )
 

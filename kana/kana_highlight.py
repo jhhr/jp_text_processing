@@ -56,28 +56,29 @@ except ImportError:
         get_conjugated_okuri_with_mecab,
     )
 try:
-    from regex.regex import (
+    from regex.kanji_furi import (
         KANJI_REC,
         DOUBLE_KANJI_REC,
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
         KATAKANA_REC,
-        ALL_MORA_REC,
-        RENDAKU_CONVERSION_DICT_HIRAGANA,
-        RENDAKU_CONVERSION_DICT_KATAKANA,
     )
 except ImportError:
-
-    from ..regex.regex import (
+    from ..regex.kanji_furi import (
         KANJI_REC,
         DOUBLE_KANJI_REC,
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
         KATAKANA_REC,
-        ALL_MORA_REC,
-        RENDAKU_CONVERSION_DICT_HIRAGANA,
-        RENDAKU_CONVERSION_DICT_KATAKANA,
     )
+try:
+    from regex.mora import ALL_MORA_REC
+except ImportError:
+    from ..regex.mora import ALL_MORA_REC
+try:
+    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
+except ImportError:
+    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
 try:
     from all_types.main_types import (
         WordData,
@@ -738,7 +739,7 @@ def process_jukujikun_reading(
     okurigana = ""
     rest_kana = maybe_okuri
     if process_okurigana:
-        # Go through each possible part_of_speec and check if the okurigana matches
+        # Go through each possible part_of_speech and check if the okurigana matches
         okuri_result = get_conjugated_okuri_with_mecab(
             kanji=highlight_args.get("full_word"),
             kanji_reading=highlight_args.get("full_furigana"),
