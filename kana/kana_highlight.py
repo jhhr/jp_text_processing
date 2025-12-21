@@ -2084,9 +2084,6 @@ def kana_highlight(
                 elif last_replaced_kanji_index is not None and index > last_replaced_kanji_index:
                     last_replaced_kanji_index = None
 
-                # is_last_kanji = index == len(full_word) - 1
-                # next_kanji = full_word[index + 1] if not is_last_kanji else ""
-
                 # Get all next characters that are numbers that ought to be processed as kanji
                 number_kanji = []
                 num_index = index
@@ -2321,7 +2318,6 @@ def kana_highlight(
             # and doesn't properly correspond to the original input. Also, we need to
             # replace the converted kanji in the final words with the original numbers.
             # If the full_word is ALL numbers (no kanji), we should always restore it.
-            # Otherwise, only restore if we've matched a significant portion (>= 50%).
             has_number_chars = any(c in NUMBER_TO_KANJI for c in full_word)
             if has_number_chars and cur_word:
                 # Check if full_word is entirely numbers
