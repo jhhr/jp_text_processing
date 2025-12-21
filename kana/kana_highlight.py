@@ -1868,7 +1868,11 @@ def kana_highlight(
             index: int,
             word: str,
             cur_edge: Edge,
-        ):
+        ) -> bool:
+            """
+            Function that processes a single kanji in a multi-kanji word.
+            :return: bool, True if processed successfully, False if needs to be handled as jukujikun
+            """
             nonlocal cur_furigana_section, cur_word, final_furigana, final_left_word
             nonlocal final_middle_word, final_right_word, final_edge, final_rest_kana
             nonlocal final_okurigana, juku_word_start, juku_word_end, juku_furigana
@@ -1904,7 +1908,7 @@ def kana_highlight(
                     f"Error in kana_highlight[]: main word loop, kanji '{kanji}' not found in"
                     " all_kanji_data"
                 )
-                return full_furigana + okurigana
+                return False
             is_kanji_to_highlight = kanji == kanji_to_highlight
             highlight_args = {
                 "kanji_to_highlight": kanji_to_highlight,
