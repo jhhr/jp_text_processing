@@ -1879,7 +1879,7 @@ def kana_highlight(
             is_first_kanji = index == 0
             is_last_kanji = index >= max(len(cur_word), len(word)) - 1
             next_kanji = word[index + 1] if index + 1 < len(word) else ""
-            next_kanji_is_repeater_and_last = index + 1 < len(word) and word[index + 1] == "々"
+            next_kanji_is_repeater = next_kanji == "々"
             is_middle_kanji = not is_first_kanji and not is_last_kanji
             if is_middle_kanji:
                 cur_edge = "middle"
@@ -1923,7 +1923,7 @@ def kana_highlight(
                 highlight_args,
                 cur_word,
                 cur_furigana_section,
-                okurigana if (is_last_kanji or next_kanji_is_repeater_and_last) else "",
+                okurigana if (is_last_kanji or next_kanji_is_repeater) else "",
                 with_tags_def=with_tags_def,
                 skip_reading_dict=skip_reading_dict,
                 logger=logger,
