@@ -297,6 +297,48 @@ def main():
         ),
     )
     test(
+        test_name="Should work for 4-kanji word",
+        kanji="漢",
+        sentence="漢字読解[かんじどっかい]",
+        expected_kana_only="<b>カン</b>ジドッカイ",
+        expected_furigana="<b> 漢[カン]</b> 字読解[ジドッカイ]",
+        expected_furikanji="<b> カン[漢]</b> ジドッカイ[字読解]",
+        expected_kana_only_with_tags_split="<b><on>カン</on></b><on>ジ</on><on>ドッ</on><on>カイ</on>",
+        expected_furigana_with_tags_split=(
+            "<b><on> 漢[カン]</on></b><on> 字[ジ]</on><on> 読[ドッ]</on><on> 解[カイ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> カン[漢]</on></b><on> ジ[字]</on><on> ドッ[読]</on><on> カイ[解]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<b><on>カン</on></b><on>ジドッカイ</on>",
+        expected_furigana_with_tags_merged="<b><on> 漢[カン]</on></b><on> 字読解[ジドッカイ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> カン[漢]</on></b><on> ジドッカイ[字読解]</on>",
+    )
+    test(
+        test_name="Should work for 5-kanji word",
+        kanji="報",
+        sentence="情報処理技術者[じょうほうしょりぎじゅつしゃ]",
+        expected_kana_only="ジョウ<b>ホウ</b>ショリギジュツシャ",
+        expected_furigana=" 情[ジョウ]<b> 報[ホウ]</b> 処理技術者[ショリギジュツシャ]",
+        expected_furikanji=" ジョウ[情]<b> ホウ[報]</b> ショリギジュツシャ[処理技術者]",
+        expected_kana_only_with_tags_split="<on>ジョウ</on><b><on>ホウ</on></b><on>ショ</on><on>リ</on><on>ギ</on><on>ジュツ</on><on>シャ</on>",
+        expected_furigana_with_tags_split=(
+            "<on> 情[ジョウ]</on><b><on> 報[ホウ]</on></b><on> 処[ショ]</on><on> 理[リ]</on>"
+            "<on> 技[ギ]</on><on> 術[ジュツ]</on><on> 者[シャ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ジョウ[情]</on><b><on> ホウ[報]</on></b><on> ショ[処]</on><on> リ[理]</on>"
+            "<on> ギ[技]</on><on> ジュツ[術]</on><on> シャ[者]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>ジョウ</on><b><on>ホウ</on></b><on>ショリギジュツシャ</on>",
+        expected_furigana_with_tags_merged=(
+            "<on> 情[ジョウ]</on><b><on> 報[ホウ]</on></b><on> 処理技術者[ショリギジュツシャ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ジョウ[情]</on><b><on> ホウ[報]</on></b><on> ショリギジュツシャ[処理技術者]</on>"
+        ),
+    )
+    test(
         test_name="Onyomi repeater word with no highlight",
         kanji="",
         sentence=" 愈々[いよいよ]",
