@@ -105,21 +105,19 @@ def main():
                 cur_test_num = test_count
 
                 # Highlight the diff between the expected and the result
-                def print_diff():
-                    print(f"""\033[91mTest {cur_test_num}: {test_name}
+                diff = f"""\033[91mTest {cur_test_num}: {test_name}
 Return type: {return_type}
-{'With tags' if with_tags_def.with_tags else ''}
-{'Tags merged' if with_tags_def.merge_consecutive else ''}
+{'No tags' if not with_tags_def.with_tags else ''}{'Tags split' if with_tags_def.with_tags and not with_tags_def.merge_consecutive else ''}{'Tags merged' if with_tags_def.with_tags and with_tags_def.merge_consecutive else ''}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
-\033[0m""")
+{expected == result and "\033[92m✓" or "\033[91m✗"}
+\033[0m"""
+                rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
 
                 # Store the first failed test with logging enabled to see what went wrong
                 def rerun():
-                    kana_highlight(
-                        kanji, sentence, return_type, with_tags_def, logger=Logger("debug")
-                    )
-                    print_diff()
+                    kana_highlight(*rerun_args)
+                    print(diff)
 
                 if rerun_test_with_debug is None:
                     rerun_test_with_debug = rerun
