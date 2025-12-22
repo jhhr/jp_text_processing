@@ -1,6 +1,4 @@
-import sys
-
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
@@ -15,101 +13,117 @@ except ImportError:
     from ..utils.logger import Logger
 
 
-def test(
-    test_name: str,
-    kanji: Optional[str],
-    sentence: str,
-    ignore_fail: bool = False,
-    onyomi_to_katakana: bool = True,
-    include_suru_okuri: bool = False,
-    debug: bool = False,
-    expected_furigana: Optional[str] = None,
-    expected_furigana_with_tags_split: Optional[str] = None,
-    expected_furigana_with_tags_merged: Optional[str] = None,
-    expected_furikanji: Optional[str] = None,
-    expected_furikanji_with_tags_split: Optional[str] = None,
-    expected_furikanji_with_tags_merged: Optional[str] = None,
-    expected_kana_only: Optional[str] = None,
-    expected_kana_only_with_tags_split: Optional[str] = None,
-    expected_kana_only_with_tags_merged: Optional[str] = None,
-):
-    """
-    Function that tests the kana_highlight function
-    """
-    cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
-        (
-            "furigana",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana,
-        ),
-        (
-            "furigana",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana_with_tags_split,
-        ),
-        (
-            "furigana",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana_with_tags_merged,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji_with_tags_split,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji_with_tags_merged,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only_with_tags_split,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only_with_tags_merged,
-        ),
-    ]
-    for return_type, with_tags_def, expected in cases:
-        if not expected:
-            continue
-        logger = Logger("debug") if debug else Logger("error")
-        result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
-        if debug:
-            print("\n\n")
-        try:
-            assert result == expected
-        except AssertionError:
-            if ignore_fail:
+def main():
+    failed_test_count: int = 0
+    test_count: int = 0
+    rerun_test_with_debug: Optional[Callable] = None
+
+    def test(
+        test_name: str,
+        kanji: Optional[str],
+        sentence: str,
+        ignore_fail: bool = False,
+        onyomi_to_katakana: bool = True,
+        include_suru_okuri: bool = False,
+        debug: bool = False,
+        expected_furigana: Optional[str] = None,
+        expected_furigana_with_tags_split: Optional[str] = None,
+        expected_furigana_with_tags_merged: Optional[str] = None,
+        expected_furikanji: Optional[str] = None,
+        expected_furikanji_with_tags_split: Optional[str] = None,
+        expected_furikanji_with_tags_merged: Optional[str] = None,
+        expected_kana_only: Optional[str] = None,
+        expected_kana_only_with_tags_split: Optional[str] = None,
+        expected_kana_only_with_tags_merged: Optional[str] = None,
+    ):
+        """
+        Function that tests the kana_highlight function
+        """
+        cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
+            (
+                "furigana",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana,
+            ),
+            (
+                "furigana",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana_with_tags_split,
+            ),
+            (
+                "furigana",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana_with_tags_merged,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji_with_tags_split,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji_with_tags_merged,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only_with_tags_split,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only_with_tags_merged,
+            ),
+        ]
+        for return_type, with_tags_def, expected in cases:
+            if not expected:
                 continue
-            # Re-run with logging enabled to see what went wrong
-            kana_highlight(kanji, sentence, return_type, with_tags_def, logger=Logger("debug"))
-            # Highlight the diff between the expected and the result
-            print(f"""\033[91m{test_name}
+            logger = Logger("debug") if debug else Logger("error")
+            result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
+            if debug:
+                print("\n\n")
+            try:
+                nonlocal test_count
+                test_count += 1
+                assert result == expected
+            except AssertionError:
+                if ignore_fail:
+                    continue
+                nonlocal rerun_test_with_debug, failed_test_count
+                failed_test_count += 1
+                cur_test_num = test_count
+
+                # Highlight the diff between the expected and the result
+                def print_diff():
+                    print(f"""\033[91mTest {cur_test_num}: {test_name}
 Return type: {return_type}
 {'With tags' if with_tags_def.with_tags else ''}
 {'Tags merged' if with_tags_def.merge_consecutive else ''}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
 \033[0m""")
-            # Stop testing here
-            sys.exit(0)
 
+                # Store the first failed test with logging enabled to see what went wrong
+                def rerun():
+                    kana_highlight(
+                        kanji, sentence, return_type, with_tags_def, logger=Logger("debug")
+                    )
+                    print_diff()
 
-def main():
+                if rerun_test_with_debug is None:
+                    rerun_test_with_debug = rerun
+
     test(
         test_name="Should not crash with no kanji_to_highlight",
         kanji=None,
@@ -3266,7 +3280,13 @@ def main():
         expected_furigana_with_tags_merged="<on> 勉強[べんきょう]</on>できるかい？",
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
-    print("\n\033[92mTests passed\033[0m")
+    if failed_test_count == 0:
+        print(f"\n\033[92m all {test_count}Tests passed\033[0m")
+    else:
+        print(f"\n\033[91m{failed_test_count}/{test_count} tests failed\033[0m")
+    if rerun_test_with_debug is not None:
+        print("\nDebug log for first failed test shown below.\n")
+        rerun_test_with_debug()
 
 
 if __name__ == "__main__":
