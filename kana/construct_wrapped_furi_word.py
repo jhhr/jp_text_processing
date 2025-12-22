@@ -7,6 +7,11 @@ try:
 except ImportError:
     from ..utils.logger import Logger  # type: ignore[no-redef]
 
+try:
+    from kanji.number_to_kanji import number_to_kanji
+except ImportError:
+    from ..kanji.number_to_kanji import number_to_kanji  # type: ignore[no-redef]
+
 TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
 
 IS_NUMBER_RE = re.compile(r"^[0-9０-９]+$")
@@ -61,42 +66,114 @@ def match_tags_with_kanji(
     logger.debug(f"match_tags_with_kanji - word: {word}, tag_order: {tag_order}")
     kanji_tags = []
     kanji_index = 0
-    prev_was_number = False
-    for i, cur_tag in enumerate(tag_order):
+    tag_index = 0
+    loop_count = 0
+    max_loops = len(word) * len(tag_order) + 10  # Safety limit
+    while tag_index < len(tag_order):
+        loop_count += 1
+        if loop_count > max_loops:
+            logger.debug(
+                f"match_tags_with_kanji - infinite loop detected! word={word},"
+                f" tag_order={tag_order}, kanji_index={kanji_index}, tag_index={tag_index}"
+            )
+            break
+        cur_tag = tag_order[tag_index]
         tag, highlight, kana, _ = cur_tag
         if kanji_index < len(word):
             cur_kanji = word[kanji_index]
             next_kanji = word[kanji_index + 1] if kanji_index + 1 < len(word) else None
-            # if Merge any consecutive numbers together, there's no way to make splitting them
-            # work in all cases
+            # Merge any consecutive numbers into a single logical unit, consuming tags based on
+            # how many kanji the number converts to (e.g., "３０" → "三十" = 2 kanji = 2 tags).
+            # For numbers with mixed tags (kun+on), keep them as separate results so kana_only
+            # mode can output them separately.
             if IS_NUMBER_RE.match(cur_kanji):
-                if not prev_was_number:
-                    prev_was_number = True
-                    # Numbers will also merge their kana
-                    kanji_tags.append(WrapMatchResult(cur_kanji, tag, highlight, kana, True))
+                number_start = kanji_index
+                while kanji_index < len(word) and IS_NUMBER_RE.match(word[kanji_index]):
                     kanji_index += 1
-                elif prev_was_number:
-                    # If the previous kanji was a number, we merge it with the current one
-                    prev_kanji, prev_tag, _, prev_kana, is_num = kanji_tags[-1]
-                    # If tags, match merge them
-                    if prev_tag == tag:
-                        kanji_tags[-1] = WrapMatchResult(
-                            prev_kanji + cur_kanji, tag, highlight, prev_kana + kana, True
-                        )
-                    else:
-                        # Else, add separately
-                        kanji_tags.append(WrapMatchResult(cur_kanji, tag, highlight, kana, True))
-                    kanji_index += 1
+                number_str = word[number_start:kanji_index]
+                # Convert to kanji to determine how many tags we need to consume
+                kanji_number = number_to_kanji(number_str, logger)
+                tags_to_consume = len(kanji_number)
+                # Check if all tags are the same type
+                all_same_tag = True
+                for i in range(1, tags_to_consume):
+                    if tag_index + i < len(tag_order):
+                        next_tag = tag_order[tag_index + i]
+                        if next_tag.tag != tag:
+                            all_same_tag = False
+                            break
+
+                if all_same_tag:
+                    # All tags are the same, accumulate kana and create single result
+                    accumulated_kana = kana
+                    for i in range(1, tags_to_consume):
+                        if tag_index + i < len(tag_order):
+                            next_tag = tag_order[tag_index + i]
+                            accumulated_kana += next_tag.contents
+                    kanji_tags.append(
+                        WrapMatchResult(number_str, tag, highlight, accumulated_kana, True)
+                    )
+                    tag_index += tags_to_consume
+                else:
+                    # Mixed tags - create separate results for each kanji in the converted number
+                    # so they can be handled differently in kana_only vs furikanji modes
+                    for i, kanji_char in enumerate(kanji_number):
+                        if tag_index < len(tag_order):
+                            cur_num_tag = tag_order[tag_index]
+                            # For the first kanji, use the full number str; for others use empty
+                            # (they'll get merged in furikanji mode but split in kana_only)
+                            if i == 0:
+                                kanji_tags.append(
+                                    WrapMatchResult(
+                                        number_str,
+                                        cur_num_tag.tag,
+                                        cur_num_tag.highlight,
+                                        cur_num_tag.contents,
+                                        True,
+                                    )
+                                )
+                            else:
+                                kanji_tags.append(
+                                    WrapMatchResult(
+                                        "",  # Empty kanji for subsequent parts
+                                        cur_num_tag.tag,
+                                        cur_num_tag.highlight,
+                                        cur_num_tag.contents,
+                                        True,
+                                    )
+                                )
+                            tag_index += 1
             elif next_kanji and (next_kanji == cur_kanji or next_kanji == "々"):
-                prev_was_number = False
-                # if the next kanji is the same as the current one, or it's a repetition marker
-                kanji_tags.append(
-                    WrapMatchResult(cur_kanji + next_kanji, tag, highlight, kana, False)
-                )
-                kanji_index += 2
+                # Only merge with the next tag when it matches the same tag type; otherwise keep
+                # separate so adjacent repeater groups with different readings don't collapse.
+                next_tag = tag_order[tag_index + 1] if tag_index + 1 < len(tag_order) else None
+                if next_tag and next_tag.tag == tag:
+                    combined_kana = kana + next_tag.contents
+                    kanji_tags.append(
+                        WrapMatchResult(
+                            cur_kanji + next_kanji, tag, highlight, combined_kana, False
+                        )
+                    )
+                    kanji_index += 2
+                    tag_index += 2  # Skip the next tag since we combined it
+                else:
+                    kanji_tags.append(
+                        WrapMatchResult(word[kanji_index], tag, highlight, kana, False)
+                    )
+                    kanji_index += 1
+                    tag_index += 1
             else:
                 kanji_tags.append(WrapMatchResult(word[kanji_index], tag, highlight, kana, False))
                 kanji_index += 1
+                tag_index += 1
+        else:
+            # Ran out of kanji but still have tags - this shouldn't happen in normal cases
+            # Just skip remaining tags to avoid infinite loop
+            logger.debug(
+                f"match_tags_with_kanji - ran out of kanji at tag_index={tag_index}, word={word},"
+                f" tag_order={tag_order}"
+            )
+            break
 
     return kanji_tags
 
@@ -132,20 +209,46 @@ def construct_wrapped_furi_word(
                 and next_tag_res.tag == cur_tag_res.tag
                 and next_tag_res.highlight == cur_tag_res.highlight
             ):
-                logger.debug(f"Merging consecutive tags: {cur_tag_res}, {next_tag_res}")
-                is_num = cur_tag_res.is_num and next_tag_res.is_num
-                tag = cur_tag_res.tag
-                highlight = cur_tag_res.highlight
-                do_merge = True
+                # Do not merge when switching between number blocks and regular kanji if the
+                # highlight differs (keep boundaries for targeted bolding). Otherwise allow
+                # merging so unhighlighted numeric+counter pairs combine.
+                if cur_tag_res.is_num != next_tag_res.is_num and (
+                    cur_tag_res.highlight or next_tag_res.highlight
+                ):
+                    do_merge = False
+                else:
+                    logger.debug(f"Merging consecutive tags: {cur_tag_res}, {next_tag_res}")
+                    is_num = cur_tag_res.is_num and next_tag_res.is_num
+                    tag = cur_tag_res.tag
+                    highlight = cur_tag_res.highlight
+                    do_merge = True
             elif return_type != "kana_only" and next_tag_res.is_num and cur_tag_res.is_num:
+                # Merge consecutive numeric digits in furikanji/furigana mode
+                # Always use <mix> for multi-part numbers to indicate they're composite
                 logger.debug(f"Merging consecutive numbers: {cur_tag_res}, {next_tag_res}")
                 do_merge = True
                 highlight = cur_tag_res.highlight
                 is_num = True
-                if next_tag_res.tag == cur_tag_res.tag:
+                tag = "mix"
+            elif (
+                merge_consecutive
+                and return_type == "furikanji"
+                and cur_tag_res.is_num
+                and not next_tag_res.is_num
+            ):
+                # In furikanji mode with merge_consecutive=True and number+counter:
+                # merge them together if same tag, keep separate if mixed tags
+                peek_next = kanji_tags[index + 2] if index + 2 < len(kanji_tags) else None
+                if not peek_next and next_tag_res.tag == cur_tag_res.tag:
+                    # Last item and same tag, merge
+                    logger.debug(
+                        f"Merging number with counter (same tag): {cur_tag_res}, {next_tag_res}"
+                    )
+                    do_merge = True
+                    is_num = False  # Result is number+counter, not pure number
                     tag = cur_tag_res.tag
-                else:
-                    tag = "mix"
+                    highlight = cur_tag_res.highlight
+                # Otherwise keep them separate (will create <mix> for number, separate tag for counter)
             if do_merge:
                 cur_tag_res = WrapMatchResult(
                     cur_tag_res.kanji + next_tag_res.kanji,
@@ -163,16 +266,31 @@ def construct_wrapped_furi_word(
         logger.debug(
             f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}, is_num: {is_num},"
         )
+
+        # For multi-kanji numbers (3+ kanji) in furikanji/furigana modes, use <mix> tag
+        if is_num and return_type != "kana_only" and tag != "mix" and IS_NUMBER_RE.match(kanji):
+            kanji_number = number_to_kanji(kanji, logger)
+            if len(kanji_number) >= 3:
+                tag = "mix"
+
         if return_type == "furikanji":
+            # Skip empty kanji in furikanji mode (they've been merged)
+            if not kanji:
+                index += 1
+                continue
             with_furi = f"<{tag}> {kana}[{kanji}]</{tag}>"
             if highlight:
                 with_furi = f"<{highlight}>{with_furi}</{highlight}>"
         elif return_type == "furigana":
+            # Skip empty kanji in furigana mode (they've been merged)
+            if not kanji:
+                index += 1
+                continue
             with_furi = f"<{tag}> {kanji}[{kana}]</{tag}>"
             if highlight:
                 with_furi = f"<{highlight}>{with_furi}</{highlight}>"
         else:
-            # kana_only is used as the default if the return type is invalid
+            # kana_only: output kana even for empty kanji entries
             with_furi = f"<{tag}>{kana}</{tag}>"
             if highlight:
                 with_furi = f"<{highlight}>{with_furi}</{highlight}>"

@@ -1632,15 +1632,15 @@ Return type: {return_type}
         test_name="jukujikun test 清々しい with highlight",
         kanji="清",
         sentence="清清[すがすが]しい",
-        expected_kana_only="<b>すがすが</b>しい",
-        expected_furigana="<b> 清々[すがすが]</b>しい",
-        expected_furikanji="<b> すがすが[清々]</b>しい",
-        expected_kana_only_with_tags_split="<b><juk>すがすが</juk></b><oku>しい</oku>",
-        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
-        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
-        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk></b><oku>しい</oku>",
-        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
-        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
+        expected_kana_only="<b>すがすがしい</b>",
+        expected_furigana="<b> 清々[すがすが]しい</b>",
+        expected_furikanji="<b> すがすが[清々]しい</b>",
+        expected_kana_only_with_tags_split="<b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk><oku>しい</oku></b>",
+        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk><oku>しい</oku></b>",
+        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk><oku>しい</oku></b>",
+        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk><oku>しい</oku></b>",
     )
     test(
         test_name="jukujikun test 清々しい with another word at left - no highlight",
@@ -1649,26 +1649,34 @@ Return type: {return_type}
         expected_kana_only="チョウすがすがしい",
         expected_furigana=" 趙清々[チョウすがすが]しい",
         expected_furikanji=" チョウすがすが[趙清々]しい",
-        expected_kana_only_with_tags_split="<on>チョウ</on><juk>すがすが</juk>しい",
-        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
-        expected_kana_only_with_tags_merged="<on>チョウ</on><juk>すがすが</juk>しい",
-        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
+        expected_kana_only_with_tags_split="<on>チョウ</on><juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><juk> すがすが[清々]</juk><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<on>チョウ</on><juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><juk> すがすが[清々]</juk><oku>しい</oku>",
     )
     test(
         test_name="jukujikun test 清々しい with another word at left - with highlight",
         kanji="清",
         sentence="趙清々[ちょうすがすが]しい",
-        expected_kana_only="チョウ<b>すがすが</b>しい",
-        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]</b>しい",
-        expected_furikanji=" チョウ[趙]<b> すがすが[清々]</b>しい",
-        expected_kana_only_with_tags_split="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
-        expected_kana_only_with_tags_merged="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
+        expected_kana_only="チョウ<b>すがすがしい</b>",
+        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]しい</b>",
+        expected_furikanji=" チョウ[趙]<b> すがすが[清々]しい</b>",
+        expected_kana_only_with_tags_split="<on>チョウ</on><b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_split=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk><oku>しい</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged="<on>チョウ</on><b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk><oku>しい</oku></b>"
+        ),
     )
     test(
         test_name="jukujikun test 清々しい in middle of two words - no highlight",
@@ -3076,7 +3084,7 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="為る conjugations /!",
+        test_name="為る conjugations /1",
         kanji="",
         sentence="為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",
         expected_kana_only_with_tags_split=(
@@ -3279,7 +3287,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
     if failed_test_count == 0:
-        print(f"\n\033[92m all {test_count}Tests passed\033[0m")
+        print(f"\n\033[92m All {test_count} tests passed\033[0m")
     else:
         print(f"\n\033[91m{failed_test_count}/{test_count} tests failed\033[0m")
     if rerun_test_with_debug is not None:

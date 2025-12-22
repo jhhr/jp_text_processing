@@ -117,6 +117,7 @@ class FinalResult(TypedDict):
     :param right_word
     :param edge
     :param match_type
+    :param was_katakana: Whether the original furigana was in katakana
     """
 
     furigana: str
@@ -127,6 +128,7 @@ class FinalResult(TypedDict):
     right_word: str
     edge: Edge
     match_type: MatchType
+    was_katakana: NotRequired[bool]
 
 
 class FuriganaParts(TypedDict):
@@ -204,3 +206,50 @@ class OkuriResults(NamedTuple):
     rest_kana: str
     result: OkuriType
     part_of_speech: Optional[PartOfSpeech] = None
+
+
+ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change"]
+
+
+class ReadingMatchInfo(TypedDict):
+    """
+    Information about a successful reading match for a kanji.
+
+    :param reading: The actual reading that matched (may include rendaku/small tsu variations)
+    :param dict_form: The dictionary form reading (for kunyomi, includes okurigana marker like "か.く")
+    :param match_type: Type of match (onyomi, kunyomi, or jukujikun if unmatched)
+    :param reading_variant: How the reading was modified (plain, rendaku, small_tsu, etc.)
+    :param matched_mora: The mora string that was matched from the furigana
+    :param kanji: The kanji character this match is for
+    :param okurigana: Extracted okurigana (only for last kanji when is_last_kanji=True)
+    :param rest_kana: Remaining kana after okurigana extraction
+    """
+
+    reading: str
+    dict_form: str
+    match_type: MatchType
+    reading_variant: ReadingType
+    matched_mora: str
+    kanji: str
+    okurigana: str
+    rest_kana: str
+
+
+class MoraAlignment(TypedDict):
+    """
+    Result of aligning mora to kanji in a word.
+
+    :param kanji_matches: List of ReadingMatchInfo for each kanji (None if jukujikun/unmatched)
+    :param mora_split: The actual mora split used (list of mora sublists, one per kanji)
+    :param jukujikun_positions: List of indices where no reading matched (jukujikun positions)
+    :param is_complete: True if all kanji matched a reading (no jukujikun positions)
+    :param final_okurigana: Okurigana extracted from last kanji (if any)
+    :param final_rest_kana: Remaining kana after okurigana extraction
+    """
+
+    kanji_matches: list[Optional[ReadingMatchInfo]]
+    mora_split: list[list[str]]
+    jukujikun_positions: list[int]
+    is_complete: bool
+    final_okurigana: str
+    final_rest_kana: str
