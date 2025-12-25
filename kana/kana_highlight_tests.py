@@ -1,4 +1,5 @@
 import sys
+import time
 
 from typing import Optional, Tuple
 
@@ -110,6 +111,7 @@ Return type: {return_type}
 
 
 def main():
+    start_time = time.time()
     test(
         test_name="Should not crash with no kanji_to_highlight",
         kanji=None,
@@ -3124,6 +3126,9 @@ def main():
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
     print("\n\033[92mTests passed\033[0m")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Tests completed in {elapsed_time:.2f} seconds.")
 
 
 if __name__ == "__main__":
