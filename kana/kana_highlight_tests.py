@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Callable
+import time
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
@@ -122,6 +123,7 @@ Return type: {return_type}
                 if rerun_test_with_debug is None:
                     rerun_test_with_debug = rerun
 
+    start_time = time.time()
     test(
         test_name="Should not crash with no kanji_to_highlight",
         kanji=None,
@@ -3290,6 +3292,9 @@ Return type: {return_type}
         print(f"\n\033[92m All {test_count} tests passed\033[0m")
     else:
         print(f"\n\033[91m{failed_test_count}/{test_count} tests failed\033[0m")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Tests completed in {elapsed_time:.2f} seconds.")
     if rerun_test_with_debug is not None:
         print("\nDebug log for first failed test shown below.\n")
         rerun_test_with_debug()
