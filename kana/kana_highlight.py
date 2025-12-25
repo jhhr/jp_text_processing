@@ -19,6 +19,7 @@ try:
     from kanji.number_to_kanji import number_to_kanji
 except ImportError:
     from ..kanji.number_to_kanji import number_to_kanji
+try:
     from okuri.okurigana_dict import (
         get_verb_noun_form_okuri,
     )
@@ -64,11 +65,11 @@ try:
         HighlightArgs,
         Edge,
         WithTagsDef,
-        FuriganaParts,
         YomiMatchResult,
         FinalResult,
         MoraAlignment,
         ReadingType,
+        WrapMatchEntry,
     )
 except ImportError:
     from ..all_types.main_types import (
@@ -76,7 +77,6 @@ except ImportError:
         HighlightArgs,
         Edge,
         WithTagsDef,
-        FuriganaParts,
         YomiMatchResult,
         FinalResult,
         MoraAlignment,
@@ -204,56 +204,6 @@ REPLACED_FURIGANA_RIGHT_RE = re.compile(r"^(.+)<b>(.+)</b>$")
 REPLACED_FURIGANA_LEFT_RE = re.compile(r"^<b>(.+)</b>(.+)$")
 
 
-def get_furigana_parts(
-    furigana: str,
-    edge: Edge,
-    logger: Logger = Logger("error"),
-) -> FuriganaParts:
-    logger.debug(f"get_furigana_parts - furigana: {furigana}, edge: {edge}")
-    result: FuriganaParts = {
-        "has_highlight": "<b>" in furigana,
-        "left_furigana": None,
-        "middle_furigana": None,
-        "right_furigana": None,
-        "matched_edge": edge,
-    }
-    if edge == "whole":
-        return result
-    if match := REPLACED_FURIGANA_MIDDLE_RE.match(furigana):
-        logger.debug(
-            f"get_furigana_parts - middle match: {match.groups()}, edge was correct:"
-            f" {edge == 'middle'}"
-        )
-        result["left_furigana"] = match.group(1)
-        result["middle_furigana"] = match.group(2)
-        result["right_furigana"] = match.group(3)
-        result["matched_edge"] = "middle"
-        return result
-    elif match := REPLACED_FURIGANA_RIGHT_RE.match(furigana):
-        logger.debug(
-            f"get_furigana_parts - right match: {match.groups()}, edge was correct:"
-            f" {edge == 'right'}"
-        )
-        result["left_furigana"] = match.group(1)
-        result["middle_furigana"] = None
-        result["right_furigana"] = match.group(2)
-        result["matched_edge"] = "right"
-        return result
-    elif match := REPLACED_FURIGANA_LEFT_RE.match(furigana):
-        logger.debug(
-            f"get_furigana_parts - left match: {match.groups()}, edge was correct: {edge == 'left'}"
-        )
-        result["left_furigana"] = match.group(1)
-        result["middle_furigana"] = None
-        result["right_furigana"] = match.group(2)
-        result["matched_edge"] = "left"
-        return result
-
-    # Nothing matched
-    logger.debug("\nget_furigana_parts - no match")
-    return result
-
-
 def apply_katakana_conversion(text: str, preserve_tags: bool = True) -> str:
     """
     Convert hiragana content to katakana, optionally preserving XML-style tags.
@@ -302,202 +252,109 @@ def reconstruct_furigana(
         f" {reconstruct_type}, wrap_with_tags: {with_tags_def.with_tags}, merge_consecutive:"
         f" {with_tags_def.merge_consecutive}"
     )
-    furigana = furi_okuri_result.get("furigana", "")
+    segments = furi_okuri_result.get("segments", [])
+    highlight_idx = furi_okuri_result.get("highlight_segment_index")
+    match_type = furi_okuri_result.get("match_type", "none")
     okurigana = furi_okuri_result.get("okurigana", "")
     rest_kana = furi_okuri_result.get("rest_kana", "")
-    left_word = furi_okuri_result.get("left_word", "")
-    middle_word = furi_okuri_result.get("middle_word", "")
-    right_word = furi_okuri_result.get("right_word", "")
-    edge = furi_okuri_result.get("edge")
-    match_type = furi_okuri_result.get("match_type", "none")
-    # For backwards compatibility, also check highlight_match_type
-    highlight_match_type = furi_okuri_result.get("highlight_match_type", match_type)
+    word = furi_okuri_result.get("word", "")
 
     # Keep okuri out of the highlight if it is not supposed to be included
     okuri_out_of_highlight = (
         not with_tags_def.include_suru_okuri
-        and highlight_match_type == "onyomi"
-        and (len(f"{left_word}{middle_word}{right_word}") > 1 or okurigana == "する")
+        and match_type == "onyomi"
+        and (len(word) > 1 or okurigana == "する")
     )
-    if not edge:
-        raise ValueError("reconstruct_furigana: edge missing in final_result")
+    logger.debug(
+        f"reconstruct_furigana - okuri_out_of_highlight: {okuri_out_of_highlight},"
+        f" include_suru_okuri: {with_tags_def.include_suru_okuri}, is onyomi match_type:"
+        f" {match_type == 'onyomi'}, word length: {len(word)}, okurigana is suru:"
+        f" {okurigana == 'する'}"
+    )
 
-    furigana_parts = get_furigana_parts(furigana, edge, logger=logger)
-    logger.debug(f"reconstruct_furigana edge: {edge}, furigana_parts: {furigana_parts}")
+    if okurigana and with_tags_def.with_tags:
+        okurigana = f"<oku>{okurigana}</oku>"
 
-    has_highlight = furigana_parts.get("has_highlight")
-    left_furigana = furigana_parts.get("left_furigana")
-    middle_furigana = furigana_parts.get("middle_furigana")
-    right_furigana = furigana_parts.get("right_furigana")
-    edge = furigana_parts.get("matched_edge")
+    def render_segment(segment: list[WrapMatchEntry], merge_override: bool = False) -> str:
+        # No tags, just return simple format
+        if not with_tags_def.with_tags:
+            segment_word = "".join([entry["kanji"] for entry in segment if entry["kanji"]])
+            segment_furi = "".join([entry["furigana"] for entry in segment])
+            if reconstruct_type == "kana_only":
+                return segment_furi
+            # Sanity check, can't make furigana/furikanji without the word (kanji)
+            if not segment_word:
+                return ""
+            if reconstruct_type == "furikanji":
+                return f" {segment_furi}[{segment_word}]"
+            # furigana type
+            return f" {segment_word}[{segment_furi}]"
 
-    if not has_highlight:
-        logger.debug("\nreconstruct_furigana - no highlight")
-        # There was no match found during onyomi and kunyomi processing, so no<b> tags
-        # For kana_only mode without merge_consecutive, we need to check if we have repeater kanji
-        # that need to be processed by construct_wrapped_furi_word
-        if reconstruct_type == "kana_only" and not with_tags_def.merge_consecutive:
-            # Check if we have tags AND repeater kanji (々) - if so, we need to call construct_wrapped_furi_word
-            # to properly combine the repeater pairs
-            has_tags_in_furigana = "<" in furigana and ">" in furigana
-            has_repeater = "々" in f"{left_word}{middle_word}{right_word}"
-            if not (has_tags_in_furigana and has_repeater):
-                # No tags or no repeater kanji, so we can just return the furigana as-is
-                if with_tags_def.with_tags:
-                    okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
-                return f"{furigana}{okurigana}{rest_kana}"
-        if with_tags_def.with_tags:
-            # we need to extract the wrap tags from the furigana and include the word and
-            # furigana within them. All words will need to be split into separate furigana
-            # sections
-            if edge == "whole":
-                whole_word = f"{left_word}{middle_word}{right_word}"
-                wrapped_whole_word = construct_wrapped_furi_word(
-                    whole_word, furigana, reconstruct_type, with_tags_def.merge_consecutive
-                )
-            elif force_merge:
-                if with_tags_def.with_tags:
-                    okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
-                if reconstruct_type == "kana_only":
-                    if not with_tags_def.with_tags:
-                        furigana = re.sub(r"<\w+>|</\w+>", "", furigana)
-                    # If we're in kana_only mode, we just return the furigana
-                    wrapped_whole_word = f"{furigana}{okurigana}{rest_kana}"
-                else:
-                    # Just merge the whole word with the furigana
-                    # remove all tags from furigana and wrap everything with <mix> tags
-                    furigana = re.sub(r"<\w+>|</\w+>", "", furigana)
-                    whole_word = f"{left_word}{middle_word}{right_word}"
-                    if with_tags_def.with_tags:
-                        if reconstruct_type == "furigana":
-                            wrapped_whole_word = f"<mix> {whole_word}[{furigana}]</mix>"
-                        elif reconstruct_type == "furikanji":
-                            wrapped_whole_word = f"<mix> {furigana}[{whole_word}]</mix>"
-                    else:
-                        if reconstruct_type == "furigana":
-                            wrapped_whole_word = f" {whole_word}[{furigana}]"
-                        elif reconstruct_type == "furikanji":
-                            wrapped_whole_word = f" {furigana}[{whole_word}]"
-                    wrapped_whole_word += okurigana + rest_kana
-            else:
-                wrapped_whole_word = ""
-                for word, word_furigana in [
-                    (left_word, left_furigana),
-                    (middle_word, middle_furigana),
-                    (right_word, right_furigana),
-                ]:
-                    if word and word_furigana:
-                        wrapped_word = construct_wrapped_furi_word(
-                            word, word_furigana, reconstruct_type, with_tags_def.merge_consecutive
-                        )
-                        wrapped_whole_word += wrapped_word
+        # With tags, needs more complex processing
+        merge_flag = with_tags_def.merge_consecutive or force_merge or merge_override
+        return construct_wrapped_furi_word(
+            segment,
+            reconstruct_type,
+            merge_flag,
+            with_tags_def.with_tags,
+            apply_highlight=False,
+            logger=logger,
+        )
 
+    rendered_segments: list[str] = []
+    merge_all = not with_tags_def.with_tags
+    for segment in segments:
+        rendered = render_segment(segment, merge_override=merge_all)
+        rendered_segments.append(rendered)
+
+    highlight_segment = None
+    if highlight_idx is not None and 0 <= highlight_idx < len(rendered_segments):
+        highlight_segment = rendered_segments[highlight_idx]
+        logger.debug(
+            f"reconstruct_furigana - highlight segment in index {highlight_idx}:"
+            f" {highlight_segment}"
+        )
+    logger.debug(
+        "reconstruct_furigana - rendered segments before okurigana/rest kana handling:"
+        f" {rendered_segments}, okurigana: {okurigana}, rest_kana: {rest_kana}"
+    )
+    if rendered_segments and okurigana:
+        # Append okurigana to the last segment if it exists, also handling highlight
+        last_segment = rendered_segments[-1]
+        if last_segment != highlight_segment:
+            # No highlight in last segment, just add okurigana
+            rendered_segments[-1] = f"{rendered_segments[-1]}{okurigana}"
+            # Handle highlight segment if it exists
+            if highlight_segment is not None:
+                rendered_segments[highlight_idx] = f"<b>{highlight_segment}</b>"
             logger.debug(
-                f"reconstruct_furigana - whole_word: {left_word}{middle_word}{right_word},"
-                f" furigana: {furigana}, wrapped_whole_word: {wrapped_whole_word}, okurigana:"
-                f" {okurigana}, rest_kana: {rest_kana}"
+                "reconstruct_furigana - no highlight in last segment, appended okurigana:"
+                f" {rendered_segments[-1]}"
             )
-
-            okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
-            return f"{wrapped_whole_word}{okurigana}{rest_kana}"
-
-        # No tags case - apply katakana conversion if needed
-        if reconstruct_type == "furikanji":
-            return f" {furigana}[{left_word}{middle_word}{right_word}]{okurigana}{rest_kana}"
-        return f" {left_word}{middle_word}{right_word}[{furigana}]{okurigana}{rest_kana}"
-
-    if edge == "whole":
-        logger.debug(
-            f"reconstruct_furigana highlight whole word - before processing: edge: {edge},"
-            f" okuri_out_of_highlight: {okuri_out_of_highlight}, okurigana: {okurigana}, rest_kana:"
-            f" {rest_kana}"
-        )
-        # Same as above except we add the<b> tags around the whole thing
-        # First remove<b> tags from the furigana
-        furigana = re.sub(r"<b>|</b>", "", furigana)
-        whole_word = f"{left_word}{middle_word}{right_word}"
-        if with_tags_def.with_tags:
-            wrapped_word = construct_wrapped_furi_word(
-                whole_word, furigana, reconstruct_type, with_tags_def.merge_consecutive
+        elif not okuri_out_of_highlight:
+            # Highlight segment is last and okurigana should be inside it
+            rendered_segments[-1] = f"<b>{rendered_segments[-1]}{okurigana}</b>"
+            logger.debug(
+                "reconstruct_furigana - highlight in last segment, included okurigana:"
+                f" {rendered_segments[-1]}"
             )
-            okurigana = f"<oku>{okurigana}</oku>" if okurigana else ""
-            if okuri_out_of_highlight:
-                return f"<b>{wrapped_word}</b>{okurigana}{rest_kana}"
-            return f"<b>{wrapped_word}{okurigana}</b>{rest_kana}"
+        elif okuri_out_of_highlight:
+            # Highlight segment is last but okurigana should be outside it
+            rendered_segments[-1] = f"<b>{rendered_segments[-1]}</b>{okurigana}"
+            logger.debug(
+                "reconstruct_furigana - highlight in last segment, okurigana outside highlight:"
+                f" {rendered_segments[-1]}"
+            )
+    elif okurigana:
+        logger.debug("reconstruct_furigana - no segments but okurigana exists, adding okurigana")
+        rendered_segments.append(okurigana)
+    else:
+        logger.debug("reconstruct_furigana - no okurigana to handle, adding highlight if needed")
+        if highlight_segment is not None:
+            rendered_segments[highlight_idx] = f"<b>{highlight_segment}</b>"
 
-        if okuri_out_of_highlight:
-            rest_kana = f"{okurigana}{rest_kana}"
-            okurigana = ""
-        if reconstruct_type == "kana_only":
-            return f"<b>{furigana}{okurigana}</b>{rest_kana}"
-        if reconstruct_type == "furikanji":
-            return f"<b> {furigana}[{whole_word}]{okurigana}</b>{rest_kana}"
-        return f"<b> {whole_word}[{furigana}]{okurigana}</b>{rest_kana}"
+    result = "".join(rendered_segments)
 
-    # There is highlighting, split the furigana and word into three parts and assemble them
-    result = ""
-    parts = [
-        # The furigana and word parts should match exactly;
-        # when one is missing so is the other
-        (left_word, left_furigana, "left"),
-        (middle_word, middle_furigana, "middle"),
-        (right_word, right_furigana, "right"),
-    ]
-    logger.debug(
-        f"reconstruct_furigana with highlight in parts - before processing: {parts}, edge: {edge},"
-        f" okuri_out_of_highlight: {okuri_out_of_highlight}, okurigana: {okurigana}, rest_kana:"
-        f" {rest_kana}"
-    )
-    for word, word_furigana, word_edge in parts:
-        logger.debug(
-            f"reconstruct_furigana - word: {word}, word_furigana: {word_furigana},"
-            f" word_edge: {word_edge}"
-        )
-        if word and word_furigana:
-            if with_tags_def.with_tags:
-                part = construct_wrapped_furi_word(
-                    word, word_furigana, reconstruct_type, with_tags_def.merge_consecutive
-                )
-            elif reconstruct_type == "kana_only":
-                part = f"{word_furigana}"
-            elif reconstruct_type == "furikanji":
-                part = f" {word_furigana}[{word}]"
-            else:
-                part = f" {word}[{word_furigana}]"
-            # If this is the edge that was matched, add the bold tags while
-            # removing the existing ones in the furigana
-            part = re.sub(r"<b>|</b>", "", part)
-            if word_edge == "right":
-                # If we're at the end, add the okurigana
-                if not okuri_out_of_highlight:
-                    if with_tags_def.with_tags:
-                        part += f"<oku>{okurigana}</oku>" if okurigana else ""
-                    else:
-                        part += okurigana
-                else:
-                    # If we're not supposed to add する okuri, and the part ends with </on>,
-                    # then we know the okurigana contains する inflections, if it's non-empty
-                    # In any case, just add okuri to rest kana so we don't highlight it
-                    if with_tags_def.with_tags:
-                        rest_kana = f"<oku>{okurigana}</oku>{rest_kana}" if okurigana else rest_kana
-                    else:
-                        rest_kana = f"{okurigana}{rest_kana}"
-            if edge == word_edge:
-                # Finally, add the highlighting if this is the edge that was matched
-                part = f"<b>{part}</b>"
-            result += part
-    logger.debug(
-        f"reconstruct_furigana with highlight - result after parts: {result}, okurigana:"
-        f" {okurigana}, rest_kana: {rest_kana}"
-    )
-    if (
-        with_tags_def.with_tags
-        and rest_kana
-        and match_type == "kunyomi"
-        and edge in ["left", "right"]
-        and rest_kana[0] in {"る", "う", "た", "て", "っ", "い", "く"}
-    ):
-        rest_kana = f"<oku>{rest_kana}</oku>"
     return f"{result}{rest_kana}"
 
 
@@ -614,157 +471,6 @@ def is_reading_in_furigana_section(
         if r in furigana_section:
             return r, cast(ReadingType, t)
     return "", "none"
-
-
-def check_onyomi_readings(
-    onyomi: str,
-    furigana: str,
-    word_data: WordData,
-    highlight_args: HighlightArgs,
-    target_furigana_section: str,
-    edge: Edge,
-    wrap_readings_with_tags: bool = True,
-    convert_to_katakana: bool = True,
-    process_type: MatchProcess = "match",
-    skip_reading: Optional[str] = None,
-    logger: Logger = Logger("error"),
-) -> YomiMatchResult:
-    """
-    Function that checks the onyomi readings against the target furigana section
-
-    :return: string, the modified furigana
-      or [True, False] when return_on_or_kun_match_only
-    """
-    if not onyomi:
-        return {
-            "text": "",
-            "type": "none",
-            "match_edge": "none",
-            "actual_match": "",
-            "matched_reading": "",
-            "all_readings_processed": True,
-        }
-    onyomi_readings = onyomi.split("、")
-    # order readings by length so that we try to match the longest reading first
-    onyomi_readings.sort(key=len, reverse=True)
-    okurigana = word_data.get("okurigana", "")
-
-    logger.debug(
-        f"check_onyomi_readings - target_furigana_section: {target_furigana_section}, edge: {edge}"
-    )
-
-    # Exception for 麻雀[まーじゃん] where 麻[まー] should be a jukujikun, and we don't want to
-    # match ま as a onyomi
-    if furigana == "まーじゃん":
-        return {
-            "text": "",
-            "type": "none",
-            "match_edge": "none",
-            "actual_match": "",
-            "matched_reading": "",
-            "all_readings_processed": True,
-        }
-
-    # Exception for 菠薐草[ほうれんそう] where ほうれん should be a jukujikun, but 菠 has the onyomi
-    # ほ which would get incorrectly matched here
-    if furigana.startswith("ほうれん") and highlight_args.get("kanji_to_match") == "菠":
-        return {
-            "text": "",
-            "type": "none",
-            "match_edge": "none",
-            "actual_match": "",
-            "matched_reading": "",
-            "all_readings_processed": True,
-        }
-
-    skip_reading_found = False
-    for reading_index, onyomi_reading in enumerate(onyomi_readings):
-        # remove text in () in the reading
-        onyomi_reading = re.sub(r"\(.*?\)", "", onyomi_reading).strip()
-        logger.debug(f"check_onyomi_readings 1 - onyomi_reading: {onyomi_reading}")
-        if not onyomi_reading:
-            continue
-
-        # Skip readings that have been tried before
-        if skip_reading and not skip_reading_found:
-            if onyomi_reading == skip_reading:
-                skip_reading_found = True
-                logger.debug(f"check_onyomi_readings - skipping reading: {onyomi_reading}")
-            # We skip until we find the reading to skip, and the next reading will have
-            # skip_reading_found=True and won't be skipped
-            continue
-
-        furigana_is_katakana = word_data.get("furigana_is_katakana", False)
-        match_in_section, match_type = is_reading_in_furigana_section(
-            onyomi_reading if furigana_is_katakana else to_hiragana(onyomi_reading),
-            target_furigana_section,
-            furigana_is_katakana,
-            okurigana,
-            edge,
-            logger=logger,
-        )
-        logger.debug(
-            f"check_onyomi_readings 2 - onyomi_reading: {onyomi_reading}, in_section:"
-            f" {match_in_section}, type: {match_type}"
-        )
-        is_last_reading = reading_index == len(onyomi_readings) - 1
-        if match_in_section:
-            return {
-                "text": process_onyomi_match(
-                    furigana,
-                    match_in_section,
-                    edge,
-                    process_type,
-                    wrap_readings_with_tags,
-                    convert_to_katakana,
-                ),
-                "type": "onyomi",
-                "match_edge": edge,
-                "actual_match": match_in_section,
-                "matched_reading": onyomi_reading,
-                "all_readings_processed": is_last_reading,
-            }
-    return {
-        "text": "",
-        "type": "none",
-        "match_edge": "none",
-        "actual_match": "",
-        "matched_reading": "",
-        "all_readings_processed": True,
-    }
-
-
-def process_onyomi_match(
-    furigana: str,
-    onyomi_that_matched: str,
-    edge: Edge,
-    process_type: MatchProcess,
-    wrap_readings_with_tags: bool,
-    convert_to_katakana: bool,
-) -> str:
-    """
-    Function that replaces the furigana with the onyomi reading that matched
-
-    :return: string, the modified furigana or the matched part, depending on the process_type
-    """
-    if edge == "right":
-        reg = re_match_from_right(onyomi_that_matched)
-    elif edge == "left":
-        reg = re_match_from_left(onyomi_that_matched)
-    else:
-        reg = re_match_from_middle(onyomi_that_matched)
-    if process_type == "match":
-        match = reg.match(furigana)
-        if match:
-            return to_katakana(match.group(2)) if convert_to_katakana else match.group(2)
-        # return nothing if we have no match
-        return ""
-    replacer = partial(
-        onyomi_replacer,
-        wrap_readings_with_tags=wrap_readings_with_tags,
-        convert_to_katakana=convert_to_katakana,
-    )
-    return re.sub(reg, replacer, furigana)
 
 
 def check_kunyomi_readings(
@@ -1198,7 +904,7 @@ def handle_jukujikun_case(
 def reconstruct_from_alignment(
     word: str,
     alignment: MoraAlignment,
-    juku_parts: dict[int, str],
+    juku_parts: dict[int, WrapMatchEntry],
     kanji_to_highlight: str,
     with_tags_def: WithTagsDef,
     okurigana: str,
@@ -1224,7 +930,6 @@ def reconstruct_from_alignment(
     :param logger: Logger for debugging
     :return: FinalResult with complete furigana and word parts
     """
-    furigana_parts: list[str] = []
     alignment_len = len(alignment["kanji_matches"])
     word_len = len(word)
 
@@ -1232,238 +937,175 @@ def reconstruct_from_alignment(
         return re.sub(r"[0-9０-９]+", lambda m: number_to_kanji(m.group(0)), text)
 
     word_for_alignment = word
+    surface_slices: list[str] = list(word)
     if alignment_len != word_len:
         # When the word contains numeric characters, the alignment is done on kanji
-        # with numeric characters converted to kanji numerals
+        # with numeric characters converted to kanji numerals. Build a mapping from the
+        # compressed alignment positions back to the original surface slices so merged
+        # numeric runs keep the original digits.
         word_for_alignment = compress_numeric_runs(word)
+        surface_slices = []
+        pos = 0
+        for match in re.finditer(r"[0-9０-９]+", word):
+            if match.start() > pos:
+                surface_slices.extend(list(word[pos : match.start()]))
+            digits = match.group(0)
+            converted = number_to_kanji(digits)
+            repeat = max(1, len(converted))
+            surface_slices.extend([digits] + [""] * (repeat - 1))
+            pos = match.end()
+        if pos < len(word):
+            surface_slices.extend(list(word[pos:]))
+        if len(surface_slices) != len(word_for_alignment):
+            surface_slices = list(word_for_alignment)
     kanji_to_highlight_pos = (
         word_for_alignment.find(kanji_to_highlight) if kanji_to_highlight else -1
     )
 
-    # Build furigana by concatenating each kanji's portion
+    entries: list[WrapMatchEntry] = []
+
     for i, kanji in enumerate(word_for_alignment):
-        # Check if this is jukujikun or matched reading
+        surface_kanji = surface_slices[i] if i < len(surface_slices) else kanji
         if i in juku_parts:
-            # Jukujikun portion (already tagged if with_tags=True)
             part = juku_parts[i]
-            if was_katakana:
-                # Convert inner juku reading to katakana to preserve original script
-                if with_tags_def.with_tags and part.startswith("<juk>"):
-                    inner = part.replace("<juk>", "").replace("</juk>", "")
-                    inner_kata = to_katakana(inner)
-                    part = f"<juk>{inner_kata}</juk>"
-                else:
-                    part = to_katakana(part)
-            furigana_parts.append(part)
+            reading = part["furigana"]
+            tag = part["tag"]
+            is_num = part["is_num"]
         elif alignment["kanji_matches"][i]:
-            # Matched reading
             match_info = alignment["kanji_matches"][i]
             reading = match_info["matched_mora"]
             match_type = match_info["match_type"]
 
-            # Apply selective katakana conversion for onyomi
             if with_tags_def.onyomi_to_katakana and match_type == "onyomi":
                 reading = to_katakana(reading)
 
-            # Wrap in type tags if requested (EACH KANJI gets its own tag)
-            if with_tags_def.with_tags:
-                if match_type == "onyomi":
-                    reading = f"<on>{reading}</on>"
-                elif match_type == "kunyomi":
-                    reading = f"<kun>{reading}</kun>"
-                elif match_type == "jukujikun":
-                    # Preserve original script: if original furigana was katakana, convert juku
-                    if was_katakana:
-                        reading = to_katakana(reading)
-                    reading = f"<juk>{reading}</juk>"
-
-            furigana_parts.append(reading)
+            tag = "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
+            is_num = surface_kanji.isdigit()
         else:
-            # This shouldn't happen if juku_parts is complete, but handle it
             logger.error(
                 f"reconstruct_from_alignment: No match or juku_part for kanji {kanji} at index {i}"
             )
-            furigana_parts.append("")
+            reading = ""
+            tag = "mix"
+            is_num = False
 
-    # Join all parts
-    complete_furigana = "".join(furigana_parts)
-
-    if (
-        with_tags_def.with_tags
-        and with_tags_def.merge_consecutive
-        and reconstruct_type == "kana_only"
-    ):
-        pattern = re.compile(r"<(on|kun|juk)>(.*?)</\1><\1>(.*?)</\1>")
-
-        def merge_same_tags(text: str) -> str:
-            while True:
-                new_text = pattern.sub(
-                    lambda m: f"<{m.group(1)}>{m.group(2)}{m.group(3)}</{m.group(1)}>", text
-                )
-                if new_text == text:
-                    return new_text
-                text = new_text
-
-        complete_furigana = merge_same_tags(complete_furigana)
+        entries.append({
+            "kanji": surface_kanji,
+            "tag": tag,
+            "furigana": reading,
+            "highlight": False,
+            "is_num": is_num,
+        })
+    logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
 
     # Uniform script conversion when original furigana was katakana
     if was_katakana:
-        if with_tags_def.with_tags:
-            complete_furigana = apply_katakana_conversion(complete_furigana, preserve_tags=True)
-        else:
-            complete_furigana = to_katakana(complete_furigana)
-
+        for entry in entries:
+            entry["furigana"] = to_katakana(entry["furigana"])
         if okurigana:
             okurigana = to_katakana(okurigana)
         if rest_kana:
             rest_kana = to_katakana(rest_kana)
 
-    # Add <b> tags around portion where kanji_to_highlight appears
-    if kanji_to_highlight and kanji_to_highlight_pos >= 0:
-        # Find which furigana portion corresponds to kanji_to_highlight_pos
-        # We need to insert <b> before and </b> after the corresponding portion
-        # If next kanji is repeater (々), include both portions in highlight
-        highlight_end_pos = kanji_to_highlight_pos + 1
-        if (
-            kanji_to_highlight_pos + 1 < len(word_for_alignment)
-            and word_for_alignment[kanji_to_highlight_pos + 1] == "々"
-        ):
-            highlight_end_pos = kanji_to_highlight_pos + 2
+    # Determine highlight span (include repeater following the target kanji)
+    highlight_start = kanji_to_highlight_pos
+    highlight_end = (
+        kanji_to_highlight_pos + 1 if kanji_to_highlight_pos >= 0 else kanji_to_highlight_pos
+    )
+    if kanji_to_highlight_pos >= 0 and kanji_to_highlight_pos + 1 < len(word_for_alignment):
+        if word_for_alignment[kanji_to_highlight_pos + 1] == "々":
+            highlight_end = kanji_to_highlight_pos + 2
 
-        portions_before = furigana_parts[:kanji_to_highlight_pos]
-        highlight_portions = furigana_parts[kanji_to_highlight_pos:highlight_end_pos]
-        portions_after = furigana_parts[highlight_end_pos:]
+    # Mark highlighted entries
+    if highlight_start >= 0:
+        for idx in range(highlight_start, min(highlight_end, len(entries))):
+            entries[idx]["highlight"] = True
 
-        logger.debug(
-            f"reconstruct_from_alignment - word: {word_for_alignment}, kanji_to_highlight_pos:"
-            f" {kanji_to_highlight_pos}, highlight_end_pos: {highlight_end_pos}, furigana_parts:"
-            f" {furigana_parts}, highlight_portions: {highlight_portions}"
-        )
-        before_text = "".join(portions_before)
-        highlight_text = "".join(highlight_portions)
-        after_text = "".join(portions_after)
+    # Merge consecutive numeric entries so they behave like a single logical block when their
+    # tag/highlight context matches (e.g., ３０ → one on-tag chunk). Keep tag boundaries intact
+    # to allow mixed-tag readings like 40分 (よん + ジュッ) to remain split. Only apply when
+    # callers want merged tags; otherwise preserve per-digit structure for split outputs.
+    if with_tags_def.merge_consecutive:
+        merged_entries: list[WrapMatchEntry] = []
+        idx = 0
+        while idx < len(entries):
+            cur = entries[idx]
+            if not cur["is_num"]:
+                merged_entries.append(cur)
+                idx += 1
+                continue
 
-        complete_furigana = f"{before_text}<b>{highlight_text}</b>{after_text}"
+            combined_kanji = cur["kanji"]
+            combined_furi = cur["furigana"]
+            tag = cur["tag"]
+            highlight_flag = cur["highlight"]
+            j = idx + 1
+            while (
+                j < len(entries)
+                and entries[j]["is_num"]
+                and entries[j]["highlight"] == highlight_flag
+                and entries[j]["tag"] == tag
+            ):
+                next_entry = entries[j]
+                combined_kanji += next_entry["kanji"]
+                combined_furi += next_entry["furigana"]
+                j += 1
 
-    # Determine edge position
-    edge: Edge = "whole"
-    if kanji_to_highlight and kanji_to_highlight_pos >= 0:
-        # Check if next character is repeater - if so, the pair extends the highlighted portion
-        has_repeater_after = (
-            kanji_to_highlight_pos + 1 < len(word_for_alignment)
-            and word_for_alignment[kanji_to_highlight_pos + 1] == "々"
-        )
-        effective_end_pos = (
-            kanji_to_highlight_pos + 2 if has_repeater_after else kanji_to_highlight_pos + 1
-        )
+            merged_entries.append({
+                "kanji": combined_kanji,
+                "tag": tag,
+                "furigana": combined_furi,
+                "highlight": highlight_flag,
+                "is_num": True,
+            })
+            idx = j
 
-        if kanji_to_highlight_pos == 0:
-            # At the start - could be left or whole edge
-            if effective_end_pos >= len(word_for_alignment):
-                edge = "whole"  # Repeater pair covers whole word
-            else:
-                edge = "left"
-        elif effective_end_pos >= len(word_for_alignment):
-            # At or extends to the end
-            edge = "right"
-        else:
-            edge = "middle"
+        entries = merged_entries
 
-    # Build word parts based on edge position
-    # The naming is based on the parts array structure used in reconstruct_furigana:
-    # [(left_word, left_furigana, "left"), (middle_word, middle_furigana, "middle"), (right_word, right_furigana, "right")]
-    # - For edge == "left": left_word = highlighted kanji, right_word = rest of word, middle_word = ""
-    # - For edge == "right": left_word = beginning of word, right_word = highlighted kanji, middle_word = ""
-    # - For edge == "middle": left_word = before highlight, middle_word = highlighted, right_word = after highlight
-    # - For edge == "whole": middle_word = full word, left_word = "", right_word = ""
-    #
-    # NOTE: When a repeater (々) follows the highlighted kanji, both characters are included in the
-    # highlighted word part to match the furigana which has both readings in the <b> tags.
-    word_output = word if word else word_for_alignment
+    # Split entries into segments: before highlight, highlight, after highlight
+    segments: list[list[WrapMatchEntry]] = []
+    highlight_segment_index: Optional[int] = None
 
-    if kanji_to_highlight_pos < 0:
-        # No highlighting - put full word in middle_word for "whole" edge compatibility
-        left_word = ""
-        middle_word = word_output
-        right_word = ""
-    elif edge == "whole":
-        # Entire word is highlighted
-        left_word = ""
-        middle_word = word_output
-        right_word = ""
-    elif edge == "left":
-        # Include repeater if present
-        if (
-            kanji_to_highlight_pos + 1 < len(word_for_alignment)
-            and word_for_alignment[kanji_to_highlight_pos + 1] == "々"
-        ):
-            left_word = word_output[: kanji_to_highlight_pos + 2]
-            right_word = word_output[kanji_to_highlight_pos + 2 :]
-        else:
-            left_word = kanji_to_highlight
-            right_word = word_output[1:]
-        middle_word = ""
-    elif edge == "right":
-        # Include repeater if present (check if next char is repeater or if this IS the repeater)
-        if kanji_to_highlight == "々" and kanji_to_highlight_pos > 0:
-            # kanji_to_highlight is the repeater itself, include the kanji before it
-            right_word = word_output[kanji_to_highlight_pos - 1 :]
-            left_word = word_output[: kanji_to_highlight_pos - 1]
-        elif (
-            kanji_to_highlight_pos + 1 < len(word_for_alignment)
-            and word_for_alignment[kanji_to_highlight_pos + 1] == "々"
-        ):
-            # Next char is repeater, include both
-            right_word = word_output[kanji_to_highlight_pos:]
-            left_word = word_output[:kanji_to_highlight_pos]
-        else:
-            right_word = kanji_to_highlight
-            left_word = word_output[:-1]
-        middle_word = ""
-    elif edge == "middle":
-        # Include repeater if present
-        if (
-            kanji_to_highlight_pos + 1 < len(word_for_alignment)
-            and word_for_alignment[kanji_to_highlight_pos + 1] == "々"
-        ):
-            middle_word = word_output[kanji_to_highlight_pos : kanji_to_highlight_pos + 2]
-            left_word = word_output[:kanji_to_highlight_pos]
-            right_word = word_output[kanji_to_highlight_pos + 2 :]
-        else:
-            left_word = word_output[:kanji_to_highlight_pos]
-            middle_word = kanji_to_highlight
-            right_word = word_output[kanji_to_highlight_pos + 1 :]
+    first_highlight_idx = next((i for i, e in enumerate(entries) if e["highlight"]), None)
+    last_highlight_idx = None
+    if first_highlight_idx is not None:
+        for i in range(len(entries) - 1, -1, -1):
+            if entries[i]["highlight"]:
+                last_highlight_idx = i
+                break
+
+    if first_highlight_idx is None:
+        segments = [entries]
     else:
-        # Fallback (shouldn't happen)
-        left_word = ""
-        middle_word = kanji_to_highlight
-        right_word = ""
+        end_idx = (last_highlight_idx or first_highlight_idx) + 1
+        if first_highlight_idx > 0:
+            segments.append(entries[:first_highlight_idx])
+        segments.append(entries[first_highlight_idx:end_idx])
+        highlight_segment_index = len(segments) - 1
+        if end_idx < len(entries):
+            segments.append(entries[end_idx:])
 
-    # Determine match type (most common type in matches)
-    match_types = [m["match_type"] for m in alignment["kanji_matches"] if m]
-    if match_types:
-        # Use the type of the highlighted kanji if available
-        if kanji_to_highlight_pos >= 0 and alignment["kanji_matches"][kanji_to_highlight_pos]:
-            match_type = alignment["kanji_matches"][kanji_to_highlight_pos]["match_type"]
-        else:
-            # Otherwise use first match type
-            match_type = match_types[0]
-    elif juku_parts:
+    logger.debug(
+        "reconstruct_from_alignment - match type from highlighted kanji at position"
+        f" {kanji_to_highlight_pos}, kanji_matches: {alignment['kanji_matches']},"
+    )
+    # Determine match type of the highlight segment
+    match_type = "none"
+    if kanji_to_highlight_pos >= 0 and alignment["kanji_matches"][kanji_to_highlight_pos]:
+        match_type = alignment["kanji_matches"][kanji_to_highlight_pos]["match_type"]
+    elif kanji_to_highlight_pos >= 0 and juku_parts:
         match_type = "jukujikun"
-    else:
-        match_type = "none"
 
     final_result: FinalResult = {
-        "furigana": complete_furigana,
+        "segments": segments,
+        "highlight_segment_index": highlight_segment_index,
+        "word": word,
+        "match_type": match_type,
         "okurigana": okurigana,
         "rest_kana": rest_kana,
-        "left_word": left_word,
-        "middle_word": middle_word,
-        "right_word": right_word,
-        "edge": edge,
-        "match_type": match_type,
         "was_katakana": was_katakana,
     }
+    logger.debug(f"reconstruct_from_alignment - final_result: {final_result}")
 
     return reconstruct_furigana(
         final_result,
@@ -1566,8 +1208,8 @@ def kana_highlight(
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 alignment=exception_alignment,
-                with_tags=with_tags_def.with_tags,
                 remaining_kana=okurigana,
+                logger=logger,
             )
             use_okurigana = ""
             use_rest_kana = okurigana
@@ -1638,8 +1280,8 @@ def kana_highlight(
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 alignment=alignment,
-                with_tags=with_tags_def.with_tags,
                 remaining_kana=okurigana,
+                logger=logger,
             )
             logger.debug(
                 f"furigana_replacer - juku_parts: {juku_parts}, juku_okurigana: {juku_okurigana}"

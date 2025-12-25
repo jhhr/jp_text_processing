@@ -1,4 +1,4 @@
-from typing import Optional, Literal, TypedDict, NamedTuple, NotRequired
+from typing import Optional, Literal, TypedDict, NamedTuple
 
 
 class WithTagsDef(NamedTuple):
@@ -64,6 +64,24 @@ class HighlightArgs(TypedDict):
 MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
 
 
+class WrapMatchEntry(TypedDict):
+    """
+    Structure describing a single kanji ↔ furigana pairing for reconstruction.
+
+    :param kanji: Surface kanji (or digit/repeater) this entry corresponds to
+    :param tag: The furigana tag type (on/kun/juk/mix)
+    :param furigana: Reading for the kanji
+    :param highlight: Whether this entry belongs to the highlighted span
+    :param is_num: Whether the kanji represents a numeric block
+    """
+
+    kanji: str
+    tag: Literal["on", "kun", "juk", "mix"]
+    furigana: str
+    highlight: bool
+    is_num: bool
+
+
 class YomiMatchResult(TypedDict):
     """
     TypedDict for the result of the onyomi or kunyomi match check
@@ -80,72 +98,29 @@ class YomiMatchResult(TypedDict):
     match_edge: Edge
     actual_match: str
     matched_reading: str
-    all_readings_processed: NotRequired[bool]
-
-
-class PartialResult(TypedDict):
-    """
-    TypedDict for the partial result of the onyomi or kunyomi match check
-    :param matched_furigana
-    :param match_type
-    :param rest_furigana
-    :param okurigana
-    :param rest_kana
-    :param edge
-    :param matched_reading: The reading that was matched for this kanji
-    :param all_readings_processed: True when all readings for this kanji have been checked
-    """
-
-    matched_furigana: str
-    match_type: MatchType
-    rest_furigana: str
-    okurigana: str
-    rest_kana: str
-    edge: Edge
-    matched_reading: NotRequired[str]
-    all_readings_processed: NotRequired[bool]
 
 
 class FinalResult(TypedDict):
     """
     TypedDict for the final result of the onyomi or kunyomi match check
-    :param furigana
+    :param segments: Sequence of wrap entries split into portions (before, highlight, after)
+    :param highlight_segment_index: Index of the highlighted segment in `segments` or None
+    :param word: The full word being reconstructed (used for spacing/okuri decisions)
+    :param edge: Legacy edge position of the highlight for okuri tagging
+    :param match_type
     :param okurigana
     :param rest_kana
-    :param left_word
-    :param middle_word
-    :param right_word
-    :param edge
-    :param match_type
     :param was_katakana: Whether the original furigana was in katakana
     """
 
-    furigana: str
-    okurigana: str
-    rest_kana: str
-    left_word: str
-    middle_word: str
-    right_word: str
+    segments: list[list[WrapMatchEntry]]
+    highlight_segment_index: Optional[int]
+    word: str
     edge: Edge
     match_type: MatchType
-    was_katakana: NotRequired[bool]
-
-
-class FuriganaParts(TypedDict):
-    """
-    TypedDict for the parts of the furigana that were matched
-    :param has_highlight
-    :param left_furigana
-    :param middle_furigana
-    :param right_furigana
-    :param matched_edge
-    """
-
-    has_highlight: bool
-    left_furigana: Optional[str]
-    middle_furigana: Optional[str]
-    right_furigana: Optional[str]
-    matched_edge: Edge
+    okurigana: str
+    rest_kana: str
+    was_katakana: bool
 
 
 PartOfSpeech = Literal[

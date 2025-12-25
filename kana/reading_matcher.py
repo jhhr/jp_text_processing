@@ -333,14 +333,6 @@ def match_kunyomi_to_mora(
                     if "." in original_reading:
                         reading_okurigana = original_reading.split(".", 1)[1]
                         # Minimal word_data/highlight_args for scoring
-                        try:
-                            from okuri.check_okurigana_for_inflection import (
-                                check_okurigana_for_inflection,
-                            )
-                        except ImportError:
-                            from ..okuri.check_okurigana_for_inflection import (
-                                check_okurigana_for_inflection,
-                            )
                         word_data = {
                             "okurigana": okurigana,
                             "word": kanji,

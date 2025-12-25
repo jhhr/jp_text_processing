@@ -6,9 +6,16 @@ splitting mora evenly among consecutive jukujikun positions and extracting okuri
 when the last kanji is jukujikun.
 """
 
-import re
 from typing import Tuple
 
+try:
+    from all_types.main_types import WrapMatchEntry
+except ImportError:
+    from ..all_types.main_types import WrapMatchEntry
+try:
+    from kana.mora_splitter import split_to_mora_list
+except ImportError:
+    from .mora_splitter import split_to_mora_list
 try:
     from kana.mora_alignment import MoraAlignment
 except ImportError:
@@ -29,22 +36,35 @@ try:
     from mecab_controller.kana_conv import to_hiragana
 except ImportError:
     from ..mecab_controller.kana_conv import to_hiragana
+try:
+    from utils.logger import Logger
+except ImportError:
+    from ..utils.logger import Logger
 
 
-def split_mora_for_jukujikun(mora_list: list[str], kanji_count: int) -> list[str]:
+def split_mora_for_jukujikun(
+    mora_list: list[str], kanji: list[str], logger: Logger = Logger("error")
+) -> list[str]:
     """
     Split mora evenly for jukujikun kanji using arithmetic division.
 
-    Distributes mora across kanji_count positions, with remainder mora
+    Distributes mora across each kanji position, with remainder mora
     distributed one per kanji from the start.
 
     :param mora_list: List of mora to split
-    :param kanji_count: Number of kanji to distribute mora among
+    :param kanji: List of kanji to distribute mora among
     :return: List of mora strings, one per kanji
     """
+    kanji_count = len(kanji)
     mora_count = len(mora_list)
     mora_per_kanji = mora_count // kanji_count
     remainder = mora_count % kanji_count
+
+    logger.debug(
+        f"split_mora_for_jukujikun - mora_count: {mora_count}, kanji_count: {kanji_count},"
+        f" mora_per_kanji: {mora_per_kanji}, remainder: {remainder}, mora_list: {mora_list}, kanji:"
+        f" {kanji}"
+    )
 
     result: list[str] = []
     cur_mora_index = 0
@@ -53,12 +73,14 @@ def split_mora_for_jukujikun(mora_list: list[str], kanji_count: int) -> list[str
         # Base allocation
         end_index = cur_mora_index + mora_per_kanji
 
-        # Add one extra mora to first 'remainder' kanji
+        # Add remainder extra mora until exhausted
         if i < remainder:
             end_index += 1
 
         # Join mora for this kanji
         mora_string = "".join(mora_list[cur_mora_index:end_index])
+
+        logger.debug(f"split_mora_for_jukujikun - kanji: {kanji[i]}, mora: {mora_string}")
         result.append(mora_string)
 
         cur_mora_index = end_index
@@ -69,9 +91,9 @@ def split_mora_for_jukujikun(mora_list: list[str], kanji_count: int) -> list[str
 def process_jukujikun_positions(
     word: str,
     alignment: MoraAlignment,
-    with_tags: bool,
     remaining_kana: str,
-) -> Tuple[dict[int, str], str, str]:
+    logger: Logger = Logger("error"),
+) -> Tuple[dict[int, WrapMatchEntry], str, str]:
     """
     Process jukujikun (unmatched) positions in the alignment.
 
@@ -85,9 +107,9 @@ def process_jukujikun_positions(
     :param with_tags: Whether to wrap jukujikun portions in <juk> tags
     :param remaining_kana: The kana following the word (for okurigana extraction)
     :return: Tuple of (jukujikun_parts_dict, okurigana, rest_kana)
-             jukujikun_parts_dict maps kanji_index → tagged/untagged jukujikun mora string
+             jukujikun_parts_dict maps kanji_index → WrapMatchEntry describing the mora
     """
-    jukujikun_parts: dict[int, str] = {}
+    jukujikun_parts: dict[int, WrapMatchEntry] = {}
     extracted_okurigana = ""
     extracted_rest_kana = remaining_kana
 
@@ -97,6 +119,7 @@ def process_jukujikun_positions(
     # Build the full furigana string from mora_split for exception substring detection
     all_mora = [mora for sublist in alignment["mora_split"] for mora in sublist]
     full_furigana = "".join(all_mora)
+    logger.debug(f"process_jukujikun_positions: full_furigana: {full_furigana}")
 
     # Priority: If the word contains a known exception substring and the furigana contains
     # its reading, assign jukujikun parts directly based on the exception mapping.
@@ -123,10 +146,13 @@ def process_jukujikun_positions(
 
                     if pos not in alignment["jukujikun_positions"]:
                         alignment["jukujikun_positions"].append(pos)
-                    if with_tags:
-                        jukujikun_parts[pos] = f"<juk>{mora_portion}</juk>"
-                    else:
-                        jukujikun_parts[pos] = mora_portion
+                    jukujikun_parts[pos] = {
+                        "kanji": word[pos],
+                        "tag": "juk",
+                        "highlight": False,
+                        "furigana": mora_portion,
+                        "is_num": word[pos].isdigit(),
+                    }
                 # Special-case: when there is exactly one kanji before the first exception,
                 # set its matched mora to the furigana prefix before the exception reading.
                 if start_search == 0 and start == 1 and not alignment["kanji_matches"][0]:
@@ -196,56 +222,64 @@ def process_jukujikun_positions(
         # 2. Calculate remaining mora (total - matched)
         # 3. Redistribute remaining mora among jukujikun positions
 
-        # Flatten the entire mora_split to get all mora
-        all_mora = [mora for sublist in alignment["mora_split"] for mora in sublist]
-
         # Mark mora consumed by matched positions using the split indices
         consumed_indices = set()
-        mora_index = 0
         for i in range(len(alignment["kanji_matches"])):
-            mora_count_for_position = len(alignment["mora_split"][i])
             if alignment["kanji_matches"][i]:
-                for j in range(mora_index, mora_index + mora_count_for_position):
-                    consumed_indices.add(j)
-            mora_index += mora_count_for_position
+                consumed_indices.add(i)
 
-        # Get remaining mora (not consumed)
-        juku_mora = [mora for idx, mora in enumerate(all_mora) if idx not in consumed_indices]
+        # Get remaining mora (not consumed), merge the lists back into a single string and then
+        # split into mora again with split_to_mora_list
+        juku_mora_str = "".join([
+            mora for idx, mora in enumerate(alignment["mora_split"]) if idx not in consumed_indices
+        ])
+        logger.debug(
+            f"process_jukujikun_positions - remaining mora for jukujikun: {juku_mora_str},"
+            f" consumed_indices: {consumed_indices}, alignment.mora_split:"
+            f" {alignment['mora_split']}"
+        )
+        juku_count = len(alignment["jukujikun_positions"])
+        juku_mora = split_to_mora_list(
+            furigana=juku_mora_str,
+            kanji_count=juku_count,
+        )["mora_list"]
 
         # Redistribute these mora evenly among jukujikun positions
-        juku_count = len(alignment["jukujikun_positions"])
         if juku_count == 0 or len(juku_mora) == 0:
             return jukujikun_parts, extracted_okurigana, extracted_rest_kana
 
-        redistributed_mora = split_mora_for_jukujikun(juku_mora, juku_count)
+        juku_kanji = [word[pos] for pos in alignment["jukujikun_positions"]]
+        redistributed_mora = split_mora_for_jukujikun(juku_mora, juku_kanji, logger=logger)
 
         # Assign redistributed mora to jukujikun positions
         for idx, pos in enumerate(alignment["jukujikun_positions"]):
             mora_portion = redistributed_mora[idx]
 
-            if with_tags:
-                # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
-                # 為 with readings し/さ is the irregular verb する
-                is_suru_verb = word[pos] == "為" and mora_portion in ["し", "さ"]
-                tag = "kun" if (word[pos].isdigit() or is_suru_verb) else "juk"
-                jukujikun_parts[pos] = f"<{tag}>{mora_portion}</{tag}>"
-            else:
-                jukujikun_parts[pos] = mora_portion
+            # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
+            # 為 with readings し/さ is the irregular verb する
+            is_suru_verb = word[pos] == "為" and mora_portion in ["し", "さ"]
+            tag = "kun" if (word[pos].isdigit() or is_suru_verb) else "juk"
+            jukujikun_parts[pos] = {
+                "kanji": word[pos],
+                "tag": tag,
+                "highlight": False,
+                "furigana": mora_portion,
+                "is_num": word[pos].isdigit(),
+            }
 
     # Handle okurigana extraction if last kanji is jukujikun
     last_kanji_index = len(word) - 1
     if last_kanji_index in alignment["jukujikun_positions"] and last_kanji_index in jukujikun_parts:
         # Last kanji is jukujikun, extract okurigana using mecab
+        # Get the jukujikun reading for last kanji (structured entry)
+        juku_entry = jukujikun_parts[last_kanji_index]
+        juku_reading = juku_entry["furigana"]
         last_kanji = word[last_kanji_index]
         if last_kanji == "々" and last_kanji_index > 0:
-            # Use the preceding kanji for repeaters so mecab can find okurigana
-            last_kanji = word[last_kanji_index - 1]
-
-        # Get the jukujikun reading for last kanji (without tags)
-        juku_reading = jukujikun_parts[last_kanji_index]
-        if with_tags:
-            # Remove <juk></juk> and <kun></kun> tags to get plain reading
-            juku_reading = re.sub(r"</?(?:juk|kun)>", "", juku_reading)
+            # Combine with previous kanji for okurigana extraction
+            last_kanji = word[last_kanji_index - 1] + "々"
+            # Combine reading also
+            juku_reading = jukujikun_parts[last_kanji_index - 1]["furigana"] + juku_reading
 
         # Use mecab to extract okurigana
         okuri_result = get_conjugated_okuri_with_mecab(
@@ -253,6 +287,10 @@ def process_jukujikun_positions(
             kanji_reading=juku_reading,
             maybe_okuri=remaining_kana,
             okuri_prefix="kanji_reading",
+        )
+        logger.debug(
+            f"process_jukujikun_positions - okuri_result: {okuri_result}, remaining_kana:"
+            f" {remaining_kana}, juku_reading: {juku_reading}, last_kanji: {last_kanji}"
         )
 
         extracted_okurigana = okuri_result.okurigana
