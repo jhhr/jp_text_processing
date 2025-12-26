@@ -2185,7 +2185,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<k><juk> ほうれん[菠薐]</juk></k><on> そう[草]</on>",
     )
     test(
-        test_name="ん should be combined with previous mora in jukujikun",
+        test_name="jukujikun test with ー long vowel mark",
+        kanji="",
+        sentence="炒麺[ちゃーめん]",
+        expected_kana_only="ちゃーメン",
+        expected_furigana=" 炒麺[ちゃーメン]",
+        expected_furikanji=" ちゃーメン[炒麺]",
+        expected_kana_only_with_tags_split="<juk>ちゃー</juk><on>メン</on>",
+        expected_furigana_with_tags_split="<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
+        expected_furikanji_with_tags_split="<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
+    )
+    test(
+        test_name=(
+            "ん should be combined with previous mora in jukujikun and handle long vowel mark ー"
+        ),
         kanji="麻",
         sentence="麻雀[まーじゃん]",
         expected_kana_only="<b>まー</b>じゃん",

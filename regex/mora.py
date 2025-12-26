@@ -165,9 +165,13 @@ SINGLE_KANA_MORA = [
 ]
 # Elongated vowels of the single kana mora (直音)
 LONG_STRAIGHT_MORA = [f"{kana}ー" for kana in SINGLE_KANA_MORA]
-# First all two kana more, so they get matched first, then the single kana mora
+# Same for palatalized mora
+LONG_PALATALIZED_MORA = [f"{kana}ー" for kana in PALATALIZED_MORA]
+# Sort mora by length descending to match longest first, so that longer mora are matched first
+# in the regex.
 ALL_MORA = (
-    PALATALIZED_MORA
+    LONG_PALATALIZED_MORA
+    + PALATALIZED_MORA
     + LONG_STRAIGHT_MORA
     + SINGLE_KANA_MORA
     + [
