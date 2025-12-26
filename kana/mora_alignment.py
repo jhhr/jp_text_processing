@@ -114,39 +114,14 @@ def find_first_complete_alignment(
     # Convert splits of lists of strings to lists of strings
     possible_splits = [["".join(mora) for mora in split] for split in possible_splits]
 
-    # Add yōon contractions across boundaries
-    youon_splits = []
-    for split in possible_splits:
-        if any(len(mora) == 2 and mora[1] in ["ゃ", "ゅ", "ょ"] for mora in split):
-            logger.debug(f"find_first_complete_alignment - checking for yōon splits in: {split}")
-            youon_split = split.copy()
-            for i, mora in enumerate(youon_split):
-                next_mora = split[i + 1] if i < kanji_count - 1 else None
-                next_mora_is_youon = (
-                    next_mora is not None
-                    and len(next_mora) == 2
-                    and next_mora[1] in ["ゃ", "ゅ", "ょ"]
-                )
-                logger.debug(
-                    f"find_first_complete_alignment - checking mora at index {i}: {mora},"
-                    f" next_mora: {next_mora}, next mora is yōon: {next_mora_is_youon}"
-                )
-                if next_mora_is_youon:
-                    base = next_mora[0]
-                    small = next_mora[1]
-                    # Extend current mora with base kana
-                    youon_split[i] = mora + base
-                    # Reduce next mora to just small kana
-                    youon_split[i + 1] = small
-            youon_splits.append(youon_split)
-    if youon_splits:
-        possible_splits.extend(youon_splits)
-
     best_alignment: Optional[MoraAlignment] = None
     best_jukujikun_count = kanji_count + 1  # Start with worst possible
     best_chars_matched_count = 0
 
-    for mora_split in possible_splits:
+    youon_mora_splits = []
+
+    def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
+        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count, youon_mora_splits
         logger.debug(f"find_first_complete_alignment - trying mora_split: {mora_split}")
         kanji_matches: list[Optional[ReadingMatchInfo]] = []
         jukujikun_positions: list[int] = []
@@ -196,6 +171,40 @@ def find_first_complete_alignment(
                 f"find_first_complete_alignment - kanji: {kanji}, mora_sequence: {mora_sequence},"
                 f" match_info: {match_info}"
             )
+            # Test for possible youon match
+            prev_mora_sequence = mora_split[i - 1] if i > 0 else None
+            if (
+                not skip_youon_check
+                and not next_kanji_is_repeater
+                # yōon only possible if previous mora exists
+                and prev_mora_sequence is not None
+                # current mora must be a yōon type
+                and len(mora_sequence) == 2
+                and mora_sequence[1] in ["ゃ", "ゅ", "ょ"]
+            ):
+                small = mora_sequence[1]
+                # If the current kanji matches the small kana as yōon, we'll make a new youon
+                # mora split to be tested fully after this loop
+                youon_match_info = match_reading_to_mora(
+                    kanji=kanji,
+                    mora_sequence=small,
+                    kanji_data=kanji_data,
+                    okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
+                    is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
+                    prefer_kunyomi=is_whole_word,
+                    logger=logger,
+                )
+                if youon_match_info:
+                    youon_mora_split = mora_split.copy()
+                    # Adjust previous mora to include base kana
+                    youon_mora_split[i - 1] = prev_mora_sequence + mora_sequence[0]
+                    # Adjust current mora to just small kana
+                    youon_mora_split[i] = small
+                    youon_mora_splits.append(youon_mora_split)
+                    logger.debug(
+                        "find_first_complete_alignment - found youon match_info:"
+                        f" {youon_match_info}, youon_mora_split: {youon_mora_split}"
+                    )
 
             if match_info:
                 # For repeater, check if second occurrence has rendaku
@@ -334,6 +343,18 @@ def find_first_complete_alignment(
             best_chars_matched_count = chars_matched_count
             best_jukujikun_count = len(jukujikun_positions)
             best_alignment = alignment
+        return alignment
+
+    for mora_split in possible_splits:
+        result = process_mora_split(mora_split)
+        # Early exit on complete match
+        if result["is_complete"]:
+            return result
+    # Also try yōon splits generated during processing
+    for youon_mora_split in youon_mora_splits:
+        result = process_mora_split(youon_mora_split, skip_youon_check=True)
+        if result["is_complete"]:
+            return result
 
     # No complete match found, return best partial alignment
     if best_alignment:
