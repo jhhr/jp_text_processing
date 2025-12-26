@@ -81,6 +81,7 @@ except ImportError:
         FinalResult,
         MoraAlignment,
         ReadingType,
+        WrapMatchEntry,
     )
 try:
     from kana.furigana_exceptions import check_exception
