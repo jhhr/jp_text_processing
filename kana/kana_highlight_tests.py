@@ -88,10 +88,27 @@ def main():
             ),
         ]
         for return_type, with_tags_def, expected in cases:
+            nonlocal rerun_test_with_debug, failed_test_count
             if not expected:
                 continue
             logger = Logger("debug") if debug else Logger("error")
-            result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
+            rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
+            try:
+                result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
+            except Exception:
+                # Uncaught exception, rerun with debug logging
+                failed_test_count += 1
+
+                def rerun():
+                    try:
+                        kana_highlight(*rerun_args)
+                    except Exception as e:
+                        print(f"Error during rerun with debug logging: {e}")
+
+                if rerun_test_with_debug is None:
+                    rerun_test_with_debug = rerun
+                continue
+
             if debug:
                 print("\n\n")
             try:
@@ -101,7 +118,6 @@ def main():
             except AssertionError:
                 if ignore_fail:
                     continue
-                nonlocal rerun_test_with_debug, failed_test_count
                 failed_test_count += 1
                 cur_test_num = test_count
 
@@ -113,7 +129,6 @@ Return type: {return_type}
 \033[92mGot:      {result}
 {expected == result and "\033[92m✓" or "\033[91m✗"}
 \033[0m"""
-                rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
 
                 # Store the first failed test with logging enabled to see what went wrong
                 def rerun():
