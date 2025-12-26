@@ -1759,6 +1759,34 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<juk>おい</juk><b><juk>らん</juk></b>",
     )
     test(
+        test_name="jukujikun test with small っ - with highlight",
+        kanji="何",
+        sentence="何方[どっち]",
+        expected_kana_only="<b>どっ</b>ち",
+        expected_furigana="<b> 何[どっ]</b> 方[ち]",
+        expected_furikanji="<b> どっ[何]</b> ち[方]",
+        expected_kana_only_with_tags_split="<b><juk>どっ</juk></b><juk>ち</juk>",
+        expected_furigana_with_tags_split="<b><juk> 何[どっ]</juk></b><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_split="<b><juk> どっ[何]</juk></b><juk> ち[方]</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>どっ</juk></b><juk>ち</juk>",
+        expected_furigana_with_tags_merged="<b><juk> 何[どっ]</juk></b><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_merged="<b><juk> どっ[何]</juk></b><juk> ち[方]</juk>",
+    )
+    test(
+        test_name="jukujikun test with small っ - no highlight",
+        kanji="",
+        sentence="何方[どっち]",
+        expected_kana_only="どっち",
+        expected_furigana=" 何方[どっち]",
+        expected_furikanji=" どっち[何方]",
+        expected_kana_only_with_tags_split="<juk>どっ</juk><juk>ち</juk>",
+        expected_furigana_with_tags_split="<juk> 何[どっ]</juk><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_split="<juk> どっ[何]</juk><juk> ち[方]</juk>",
+        expected_kana_only_with_tags_merged="<juk>どっち</juk>",
+        expected_furigana_with_tags_merged="<juk> 何方[どっち]</juk>",
+        expected_furikanji_with_tags_merged="<juk> どっち[何方]</juk>",
+    )
+    test(
         test_name="single-kanji juku in middle of word",
         kanji="気",
         sentence="意気地[いくじ]",
