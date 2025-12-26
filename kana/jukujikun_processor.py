@@ -248,7 +248,14 @@ def process_jukujikun_positions(
         if juku_count == 0 or len(juku_mora) == 0:
             return jukujikun_parts, extracted_okurigana, extracted_rest_kana
 
-        juku_kanji = [word[pos] for pos in alignment["jukujikun_positions"]]
+        try:
+            juku_kanji = [word[pos] for pos in alignment["jukujikun_positions"]]
+        except IndexError:
+            logger.error(
+                "process_jukujikun_positions - IndexError: jukujikun_positions:"
+                f" {alignment['jukujikun_positions']}, word: {word}"
+            )
+            return jukujikun_parts, extracted_okurigana, extracted_rest_kana
         redistributed_mora = split_mora_for_jukujikun(juku_mora, juku_kanji, logger=logger)
 
         # Assign redistributed mora to jukujikun positions

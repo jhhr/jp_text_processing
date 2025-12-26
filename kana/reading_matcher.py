@@ -5,12 +5,24 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 try:
-    from all_types.main_types import ReadingMatchInfo, ReadingType
+    from all_types.main_types import (
+        ReadingMatchInfo,
+        ReadingType,
+        KunyomiReadingToTry,
+        KanjiData,
+        KanjiReadingData,
+    )
 except ImportError:
-    from ..all_types.main_types import ReadingMatchInfo, ReadingType
+    from ..all_types.main_types import (
+        ReadingMatchInfo,
+        ReadingType,
+        KunyomiReadingToTry,
+        KanjiData,
+        KanjiReadingData,
+    )
 try:
     from mecab_controller.kana_conv import to_hiragana
 except ImportError:
@@ -66,8 +78,9 @@ def check_reading_match(
     reading: str,
     mora_string: str,
     okurigana: str = "",
+    cache_func: Optional[Callable[[str], None]] = None,
     logger: Logger = Logger("error"),
-) -> Tuple[str, ReadingType]:
+) -> Optional[Tuple[str, ReadingType]]:
     """
     Core function to check if a reading matches a mora string, trying various phonetic changes.
 
@@ -82,13 +95,19 @@ def check_reading_match(
     :param reading: The dictionary reading to check
     :param mora_string: The joined mora sequence to match against
     :param okurigana: The okurigana following this reading (for う→っ cases)
+    :param cache_func: Optional function to store cached results, instead of returning matches
     :return: Tuple of (matched_reading, reading_type) or ("", "none") if no match
     """
     if not reading:
+        if cache_func:
+            # Nothing to cache
+            return None
         return "", "none"
 
     # 1. Plain match
-    if reading == mora_string:
+    if cache_func:
+        cache_func(reading, "plain")
+    elif reading == mora_string:
         return reading, "plain"
 
     # 2. Rendaku - first kana voiced
@@ -98,7 +117,9 @@ def check_reading_match(
             rendaku_readings.append(f"{kana}{reading[1:]}")
 
     for rendaku_reading in rendaku_readings:
-        if rendaku_reading == mora_string:
+        if cache_func:
+            cache_func(rendaku_reading, "rendaku")
+        elif rendaku_reading == mora_string:
             return rendaku_reading, "rendaku"
 
     # 3. Small tsu - last kana becomes っ
@@ -108,7 +129,9 @@ def check_reading_match(
             small_tsu_readings.append(f"{reading[:-1]}っ")
 
     for small_tsu_reading in small_tsu_readings:
-        if small_tsu_reading == mora_string:
+        if cache_func:
+            cache_func(small_tsu_reading, "small_tsu")
+        elif small_tsu_reading == mora_string:
             return small_tsu_reading, "small_tsu"
 
     # 4. Vowel change
@@ -118,14 +141,18 @@ def check_reading_match(
             vowel_change_readings.append(f"{kana}{reading[1:]}")
 
     for vowel_change_reading in vowel_change_readings:
-        if vowel_change_reading == mora_string:
+        if cache_func:
+            cache_func(vowel_change_reading, "vowel_change")
+        elif vowel_change_reading == mora_string:
             return vowel_change_reading, "vowel_change"
 
     # 5. Yōon contraction: reading like しよ → しょ, きや → きゃ, etc.
     # Check direct contraction
     if len(reading) >= 2 and reading[1] in YOON_SMALL_MAP:
         yoon_contracted = f"{reading[0]}{YOON_SMALL_MAP[reading[1]]}{reading[2:]}"
-        if yoon_contracted == mora_string:
+        if cache_func:
+            cache_func(yoon_contracted, "vowel_change")
+        elif yoon_contracted == mora_string:
             return yoon_contracted, "vowel_change"
 
     # Also try yōon contraction on rendaku variants of the first kana
@@ -134,7 +161,9 @@ def check_reading_match(
             yoon_rendaku = (
                 f"{rendaku_reading[0]}{YOON_SMALL_MAP[rendaku_reading[1]]}{rendaku_reading[2:]}"
             )
-            if yoon_rendaku == mora_string:
+            if cache_func:
+                cache_func(yoon_rendaku, "vowel_change")
+            elif yoon_rendaku == mora_string:
                 return yoon_rendaku, "vowel_change"
 
     # 6. Combined rendaku + small tsu
@@ -145,30 +174,66 @@ def check_reading_match(
                 rendaku_small_tsu_readings.append(f"{rendaku_reading[:-1]}っ")
 
     for combined_reading in rendaku_small_tsu_readings:
-        if combined_reading == mora_string:
+        if cache_func:
+            cache_func(combined_reading, "rendaku_small_tsu")
+        elif combined_reading == mora_string:
             return combined_reading, "rendaku_small_tsu"
 
     # 7. う dropped before っ okurigana (e.g., 言う[いう]って → い + って)
     if okurigana and okurigana[0] == "っ" and reading[-1] == "う":
         u_dropped = reading[:-1]
-        if u_dropped == mora_string:
-            return u_dropped, "small_tsu"
+        if cache_func:
+            cache_func(u_dropped, "u_dropped")
+        elif u_dropped == mora_string:
+            return u_dropped, "u_dropped"
         # Also try with rendaku
         for rendaku_reading in rendaku_readings:
             if rendaku_reading[-1] == "う":
                 u_dropped_rendaku = rendaku_reading[:-1]
-                if u_dropped_rendaku == mora_string:
-                    return u_dropped_rendaku, "rendaku"
+                if cache_func:
+                    cache_func(u_dropped_rendaku, "u_dropped")
+                elif u_dropped_rendaku == mora_string:
+                    return u_dropped_rendaku, "u_dropped"
 
+    if cache_func:
+        # Nothing matched, but we were caching
+        return None
     return "", "none"
+
+
+def get_onyomi_reading_hiragana(
+    onyomi_reading: str, logger: Logger = Logger("error")
+) -> Tuple[str, str]:
+    """
+    Generate hiragana reading variant for a given onyomi reading.
+
+    :param onyomi_reading: The original onyomi reading
+    :return: Hiragana reading variant
+    """
+    if not onyomi_reading:
+        return ""
+    # Remove parentheses content
+    try:
+        onyomi_reading = onyomi_reading.split("(")[0].strip()
+    except Exception:
+        logger.error(f"get_onyomi_reading_variants - invalid onyomi_reading: {onyomi_reading}")
+        return ""
+    if not onyomi_reading:
+        return ""
+
+    # Convert to hiragana for matching
+    reading_hiragana = to_hiragana(onyomi_reading)
+
+    return reading_hiragana
 
 
 def match_onyomi_to_mora(
     kanji: str,
     mora_sequence: str,
-    kanji_data: dict,
     okurigana: str,
     is_last_kanji: bool,
+    kanji_data: Optional[KanjiData] = None,
+    kanji_reading_data: Optional[KanjiReadingData] = None,
     logger: Logger = Logger("error"),
 ) -> Optional[ReadingMatchInfo]:
     """
@@ -176,32 +241,57 @@ def match_onyomi_to_mora(
 
     :param kanji: The kanji character to match
     :param mora_sequence: Joined mora string to match against
-    :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param okurigana: The okurigana following the word (used for last kanji okurigana extraction)
     :param is_last_kanji: Whether this is the last kanji in the word
+    :param kanji_data: Optional dict containing onyomi/kunyomi data for this kanji, either this
+        or kanji_reading_data must be provided
+    :param kanji_reading_data: Optional cached kunyomi reading dict for this kanji, either this or
+        kanji_data must be provided
     :return: ReadingMatchInfo if match found, None otherwise
     """
-    onyomi = kanji_data.get("onyomi", "")
-    if not onyomi:
+
+    onyomi = kanji_data.get("onyomi", "") if kanji_data else ""
+    onyomi_reading_data = kanji_reading_data.get("onyomi", None) if kanji_reading_data else None
+    if not onyomi and not onyomi_reading_data:
+        return None
+
+    if onyomi_reading_data:
+        # Try cached onyomi readings, if given. When okurigana starts with っ we may
+        # have both a normal entry and a _u_dropped variant; check both.
+        mora_keys = [mora_sequence]
+        if okurigana and okurigana[0] == "っ":
+            mora_keys.insert(0, f"{mora_sequence}_u_dropped")
+
+        for mora_key in mora_keys:
+            if mora_key in onyomi_reading_data:
+                original_reading, reading_variant = onyomi_reading_data[mora_key]
+                return ReadingMatchInfo(
+                    reading=mora_sequence,
+                    dict_form=original_reading,  # Store original reading
+                    match_type="onyomi",
+                    reading_variant=reading_variant,
+                    matched_mora=mora_sequence,
+                    kanji=kanji,
+                    okurigana="",
+                    rest_kana="",
+                )
+
         return None
 
     # Parse onyomi readings
     onyomi_readings = [r.strip() for r in onyomi.split("、")]
 
     for onyomi_reading in onyomi_readings:
-        # Remove parentheses content
-        onyomi_reading = onyomi_reading.split("(")[0].strip()
-        if not onyomi_reading:
+        reading_hiragana = get_onyomi_reading_hiragana(onyomi_reading, logger=logger)
+        if not reading_hiragana:
             continue
-
-        # Convert to hiragana for matching
-        reading_hiragana = to_hiragana(onyomi_reading)
 
         # Try to match
         matched_reading, reading_variant = check_reading_match(
             reading_hiragana,
             mora_sequence,
             okurigana if is_last_kanji else "",
+            logger=logger,
         )
 
         if matched_reading:
@@ -220,12 +310,73 @@ def match_onyomi_to_mora(
     return None
 
 
+def get_kunyomi_reading_variants(
+    kunyomi_reading: str, kanji: str, logger: Logger = Logger("error")
+) -> list[KunyomiReadingToTry]:
+    """
+    Generate reading variants for a given kunyomi reading.
+
+    This includes the base reading (stem) and noun form variants if applicable.
+
+    :param kunyomi_reading: The original kunyomi reading (may include okurigana marker)
+    :param kanji: The kanji character this reading is for
+    :return: List of tuples (reading_to_match, base_variant, original_reading)
+    """
+    if not kunyomi_reading:
+        return []
+    # Remove parentheses content
+    try:
+        kunyomi_reading = kunyomi_reading.split("(")[0].strip()
+    except Exception:
+        logger.error(f"get_kunyomi_reading_variants - invalid kunyomi_reading: {kunyomi_reading}")
+        return []
+    if not kunyomi_reading:
+        return []
+
+    # Extract stem (portion before "." marker)
+    if "." in kunyomi_reading:
+        stem = kunyomi_reading.split(".")[0]
+        dict_form_okuri = kunyomi_reading.split(".")[1]
+        # Also extract full reading (without dot) for cases without okurigana
+        full_reading = kunyomi_reading.replace(".", "")
+    else:
+        stem = kunyomi_reading
+        dict_form_okuri = ""
+        full_reading = kunyomi_reading
+
+    # Build list of readings to try (in priority order)
+    readings_to_try: list[KunyomiReadingToTry] = []
+
+    # 1. Try stem first (e.g., "ひ" from "ひ.く")
+    readings_to_try.append(KunyomiReadingToTry(stem, "plain", kunyomi_reading))
+
+    # 2. If the reading has okurigana, try noun form variants
+    # (e.g., "ひき" is the noun form of "ひ.く" where く→き)
+    # This applies to both middle and last kanji (for compound noun forms like 書留)
+    if dict_form_okuri:
+        # Get noun form okurigana
+        noun_form_okuri = get_verb_noun_form_okuri(dict_form_okuri, kanji, kunyomi_reading)
+        if noun_form_okuri:
+            noun_form_reading = f"{stem}{noun_form_okuri}"
+            if noun_form_reading != full_reading:
+                readings_to_try.append(
+                    KunyomiReadingToTry(noun_form_reading, "plain", kunyomi_reading)
+                )
+
+    # 3. Try full reading if not already tried (e.g., "ひく" from "ひ.く")
+    if full_reading != stem and full_reading not in [r.reading_to_match for r in readings_to_try]:
+        readings_to_try.append(KunyomiReadingToTry(full_reading, "plain", kunyomi_reading))
+
+    return readings_to_try
+
+
 def match_kunyomi_to_mora(
     kanji: str,
     mora_sequence: str,
-    kanji_data: dict,
     okurigana: str,
     is_last_kanji: bool,
+    kanji_data: Optional[KanjiData] = None,
+    kanji_reading_data: Optional[KanjiReadingData] = None,
     logger: Logger = Logger("error"),
 ) -> Optional[ReadingMatchInfo]:
     """
@@ -237,14 +388,18 @@ def match_kunyomi_to_mora(
 
     :param kanji: The kanji character to match
     :param mora_sequence: Joined mora string to match against
-    :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param okurigana: The okurigana following the word (used for last kanji okurigana extraction)
     :param is_last_kanji: Whether this is the last kanji in the word
+    :param kanji_data: Optional dict containing onyomi/kunyomi data for this kanji, either this
+        or kanji_reading_data must be provided
+    :param kanji_reading_data: Optional cached kunyomi reading dict for this kanji, either this or
+        kanji_data must be provided
     :return: ReadingMatchInfo if match found, None otherwise
     """
 
-    kunyomi = kanji_data.get("kunyomi", "")
-    if not kunyomi:
+    kunyomi = kanji_data.get("kunyomi", "") if kanji_data else ""
+    kunyomi_reading_data = kanji_reading_data.get("kunyomi", None) if kanji_reading_data else None
+    if not kunyomi and not kunyomi_reading_data:
         return None
 
     # Special handling for 為 (する verb) - add conjugated stems し and さ
@@ -262,119 +417,116 @@ def match_kunyomi_to_mora(
             rest_kana="",
         )
 
-    # Parse kunyomi readings
-    kunyomi_readings = [r.strip() for r in kunyomi.split("、")]
-
     # When this is the last kanji and okurigana is present, prefer readings whose
     # okurigana marker best matches the remaining kana. Collect candidates and pick best.
     best_candidate: Optional[ReadingMatchInfo] = None
     best_candidate_score: int = -1
 
-    for kunyomi_reading in kunyomi_readings:
-        # Remove parentheses content
-        kunyomi_reading = kunyomi_reading.split("(")[0].strip()
-        if not kunyomi_reading:
-            continue
-
-        # Extract stem (portion before "." marker)
-        if "." in kunyomi_reading:
-            stem = kunyomi_reading.split(".")[0]
-            dict_form_okuri = kunyomi_reading.split(".")[1]
-            # Also extract full reading (without dot) for cases without okurigana
-            full_reading = kunyomi_reading.replace(".", "")
+    def process_candidate(
+        matched_reading: str,
+        reading_variant: str,
+        original_reading: str,
+    ) -> Optional[ReadingMatchInfo]:
+        nonlocal best_candidate, best_candidate_score
+        candidate = ReadingMatchInfo(
+            reading=matched_reading,
+            dict_form=original_reading,
+            match_type="kunyomi",
+            reading_variant=reading_variant if reading_variant != "none" else base_variant,
+            matched_mora=mora_sequence,
+            kanji=kanji,
+            okurigana="",
+            rest_kana="",
+        )
+        # If we are at the last kanji and have okurigana to match, score this candidate
+        if is_last_kanji and okurigana:
+            # If this reading has an okurigana marker, check how well it matches
+            if "." in original_reading:
+                reading_okurigana = original_reading.split(".", 1)[1]
+                # Minimal word_data/highlight_args for scoring
+                word_data = {
+                    "okurigana": okurigana,
+                    "word": kanji,
+                    "kanji_pos": 0,
+                    "kanji_count": 1,
+                    "furigana": "",
+                    "furigana_is_katakana": False,
+                    "edge": "whole",
+                }
+                highlight_args = {
+                    "onyomi": "",
+                    "kunyomi": original_reading,
+                    "kanji_to_match": kanji,
+                    "kanji_to_highlight": kanji,
+                    "add_highlight": False,
+                    "edge": "whole",
+                    "full_word": kanji,
+                    "full_furigana": "",
+                }
+                res = check_okurigana_for_inflection(
+                    reading_okurigana=reading_okurigana,
+                    reading=original_reading,
+                    word_data=word_data,
+                    highlight_args=highlight_args,
+                    logger=logger,
+                )
+                # Score by length of matched okuri (prefer full matches)
+                score = len(res.okurigana)
+                if res.result == "full_okuri":
+                    # Perfect match, return immediately
+                    return candidate
+                if score > best_candidate_score:
+                    best_candidate = candidate
+                    best_candidate_score = score
+                # Return None to continue processing other candidates
+                return None
         else:
-            stem = kunyomi_reading
-            dict_form_okuri = ""
-            full_reading = kunyomi_reading
+            # If not last kanji or no okurigana to match, return first found
+            return candidate
+        if best_candidate is None:
+            # If not scoring or no okurigana marker, fall back to first matched candidate
+            best_candidate = candidate
+            best_candidate_score = max(best_candidate_score, 0)
+        return None
 
-        # Build list of readings to try (in priority order)
-        readings_to_try = []
+    # Try cached kunyomi readings, if given
+    if kunyomi_reading_data:
+        # Try cached kunyomi readings. Check both the base key and the _u_dropped
+        # variant for okurigana that starts with っ so regular stems still match.
+        mora_keys = [mora_sequence]
+        if okurigana and okurigana[0] == "っ":
+            mora_keys.insert(0, f"{mora_sequence}_u_dropped")
 
-        # 1. Try stem first (e.g., "ひ" from "ひ.く")
-        readings_to_try.append((stem, "plain", kunyomi_reading))
+        for mora_key in mora_keys:
+            if mora_key in kunyomi_reading_data:
+                candidate_data: list[list[str, ReadingType]] = kunyomi_reading_data[mora_key]
+                for original_reading, reading_variant in candidate_data:
+                    candidate = process_candidate(mora_sequence, reading_variant, original_reading)
+                    if candidate:
+                        return candidate
 
-        # 2. If the reading has okurigana, try noun form variants
-        # (e.g., "ひき" is the noun form of "ひ.く" where く→き)
-        # This applies to both middle and last kanji (for compound noun forms like 書留)
-        if dict_form_okuri:
-            # Get noun form okurigana
-            noun_form_okuri = get_verb_noun_form_okuri(dict_form_okuri, kanji, kunyomi_reading)
-            if noun_form_okuri:
-                noun_form_reading = f"{stem}{noun_form_okuri}"
-                if noun_form_reading != full_reading:
-                    readings_to_try.append((noun_form_reading, "plain", kunyomi_reading))
+        # If cached lookup didn't produce a result and we have kanji_data, fall back to non-cached
+        if best_candidate:
+            return best_candidate
+        return None
 
-        # 3. Try full reading if not already tried (e.g., "ひく" from "ひ.く")
-        if full_reading != stem and full_reading not in [r[0] for r in readings_to_try]:
-            readings_to_try.append((full_reading, "plain", kunyomi_reading))
-
+    # Parse kunyomi readings
+    kunyomi_readings = [r.strip() for r in kunyomi.split("、")]
+    for kunyomi_reading in kunyomi_readings:
+        readings_to_try = get_kunyomi_reading_variants(kunyomi_reading, kanji, logger=logger)
         # Try to match each reading variant
         for reading_to_match, base_variant, original_reading in readings_to_try:
             matched_reading, reading_variant = check_reading_match(
                 reading_to_match,
                 mora_sequence,
                 okurigana if is_last_kanji else "",
+                logger=logger,
             )
 
             if matched_reading:
-                candidate = ReadingMatchInfo(
-                    reading=matched_reading,
-                    dict_form=original_reading,
-                    match_type="kunyomi",
-                    reading_variant=reading_variant if reading_variant != "none" else base_variant,
-                    matched_mora=mora_sequence,
-                    kanji=kanji,
-                    okurigana="",
-                    rest_kana="",
-                )
-                # If we are at the last kanji and have okurigana to match, score this candidate
-                if is_last_kanji and okurigana:
-                    # If this reading has an okurigana marker, check how well it matches
-                    if "." in original_reading:
-                        reading_okurigana = original_reading.split(".", 1)[1]
-                        # Minimal word_data/highlight_args for scoring
-                        word_data = {
-                            "okurigana": okurigana,
-                            "word": kanji,
-                            "kanji_pos": 0,
-                            "kanji_count": 1,
-                            "furigana": "",
-                            "furigana_is_katakana": False,
-                            "edge": "whole",
-                        }
-                        highlight_args = {
-                            "onyomi": "",
-                            "kunyomi": original_reading,
-                            "kanji_to_match": kanji,
-                            "kanji_to_highlight": kanji,
-                            "add_highlight": False,
-                            "edge": "whole",
-                            "full_word": kanji,
-                            "full_furigana": "",
-                        }
-                        res = check_okurigana_for_inflection(
-                            reading_okurigana=reading_okurigana,
-                            reading=original_reading,
-                            word_data=word_data,
-                            highlight_args=highlight_args,
-                        )
-                        # Score by length of matched okuri (prefer full matches)
-                        score = len(res.okurigana)
-                        if res.result == "full_okuri":
-                            # Perfect match, return immediately
-                            return candidate
-                        if score > best_candidate_score:
-                            best_candidate = candidate
-                            best_candidate_score = score
-                        # Continue checking other readings to find a better match
-                        continue
-                else:
-                    # Not last kanji or no okurigana to match, return first found
+                candidate = process_candidate(matched_reading, reading_variant, original_reading)
+                if candidate:
                     return candidate
-                # If not scoring or no okurigana marker, fall back to first matched candidate
-                if best_candidate is None:
-                    best_candidate = candidate
-                    best_candidate_score = max(best_candidate_score, 0)
 
     return best_candidate
 
@@ -382,10 +534,11 @@ def match_kunyomi_to_mora(
 def match_reading_to_mora(
     kanji: str,
     mora_sequence: str,
-    kanji_data: dict,
     okurigana: str,
     is_last_kanji: bool,
     prefer_kunyomi: bool = False,
+    kanji_data: Optional[KanjiData] = None,
+    kanji_reading_data: Optional[KanjiReadingData] = None,
     logger: Logger = Logger("error"),
 ) -> Optional[ReadingMatchInfo]:
     """
@@ -404,26 +557,50 @@ def match_reading_to_mora(
     if prefer_kunyomi:
         # Try kunyomi first when okurigana is present and kunyomi is more likely
         kunyomi_match = match_kunyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji=kanji,
+            mora_sequence=mora_sequence,
+            okurigana=okurigana,
+            is_last_kanji=is_last_kanji,
+            kanji_data=kanji_data,
+            kanji_reading_data=kanji_reading_data,
+            logger=logger,
         )
         if kunyomi_match:
             return kunyomi_match
 
         onyomi_match = match_onyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji=kanji,
+            mora_sequence=mora_sequence,
+            okurigana=okurigana,
+            is_last_kanji=is_last_kanji,
+            kanji_data=kanji_data,
+            kanji_reading_data=kanji_reading_data,
+            logger=logger,
         )
         if onyomi_match:
             return onyomi_match
     else:
         # Default order: onyomi then kunyomi
         onyomi_match = match_onyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji=kanji,
+            mora_sequence=mora_sequence,
+            okurigana=okurigana,
+            is_last_kanji=is_last_kanji,
+            kanji_data=kanji_data,
+            kanji_reading_data=kanji_reading_data,
+            logger=logger,
         )
         if onyomi_match:
             return onyomi_match
 
         kunyomi_match = match_kunyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji=kanji,
+            mora_sequence=mora_sequence,
+            okurigana=okurigana,
+            is_last_kanji=is_last_kanji,
+            kanji_data=kanji_data,
+            kanji_reading_data=kanji_reading_data,
+            logger=logger,
         )
         if kunyomi_match:
             return kunyomi_match

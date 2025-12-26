@@ -30,9 +30,9 @@ try:
 except ImportError:
     from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 try:
-    from kanji.all_kanji_data import all_kanji_data
+    from kanji.all_kanji_reading_data import all_kanji_reading_data
 except ImportError:
-    from ..kanji.all_kanji_data import all_kanji_data
+    from ..kanji.all_kanji_reading_data import all_kanji_reading_data
 try:
     from utils.logger import Logger
 except ImportError:
@@ -69,6 +69,7 @@ def find_first_complete_alignment(
     mora_list: Optional[list[str]] = None,
     possible_splits: Optional[list[list[str]]] = None,
     is_whole_word: bool = False,
+    matches_cache: Optional[dict[tuple, Optional[ReadingMatchInfo]]] = None,
     logger: Logger = Logger("error"),
 ) -> MoraAlignment:
     """
@@ -118,7 +119,9 @@ def find_first_complete_alignment(
     best_jukujikun_count = kanji_count + 1  # Start with worst possible
     best_chars_matched_count = 0
 
-    youon_mora_splits = []
+    youon_mora_splits: list[list[str]] = []
+
+    matches_cache: dict[tuple, Optional[ReadingMatchInfo]] = {}
 
     def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
         nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count, youon_mora_splits
@@ -138,6 +141,12 @@ def find_first_complete_alignment(
             next_kanji = word[i + 1] if i < kanji_count - 1 else ""
             next_kanji_is_repeater = next_kanji == "々" or next_kanji == kanji
 
+            # Get kanji reading data
+            kanji_reading_data = all_kanji_reading_data.get(kanji, None)
+            if kanji_reading_data is None:
+                logger.error(f"Kanji data not found for '{kanji}'")
+                kanji_reading_data = {}
+
             # Join the mora sublist for this kanji position
             try:
                 mora_sequence = mora_split[i]
@@ -147,33 +156,9 @@ def find_first_complete_alignment(
                     "find_first_complete_alignment - mora_split contains fewer parts than"
                     f" kanji_count for word '{word}': {mora_split} vs {kanji_count}"
                 )
-
-            # IMPORTANT: For repeater kanji, do NOT include the next position's mora
-            # We match ONLY the first occurrence, then validate the second separately
-
-            # Get kanji data
-            kanji_data = all_kanji_data.get(kanji, None)
-            if kanji_data is None:
-                logger.error(f"Kanji data not found for '{kanji}'")
-                kanji_data = {}
-
-            # Try to match reading
-            match_info = match_reading_to_mora(
-                kanji=kanji,
-                mora_sequence=mora_sequence,
-                kanji_data=kanji_data,
-                okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
-                is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
-                prefer_kunyomi=is_whole_word,
-                logger=logger,
-            )
-            logger.debug(
-                f"find_first_complete_alignment - kanji: {kanji}, mora_sequence: {mora_sequence},"
-                f" match_info: {match_info}"
-            )
             # Test for possible youon match
             prev_mora_sequence = mora_split[i - 1] if i > 0 else None
-            if (
+            check_youon = (
                 not skip_youon_check
                 and not next_kanji_is_repeater
                 # yōon only possible if previous mora exists
@@ -181,14 +166,72 @@ def find_first_complete_alignment(
                 # current mora must be a yōon type
                 and len(mora_sequence) == 2
                 and mora_sequence[1] in ["ゃ", "ゅ", "ょ"]
+            )
+
+            # Rule out this mora_sequence if the kanji has no reading data of the same length
+            length_keys_set = {str(len(mora_sequence))}
+            if check_youon:
+                length_keys_set.add("1")
+            length_keys_list = list(length_keys_set)
+            if "lengths" in kanji_reading_data and not any(
+                lk in kanji_reading_data["lengths"] for lk in length_keys_list
             ):
+                logger.debug(
+                    "find_first_complete_alignment - skipping mora_sequence due to length mismatch:"
+                    f" kanji: {kanji}, mora_sequence: {mora_sequence},"
+                    f" available lengths: {list(kanji_reading_data['lengths'].keys())}"
+                )
+                # No possible reading of this length for the kanji
+                kanji_matches.append(None)
+                jukujikun_positions.append(i)
+
+                # If this has a repeater, also mark repeater as jukujikun
+                if next_kanji_is_repeater:
+                    kanji_matches.append(None)
+                    jukujikun_positions.append(i + 1)
+                    i += 2
+                    continue
+
+                i += 1
+                continue
+
+            # IMPORTANT: For repeater kanji, do NOT include the next position's mora
+            # We match ONLY the first occurrence, then validate the second separately
+
+            # Try to match reading, first from cache
+            cache_key = (
+                kanji,
+                mora_sequence,
+                okurigana if is_last_kanji and not next_kanji_is_repeater else "",
+                is_last_kanji and not next_kanji_is_repeater,
+                is_whole_word,
+            )
+            if cache_key in matches_cache:
+                match_info = matches_cache[cache_key]
+            else:
+                match_info = match_reading_to_mora(
+                    kanji=kanji,
+                    mora_sequence=mora_sequence,
+                    kanji_reading_data=kanji_reading_data,
+                    okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
+                    is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
+                    prefer_kunyomi=is_whole_word,
+                    logger=logger,
+                )
+                matches_cache[cache_key] = match_info
+            logger.debug(
+                f"find_first_complete_alignment - kanji: {kanji}, mora_sequence: {mora_sequence},"
+                f" match_info: {match_info}"
+            )
+
+            if check_youon:
                 small = mora_sequence[1]
                 # If the current kanji matches the small kana as yōon, we'll make a new youon
                 # mora split to be tested fully after this loop
                 youon_match_info = match_reading_to_mora(
                     kanji=kanji,
                     mora_sequence=small,
-                    kanji_data=kanji_data,
+                    kanji_reading_data=kanji_reading_data,
                     okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
                     is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
                     prefer_kunyomi=is_whole_word,

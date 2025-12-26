@@ -70,6 +70,7 @@ try:
         MoraAlignment,
         ReadingType,
         WrapMatchEntry,
+        ReadingMatchInfo,
     )
 except ImportError:
     from ..all_types.main_types import (
@@ -81,6 +82,7 @@ except ImportError:
         FinalResult,
         MoraAlignment,
         ReadingType,
+        ReadingMatchInfo,
     )
 try:
     from kana.furigana_exceptions import check_exception
@@ -1236,6 +1238,7 @@ def kana_highlight(
         alignment_word = replace_numeric_substrings(full_word)
         alignment = None
         was_katakana = False
+        matches_cache: dict[tuple, Optional[ReadingMatchInfo]] = {}
 
         if is_whole_word_case:
             possible_whole_word_splits, was_katakana = whole_word_mora_split(
@@ -1250,6 +1253,7 @@ def kana_highlight(
                 okurigana=okurigana,
                 possible_splits=possible_whole_word_splits,
                 is_whole_word=True,
+                matches_cache=matches_cache,
                 logger=logger,
             )
         else:
@@ -1261,6 +1265,7 @@ def kana_highlight(
                 okurigana=okurigana,
                 mora_list=mora_result["mora_list"],
                 is_whole_word=False,
+                matches_cache=matches_cache,
                 logger=logger,
             )
 

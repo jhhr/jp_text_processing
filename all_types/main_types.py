@@ -183,7 +183,9 @@ class OkuriResults(NamedTuple):
     part_of_speech: Optional[PartOfSpeech] = None
 
 
-ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change"]
+ReadingType = Literal[
+    "none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change", "u_dropped"
+]
 
 
 class ReadingMatchInfo(TypedDict):
@@ -228,3 +230,26 @@ class MoraAlignment(TypedDict):
     is_complete: bool
     final_okurigana: str
     final_rest_kana: str
+
+
+class KunyomiReadingToTry(NamedTuple):
+    reading_to_match: str
+    reading_type: ReadingType
+    original_reading: str
+
+
+# Raw kanji data contains onyomi and kunyomi strings separated by "、"
+class KanjiData(TypedDict):
+    onyomi: str
+    kunyomi: str
+
+
+# Processed kanji reading data with matched readings, stored as a dict from the reading variant
+# original reading + reading type
+class KanjiReadingData(TypedDict):
+    # onyomi only store one reading variant per matched reading
+    onyomi: dict[str, list[str, ReadingType]]
+    # multiple kunyomi can map to same reading variant, as there can be okurigana differences
+    kunyomi: dict[str, list[list[str, ReadingType]]]
+    # all reading lengths for ruling out of impossible matches
+    lengths: dict[int, bool]
