@@ -361,12 +361,16 @@ def match_kunyomi_to_mora(
                         # Score by length of matched okuri (prefer full matches)
                         score = len(res.okurigana)
                         if res.result == "full_okuri":
-                            score += 1000
+                            # Perfect match, return immediately
+                            return candidate
                         if score > best_candidate_score:
                             best_candidate = candidate
                             best_candidate_score = score
                         # Continue checking other readings to find a better match
                         continue
+                else:
+                    # Not last kanji or no okurigana to match, return first found
+                    return candidate
                 # If not scoring or no okurigana marker, fall back to first matched candidate
                 if best_candidate is None:
                     best_candidate = candidate
