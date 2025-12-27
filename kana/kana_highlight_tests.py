@@ -1,7 +1,5 @@
-import sys
+from typing import Optional, Tuple, Callable
 import time
-
-from typing import Optional, Tuple
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
@@ -16,101 +14,130 @@ except ImportError:
     from ..utils.logger import Logger
 
 
-def test(
-    test_name: str,
-    kanji: Optional[str],
-    sentence: str,
-    ignore_fail: bool = False,
-    onyomi_to_katakana: bool = True,
-    include_suru_okuri: bool = False,
-    debug: bool = False,
-    expected_furigana: Optional[str] = None,
-    expected_furigana_with_tags_split: Optional[str] = None,
-    expected_furigana_with_tags_merged: Optional[str] = None,
-    expected_furikanji: Optional[str] = None,
-    expected_furikanji_with_tags_split: Optional[str] = None,
-    expected_furikanji_with_tags_merged: Optional[str] = None,
-    expected_kana_only: Optional[str] = None,
-    expected_kana_only_with_tags_split: Optional[str] = None,
-    expected_kana_only_with_tags_merged: Optional[str] = None,
-):
-    """
-    Function that tests the kana_highlight function
-    """
-    cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
-        (
-            "furigana",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana,
-        ),
-        (
-            "furigana",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana_with_tags_split,
-        ),
-        (
-            "furigana",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_furigana_with_tags_merged,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji_with_tags_split,
-        ),
-        (
-            "furikanji",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_furikanji_with_tags_merged,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only_with_tags_split,
-        ),
-        (
-            "kana_only",
-            WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
-            expected_kana_only_with_tags_merged,
-        ),
-    ]
-    for return_type, with_tags_def, expected in cases:
-        if not expected:
-            continue
-        logger = Logger("debug") if debug else Logger("error")
-        result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
-        if debug:
-            print("\n\n")
-        try:
-            assert result == expected
-        except AssertionError:
-            if ignore_fail:
+def main():
+    failed_test_count: int = 0
+    test_count: int = 0
+    rerun_test_with_debug: Optional[Callable] = None
+
+    def test(
+        test_name: str,
+        kanji: Optional[str],
+        sentence: str,
+        ignore_fail: bool = False,
+        onyomi_to_katakana: bool = True,
+        include_suru_okuri: bool = False,
+        debug: bool = False,
+        expected_furigana: Optional[str] = None,
+        expected_furigana_with_tags_split: Optional[str] = None,
+        expected_furigana_with_tags_merged: Optional[str] = None,
+        expected_furikanji: Optional[str] = None,
+        expected_furikanji_with_tags_split: Optional[str] = None,
+        expected_furikanji_with_tags_merged: Optional[str] = None,
+        expected_kana_only: Optional[str] = None,
+        expected_kana_only_with_tags_split: Optional[str] = None,
+        expected_kana_only_with_tags_merged: Optional[str] = None,
+    ):
+        """
+        Function that tests the kana_highlight function
+        """
+        cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
+            (
+                "furigana",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana,
+            ),
+            (
+                "furigana",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana_with_tags_split,
+            ),
+            (
+                "furigana",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_furigana_with_tags_merged,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji_with_tags_split,
+            ),
+            (
+                "furikanji",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_furikanji_with_tags_merged,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(False, False, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(True, False, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only_with_tags_split,
+            ),
+            (
+                "kana_only",
+                WithTagsDef(True, True, onyomi_to_katakana, include_suru_okuri),
+                expected_kana_only_with_tags_merged,
+            ),
+        ]
+        for return_type, with_tags_def, expected in cases:
+            nonlocal rerun_test_with_debug, failed_test_count
+            if not expected:
                 continue
-            # Re-run with logging enabled to see what went wrong
-            kana_highlight(kanji, sentence, return_type, with_tags_def, logger=Logger("debug"))
-            # Highlight the diff between the expected and the result
-            print(f"""\033[91m{test_name}
+            logger = Logger("debug") if debug else Logger("error")
+            rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
+            try:
+                result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
+            except Exception:
+                # Uncaught exception, rerun with debug logging
+                failed_test_count += 1
+
+                def rerun():
+                    try:
+                        kana_highlight(*rerun_args)
+                    except Exception as e:
+                        print(f"Error during rerun with debug logging: {e}")
+
+                if rerun_test_with_debug is None:
+                    rerun_test_with_debug = rerun
+                continue
+
+            if debug:
+                print("\n\n")
+            try:
+                nonlocal test_count
+                test_count += 1
+                assert result == expected
+            except AssertionError:
+                if ignore_fail:
+                    continue
+                failed_test_count += 1
+                cur_test_num = test_count
+
+                # Highlight the diff between the expected and the result
+                diff = f"""\033[91mTest {cur_test_num}: {test_name}
 Return type: {return_type}
-{'With tags' if with_tags_def.with_tags else ''}
-{'Tags merged' if with_tags_def.merge_consecutive else ''}
+{'No tags' if not with_tags_def.with_tags else ''}{'Tags split' if with_tags_def.with_tags and not with_tags_def.merge_consecutive else ''}{'Tags merged' if with_tags_def.with_tags and with_tags_def.merge_consecutive else ''}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
-\033[0m""")
-            # Stop testing here
-            sys.exit(0)
+{expected == result and "\033[92m✓" or "\033[91m✗"}
+\033[0m"""
 
+                # Store the first failed test with logging enabled to see what went wrong
+                def rerun():
+                    kana_highlight(*rerun_args)
+                    print(diff)
 
-def main():
+                if rerun_test_with_debug is None:
+                    rerun_test_with_debug = rerun
+
     start_time = time.time()
     test(
         test_name="Should not crash with no kanji_to_highlight",
@@ -296,6 +323,48 @@ def main():
         expected_furikanji_with_tags_merged=(
             "<b><kun> とな[隣]</kun><oku>り</oku></b><kun> あ[合]</kun><oku>わせ</oku>の"
             "<kun> まち[町]</kun>。"
+        ),
+    )
+    test(
+        test_name="Should work for 4-kanji word",
+        kanji="漢",
+        sentence="漢字読解[かんじどっかい]",
+        expected_kana_only="<b>カン</b>ジドッカイ",
+        expected_furigana="<b> 漢[カン]</b> 字読解[ジドッカイ]",
+        expected_furikanji="<b> カン[漢]</b> ジドッカイ[字読解]",
+        expected_kana_only_with_tags_split="<b><on>カン</on></b><on>ジ</on><on>ドッ</on><on>カイ</on>",
+        expected_furigana_with_tags_split=(
+            "<b><on> 漢[カン]</on></b><on> 字[ジ]</on><on> 読[ドッ]</on><on> 解[カイ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> カン[漢]</on></b><on> ジ[字]</on><on> ドッ[読]</on><on> カイ[解]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<b><on>カン</on></b><on>ジドッカイ</on>",
+        expected_furigana_with_tags_merged="<b><on> 漢[カン]</on></b><on> 字読解[ジドッカイ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> カン[漢]</on></b><on> ジドッカイ[字読解]</on>",
+    )
+    test(
+        test_name="Should work for 5-kanji word",
+        kanji="報",
+        sentence="情報処理技術者[じょうほうしょりぎじゅつしゃ]",
+        expected_kana_only="ジョウ<b>ホウ</b>ショリギジュツシャ",
+        expected_furigana=" 情[ジョウ]<b> 報[ホウ]</b> 処理技術者[ショリギジュツシャ]",
+        expected_furikanji=" ジョウ[情]<b> ホウ[報]</b> ショリギジュツシャ[処理技術者]",
+        expected_kana_only_with_tags_split="<on>ジョウ</on><b><on>ホウ</on></b><on>ショ</on><on>リ</on><on>ギ</on><on>ジュツ</on><on>シャ</on>",
+        expected_furigana_with_tags_split=(
+            "<on> 情[ジョウ]</on><b><on> 報[ホウ]</on></b><on> 処[ショ]</on><on> 理[リ]</on>"
+            "<on> 技[ギ]</on><on> 術[ジュツ]</on><on> 者[シャ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> ジョウ[情]</on><b><on> ホウ[報]</on></b><on> ショ[処]</on><on> リ[理]</on>"
+            "<on> ギ[技]</on><on> ジュツ[術]</on><on> シャ[者]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>ジョウ</on><b><on>ホウ</on></b><on>ショリギジュツシャ</on>",
+        expected_furigana_with_tags_merged=(
+            "<on> 情[ジョウ]</on><b><on> 報[ホウ]</on></b><on> 処理技術者[ショリギジュツシャ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> ジョウ[情]</on><b><on> ホウ[報]</on></b><on> ショリギジュツシャ[処理技術者]</on>"
         ),
     )
     test(
@@ -928,6 +997,21 @@ def main():
         expected_kana_only_with_tags_merged="<b><kun>くち</kun></b><kun>べに</kun>",
         expected_furigana_with_tags_merged="<b><kun> 口[くち]</kun></b><kun> 紅[べに]</kun>",
         expected_furikanji_with_tags_merged="<b><kun> くち[口]</kun></b><kun> べに[紅]</kun>",
+    )
+    test(
+        test_name="Should match the full reading match when there are multiple 3/",
+        kanji="主",
+        # Both シュ (on) and シュウ (on) are in the furigana but the correct match is シュウ
+        sentence="主従[しゅうじゅう]",
+        expected_kana_only="<b>シュウ</b>ジュウ",
+        expected_furigana="<b> 主[シュウ]</b> 従[ジュウ]",
+        expected_furikanji="<b> シュウ[主]</b> ジュウ[従]",
+        expected_kana_only_with_tags_split="<b><on>シュウ</on></b><on>ジュウ</on>",
+        expected_furigana_with_tags_split="<b><on> 主[シュウ]</on></b><on> 従[ジュウ]</on>",
+        expected_furikanji_with_tags_split="<b><on> シュウ[主]</on></b><on> ジュウ[従]</on>",
+        expected_kana_only_with_tags_merged="<b><on>シュウ</on></b><on>ジュウ</on>",
+        expected_furigana_with_tags_merged="<b><on> 主[シュウ]</on></b><on> 従[ジュウ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> シュウ[主]</on></b><on> ジュウ[従]</on>",
     )
     test(
         test_name="small tsu 1/",
@@ -1565,15 +1649,15 @@ def main():
         test_name="jukujikun test 清々しい with highlight",
         kanji="清",
         sentence="清清[すがすが]しい",
-        expected_kana_only="<b>すがすが</b>しい",
-        expected_furigana="<b> 清々[すがすが]</b>しい",
-        expected_furikanji="<b> すがすが[清々]</b>しい",
-        expected_kana_only_with_tags_split="<b><juk>すがすが</juk></b><oku>しい</oku>",
-        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
-        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
-        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk></b><oku>しい</oku>",
-        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk></b><oku>しい</oku>",
-        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk></b><oku>しい</oku>",
+        expected_kana_only="<b>すがすがしい</b>",
+        expected_furigana="<b> 清々[すがすが]しい</b>",
+        expected_furikanji="<b> すがすが[清々]しい</b>",
+        expected_kana_only_with_tags_split="<b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_split="<b><juk> 清々[すがすが]</juk><oku>しい</oku></b>",
+        expected_furikanji_with_tags_split="<b><juk> すがすが[清々]</juk><oku>しい</oku></b>",
+        expected_kana_only_with_tags_merged="<b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged="<b><juk> 清々[すがすが]</juk><oku>しい</oku></b>",
+        expected_furikanji_with_tags_merged="<b><juk> すがすが[清々]</juk><oku>しい</oku></b>",
     )
     test(
         test_name="jukujikun test 清々しい with another word at left - no highlight",
@@ -1582,26 +1666,34 @@ def main():
         expected_kana_only="チョウすがすがしい",
         expected_furigana=" 趙清々[チョウすがすが]しい",
         expected_furikanji=" チョウすがすが[趙清々]しい",
-        expected_kana_only_with_tags_split="<on>チョウ</on><juk>すがすが</juk>しい",
-        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
-        expected_kana_only_with_tags_merged="<on>チョウ</on><juk>すがすが</juk>しい",
-        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk>しい",
-        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><juk> すがすが[清々]</juk>しい",
+        expected_kana_only_with_tags_split="<on>チョウ</on><juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><juk> すがすが[清々]</juk><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<on>チョウ</on><juk>すがすが</juk><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><juk> 清々[すがすが]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><juk> すがすが[清々]</juk><oku>しい</oku>",
     )
     test(
         test_name="jukujikun test 清々しい with another word at left - with highlight",
         kanji="清",
         sentence="趙清々[ちょうすがすが]しい",
-        expected_kana_only="チョウ<b>すがすが</b>しい",
-        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]</b>しい",
-        expected_furikanji=" チョウ[趙]<b> すがすが[清々]</b>しい",
-        expected_kana_only_with_tags_split="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_split="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_split="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
-        expected_kana_only_with_tags_merged="<on>チョウ</on><b><juk>すがすが</juk></b>しい",
-        expected_furigana_with_tags_merged="<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk></b>しい",
-        expected_furikanji_with_tags_merged="<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk></b>しい",
+        expected_kana_only="チョウ<b>すがすがしい</b>",
+        expected_furigana=" 趙[チョウ]<b> 清々[すがすが]しい</b>",
+        expected_furikanji=" チョウ[趙]<b> すがすが[清々]しい</b>",
+        expected_kana_only_with_tags_split="<on>チョウ</on><b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_split=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk><oku>しい</oku></b>"
+        ),
+        expected_kana_only_with_tags_merged="<on>チョウ</on><b><juk>すがすが</juk><oku>しい</oku></b>",
+        expected_furigana_with_tags_merged=(
+            "<on> 趙[チョウ]</on><b><juk> 清々[すがすが]</juk><oku>しい</oku></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> チョウ[趙]</on><b><juk> すがすが[清々]</juk><oku>しい</oku></b>"
+        ),
     )
     test(
         test_name="jukujikun test 清々しい in middle of two words - no highlight",
@@ -1680,6 +1772,34 @@ def main():
         expected_kana_only="おい<b>らん</b>",
         expected_kana_only_with_tags_split="<juk>おい</juk><b><juk>らん</juk></b>",
         expected_kana_only_with_tags_merged="<juk>おい</juk><b><juk>らん</juk></b>",
+    )
+    test(
+        test_name="jukujikun test with small っ - with highlight",
+        kanji="何",
+        sentence="何方[どっち]",
+        expected_kana_only="<b>どっ</b>ち",
+        expected_furigana="<b> 何[どっ]</b> 方[ち]",
+        expected_furikanji="<b> どっ[何]</b> ち[方]",
+        expected_kana_only_with_tags_split="<b><juk>どっ</juk></b><juk>ち</juk>",
+        expected_furigana_with_tags_split="<b><juk> 何[どっ]</juk></b><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_split="<b><juk> どっ[何]</juk></b><juk> ち[方]</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>どっ</juk></b><juk>ち</juk>",
+        expected_furigana_with_tags_merged="<b><juk> 何[どっ]</juk></b><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_merged="<b><juk> どっ[何]</juk></b><juk> ち[方]</juk>",
+    )
+    test(
+        test_name="jukujikun test with small っ - no highlight",
+        kanji="",
+        sentence="何方[どっち]",
+        expected_kana_only="どっち",
+        expected_furigana=" 何方[どっち]",
+        expected_furikanji=" どっち[何方]",
+        expected_kana_only_with_tags_split="<juk>どっ</juk><juk>ち</juk>",
+        expected_furigana_with_tags_split="<juk> 何[どっ]</juk><juk> 方[ち]</juk>",
+        expected_furikanji_with_tags_split="<juk> どっ[何]</juk><juk> ち[方]</juk>",
+        expected_kana_only_with_tags_merged="<juk>どっち</juk>",
+        expected_furigana_with_tags_merged="<juk> 何方[どっち]</juk>",
+        expected_furikanji_with_tags_merged="<juk> どっち[何方]</juk>",
     )
     test(
         test_name="single-kanji juku in middle of word",
@@ -1773,6 +1893,71 @@ def main():
         ),
     )
     test(
+        test_name="jukujikun test 襤褸 matched",
+        kanji="襤",
+        # 襤 has the kunyomi ぼろ, but 襤褸 should be read as the jukujikun ぼろ
+        sentence="襤褸[ぼろ]",
+        expected_kana_only="<b>ぼ</b>ろ",
+        expected_furigana="<b> 襤[ぼ]</b> 褸[ろ]",
+        expected_furikanji="<b> ぼ[襤]</b> ろ[褸]",
+        expected_kana_only_with_tags_split="<b><juk>ぼ</juk></b><juk>ろ</juk>",
+        expected_furigana_with_tags_split="<b><juk> 襤[ぼ]</juk></b><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_split="<b><juk> ぼ[襤]</juk></b><juk> ろ[褸]</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>ぼ</juk></b><juk>ろ</juk>",
+        expected_furigana_with_tags_merged="<b><juk> 襤[ぼ]</juk></b><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_merged="<b><juk> ぼ[襤]</juk></b><juk> ろ[褸]</juk>",
+    )
+    test(
+        test_name="jukujikun test 襤褸 not matched",
+        kanji="",
+        sentence="襤褸[ぼろ]",
+        expected_kana_only="ぼろ",
+        expected_furigana=" 襤褸[ぼろ]",
+        expected_furikanji=" ぼろ[襤褸]",
+        expected_kana_only_with_tags_split="<juk>ぼ</juk><juk>ろ</juk>",
+        expected_furigana_with_tags_split="<juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk>",
+        expected_furikanji_with_tags_split="<juk> ぼ[襤]</juk><juk> ろ[褸]</juk>",
+        expected_kana_only_with_tags_merged="<juk>ぼろ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸[ぼろ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ぼろ[襤褸]</juk>",
+    )
+    test(
+        test_name="jukujikun test 襤褸襤褸 not matched",
+        kanji="",
+        sentence="襤褸襤褸[ぼろぼろ]",
+        expected_kana_only="ぼろぼろ",
+        expected_furigana=" 襤褸襤褸[ぼろぼろ]",
+        expected_furikanji=" ぼろぼろ[襤褸襤褸]",
+        expected_kana_only_with_tags_split="<juk>ぼ</juk><juk>ろ</juk><juk>ぼ</juk><juk>ろ</juk>",
+        expected_furigana_with_tags_split=(
+            "<juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk><juk> 襤[ぼ]</juk><juk> 褸[ろ]</juk>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> ぼ[襤]</juk><juk> ろ[褸]</juk><juk> ぼ[襤]</juk><juk> ろ[褸]</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ぼろぼろ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸襤褸[ぼろぼろ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ぼろぼろ[襤褸襤褸]</juk>",
+    )
+    test(
+        test_name="jukujikun test 襤褸襤褸 as katakana not matched",
+        kanji="",
+        sentence="襤褸襤褸[ボロボロ]",
+        expected_kana_only="ボロボロ",
+        expected_furigana=" 襤褸襤褸[ボロボロ]",
+        expected_furikanji=" ボロボロ[襤褸襤褸]",
+        expected_kana_only_with_tags_split="<juk>ボ</juk><juk>ロ</juk><juk>ボ</juk><juk>ロ</juk>",
+        expected_furigana_with_tags_split=(
+            "<juk> 襤[ボ]</juk><juk> 褸[ロ]</juk><juk> 襤[ボ]</juk><juk> 褸[ロ]</juk>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> ボ[襤]</juk><juk> ロ[褸]</juk><juk> ボ[襤]</juk><juk> ロ[褸]</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ボロボロ</juk>",
+        expected_furigana_with_tags_merged="<juk> 襤褸襤褸[ボロボロ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ボロボロ[襤褸襤褸]</juk>",
+    )
+    test(
         test_name="jukujikun test with other readings after juku word /1",
         kanji="買",
         sentence="風邪薬[かぜぐすり]を買[か]った",
@@ -1817,6 +2002,26 @@ def main():
         expected_kana_only_with_tags_merged="<juk>ばら</juk><b><kun>いろ</kun></b>",
         expected_furigana_with_tags_merged="<juk> 薔薇[ばら]</juk><b><kun> 色[いろ]</kun></b>",
         expected_furikanji_with_tags_merged="<juk> ばら[薔薇]</juk><b><kun> いろ[色]</kun></b>",
+    )
+    test(
+        test_name="jukujikun test with other readings after juku word /3",
+        kanji="",
+        # 路 has the kunyomi じ so this should be used to match over こうじ, so that that only juku
+        # portion becomes うじ that would be assigned to 小
+        sentence="袋小路[ふくろこうじ]",
+        expected_kana_only="ふくろこうじ",
+        expected_furigana=" 袋小路[ふくろこうじ]",
+        expected_furikanji=" ふくろこうじ[袋小路]",
+        expected_kana_only_with_tags_split="<kun>ふくろ</kun><juk>こう</juk><kun>じ</kun>",
+        expected_furigana_with_tags_split="<kun> 袋[ふくろ]</kun><juk> 小[こう]</juk><kun> 路[じ]</kun>",
+        expected_furikanji_with_tags_split=(
+            "<kun> ふくろ[袋]</kun><juk> こう[小]</juk><kun> じ[路]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<kun>ふくろ</kun><juk>こう</juk><kun>じ</kun>",
+        expected_furigana_with_tags_merged="<kun> 袋[ふくろ]</kun><juk> 小[こう]</juk><kun> 路[じ]</kun>",
+        expected_furikanji_with_tags_merged=(
+            "<kun> ふくろ[袋]</kun><juk> こう[小]</juk><kun> じ[路]</kun>"
+        ),
     )
     test(
         test_name="multi-kanji jukujikun word with other readings after juku word non-matched",
@@ -1980,7 +2185,20 @@ def main():
         expected_furikanji_with_tags_merged="<k><juk> ほうれん[菠薐]</juk></k><on> そう[草]</on>",
     )
     test(
-        test_name="ん should be combined with previous mora in jukujikun",
+        test_name="jukujikun test with ー long vowel mark",
+        kanji="",
+        sentence="炒麺[ちゃーめん]",
+        expected_kana_only="ちゃーメン",
+        expected_furigana=" 炒麺[ちゃーメン]",
+        expected_furikanji=" ちゃーメン[炒麺]",
+        expected_kana_only_with_tags_split="<juk>ちゃー</juk><on>メン</on>",
+        expected_furigana_with_tags_split="<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
+        expected_furikanji_with_tags_split="<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
+    )
+    test(
+        test_name=(
+            "ん should be combined with previous mora in jukujikun and handle long vowel mark ー"
+        ),
         kanji="麻",
         sentence="麻雀[まーじゃん]",
         expected_kana_only="<b>まー</b>じゃん",
@@ -2924,7 +3142,7 @@ def main():
         ),
     )
     test(
-        test_name="為る conjugations /!",
+        test_name="為る conjugations /1",
         kanji="",
         sentence="為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",
         expected_kana_only_with_tags_split=(
@@ -2957,6 +3175,7 @@ def main():
     test(
         test_name="correct onyomi for 不 in 不都合",
         kanji="不",
+        # The shorter onyomi フ should be matched instead of フツ
         sentence="不都合[ふつごう]",
         expected_kana_only="<b>フ</b>ツゴウ",
         expected_furigana="<b> 不[フ]</b> 都合[ツゴウ]",
@@ -3125,10 +3344,16 @@ def main():
         expected_furigana_with_tags_merged="<on> 勉強[べんきょう]</on>できるかい？",
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
-    print("\n\033[92mTests passed\033[0m")
+    if failed_test_count == 0:
+        print(f"\n\033[92m All {test_count} tests passed\033[0m")
+    else:
+        print(f"\n\033[91m{failed_test_count}/{test_count} tests failed\033[0m")
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Tests completed in {elapsed_time:.2f} seconds.")
+    if rerun_test_with_debug is not None:
+        print("\nDebug log for first failed test shown below.\n")
+        rerun_test_with_debug()
 
 
 if __name__ == "__main__":
