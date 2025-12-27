@@ -305,17 +305,4 @@ def process_jukujikun_positions(
         extracted_okurigana = okuri_result.okurigana
         extracted_rest_kana = okuri_result.rest_kana
 
-        # Fallback: for jukujikun exceptions where mecab cannot parse (e.g., 清々 + しい),
-        # treat the entire trailing kana as okurigana when nothing was extracted and the
-        # trailing text doesn't look like a standalone particle.
-        particle_heads = {"を", "は", "が", "に", "で", "と", "も", "へ", "の", "や", "か"}
-        if (
-            not extracted_okurigana
-            and remaining_kana
-            and len(remaining_kana) > 1
-            and remaining_kana[0] not in particle_heads
-        ):
-            extracted_okurigana = remaining_kana
-            extracted_rest_kana = ""
-
     return jukujikun_parts, extracted_okurigana, extracted_rest_kana
