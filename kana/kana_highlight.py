@@ -8,9 +8,9 @@ from .construct_wrapped_furi_word import (
 )
 
 try:
-    from mecab_controller.kana_conv import to_katakana, to_hiragana, is_katakana_str
+    from mecab_controller.kana_conv import to_katakana, to_hiragana, is_katakana_str, is_kana_str
 except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_katakana_str
+    from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_katakana_str, is_kana_str
 try:
     from utils.logger import Logger
 except ImportError:
@@ -43,6 +43,7 @@ try:
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
         KATAKANA_REC,
+        NON_KANA_REC,
     )
 except ImportError:
     from ..regex.kanji_furi import (
@@ -50,6 +51,7 @@ except ImportError:
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
         KATAKANA_REC,
+        NON_KANA_REC,
     )
 try:
     from regex.mora import ALL_MORA_REC
@@ -1171,27 +1173,49 @@ def kana_highlight(
             f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
             f" {okurigana}"
         )
-        # if furigana is empty, use a placeholder for furigana and try to return something sensible
-        if not full_furigana:
+        # Clean off non-kana characters from furigana, unless it becomes empty
+        cleaned_furigana = re.sub(NON_KANA_REC, "", full_furigana)
+        if cleaned_furigana:
+            logger.debug(
+                f"furigana_replacer - cleaned furigana: {cleaned_furigana} from original:"
+                f" {full_furigana}"
+            )
+            full_furigana = cleaned_furigana
+        # if furigana is invalid - empty or all non-kana characters - try to return something
+        # sensible
+        if not full_furigana or not is_kana_str(full_furigana):
+            logger.debug(f"furigana_replacer - empty or invalid furigana case: {full_furigana}")
             if return_type == "kana_only":
-                # no furigana, so we return just the okurigana, we can't determine if it's okurigana
-                # for the word, so we can't put tags either
-                return okurigana
+                # return furigana as is, since it's either empty or invalid
+                # Since the kanji are omitted, there's nothing to highlight
+                if not full_furigana or not with_tags_def.with_tags:
+                    return f"{full_furigana}{okurigana}"
+                return f"<err>{full_furigana}</err>{okurigana}"
             if kanji_to_highlight and kanji_to_highlight in full_word:
                 # There's a kanji to highlight, add <b> around the kanji
                 full_word = full_word.replace(kanji_to_highlight, f"<b>{kanji_to_highlight}</b>")
             if return_type == "furigana":
-                if with_tags_def.with_tags:
-                    # Wrap the whole word in <err> tag since we have no furigana
-                    return f"<err>{full_word}</err>{okurigana}"
-                return f"{full_word}{okurigana}"
+                if full_furigana:
+                    if with_tags_def.with_tags:
+                        # Wrap the whole word in <err> tag since the furigana is invalid
+                        return f"<err> {full_word}[{full_furigana}]</err>{okurigana}"
+                    return f" {full_word}[{full_furigana}]{okurigana}"
+                else:
+                    # no furigana, don't add brackets
+                    if with_tags_def.with_tags:
+                        # Wrap the whole word in <err> tag since we have no furigana
+                        return f"<err>{full_word}</err>{okurigana}"
+                    return f"{full_word}{okurigana}"
+            # Since it's expected that the kanji should be hidden, add a placeholder for empty
+            # furigana
+            if not full_furigana:
+                full_furigana = "□"
             if return_type == "furikanji":
-                # Since it's expected that the kanji should be hidden, add a placeholder
-                placeholder = "□"
                 if with_tags_def.with_tags:
                     # Wrap with <err> tag too
-                    return f"<err> {placeholder}[{full_word}]</err>{okurigana}"
-                return f" {placeholder}[{full_word}]{okurigana}"
+                    return f"<err> {full_furigana}[{full_word}]</err>{okurigana}"
+                return f" {full_furigana}[{full_word}]{okurigana}"
+
         # Replace doubled kanji with the repeater character
         full_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
         logger.debug(f"furigana_replacer - word after double kanji: {full_word}")

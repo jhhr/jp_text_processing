@@ -30,3 +30,6 @@ KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGA
 HIRAGANA_RE = "([ぁ-ん])"
 KATAKANA_RE = "([ァ-ン])"
 KATAKANA_REC = re.compile(KATAKANA_RE)
+
+KANA_REC = re.compile(r"[ぁ-んァ-ンー]")
+NON_KANA_REC = re.compile(r"[^ぁ-んァ-ンー]")

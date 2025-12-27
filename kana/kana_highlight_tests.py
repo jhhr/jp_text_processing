@@ -239,6 +239,115 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<err> □[<b>今</b>日]</err>は<on> テンキ[天気]</on>がいい。",
     )
     test(
+        test_name="All non-kana furigana should be preserved - no highlight",
+        kanji="",
+        sentence="漢字[kanji]の読[yo]mi方[kata]を学[mana]bu。",
+        # no tags in kana_only mode
+        expected_kana_only="kanjiのyomikataをmanabu。",
+        expected_furigana=" 漢字[kanji]の 読[yo]mi 方[kata]を 学[mana]bu。",
+        expected_furikanji=" kanji[漢字]の yo[読]mi kata[方]を mana[学]bu。",
+        # all tags will be <err>
+        expected_kana_only_with_tags_split=(
+            "<err>kanji</err>の<err>yo</err>mi<err>kata</err>を<err>mana</err>bu。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<err>kanji</err>の<err>yo</err>mi<err>kata</err>を<err>mana</err>bu。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<err> 漢字[kanji]</err>の<err> 読[yo]</err>mi<err> 方[kata]</err>を<err>"
+            " 学[mana]</err>bu。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<err> 漢字[kanji]</err>の<err> 読[yo]</err>mi<err> 方[kata]</err>を<err>"
+            " 学[mana]</err>bu。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<err> kanji[漢字]</err>の<err> yo[読]</err>mi<err> kata[方]</err>を<err>"
+            " mana[学]</err>bu。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<err> kanji[漢字]</err>の<err> yo[読]</err>mi<err> kata[方]</err>を<err>"
+            " mana[学]</err>bu。"
+        ),
+    )
+    test(
+        test_name="All non-kana furigana should be preserved - with highlight",
+        kanji="漢",
+        sentence="漢字[kanji]の読[yo]mi方[kata]を学[mana]bu。",
+        expected_kana_only="kanjiのyomikataをmanabu。",
+        # Simple replacement of kanji with <b> regardless of where it's positioned, in top or bottom
+        expected_furigana=" <b>漢</b>字[kanji]の 読[yo]mi 方[kata]を 学[mana]bu。",
+        expected_furikanji=" kanji[<b>漢</b>字]の yo[読]mi kata[方]を mana[学]bu。",
+        expected_kana_only_with_tags_split=(
+            "<err>kanji</err>の<err>yo</err>mi<err>kata</err>を<err>mana</err>bu。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<err>kanji</err>の<err>yo</err>mi<err>kata</err>を<err>mana</err>bu。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<err> <b>漢</b>字[kanji]</err>の<err> 読[yo]</err>mi<err> 方[kata]</err>を<err>"
+            " 学[mana]</err>bu。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<err> <b>漢</b>字[kanji]</err>の<err> 読[yo]</err>mi<err> 方[kata]</err>を<err>"
+            " 学[mana]</err>bu。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<err> kanji[<b>漢</b>字]</err>の<err> yo[読]</err>mi<err> kata[方]</err>を<err>"
+            " mana[学]</err>bu。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<err> kanji[<b>漢</b>字]</err>の<err> yo[読]</err>mi<err> kata[方]</err>を<err>"
+            " mana[学]</err>bu。"
+        ),
+    )
+    test(
+        test_name=(
+            "Should ignore non-kana characters in furigana if there are also kana - no highlight"
+        ),
+        kanji="",
+        sentence="天気[てんき123]は良[い]いですね。",
+        expected_kana_only="テンキはいいですね。",
+        expected_furigana=" 天気[テンキ]は 良[い]いですね。",
+        expected_furikanji=" テンキ[天気]は い[良]いですね。",
+        expected_kana_only_with_tags_split="<on>テン</on><on>キ</on>は<kun>い</kun><oku>い</oku>ですね。",
+        expected_kana_only_with_tags_merged="<on>テンキ</on>は<kun>い</kun><oku>い</oku>ですね。",
+        expected_furigana_with_tags_split=(
+            "<on> 天[テン]</on><on> 気[キ]</on>は<kun> 良[い]</kun><oku>い</oku>ですね。"
+        ),
+        expected_furigana_with_tags_merged="<on> 天気[テンキ]</on>は<kun> 良[い]</kun><oku>い</oku>ですね。",
+        expected_furikanji_with_tags_split=(
+            "<on> テン[天]</on><on> キ[気]</on>は<kun> い[良]</kun><oku>い</oku>ですね。"
+        ),
+        expected_furikanji_with_tags_merged="<on> テンキ[天気]</on>は<kun> い[良]</kun><oku>い</oku>ですね。",
+    )
+    test(
+        "Should ignore non-kana characters in furigana if there are also kana - with highlight",
+        kanji="歩",
+        sentence="歩道[ほどう123]を歩[bある]く。",
+        expected_kana_only="<b>ホ</b>ドウを<b>あるく</b>。",
+        expected_furigana="<b> 歩[ホ]</b> 道[ドウ]を<b> 歩[ある]く</b>。",
+        expected_furikanji="<b> ホ[歩]</b> ドウ[道]を<b> ある[歩]く</b>。",
+        expected_kana_only_with_tags_split=(
+            "<b><on>ホ</on></b><on>ドウ</on>を<b><kun>ある</kun><oku>く</oku></b>。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<b><on>ホ</on></b><on>ドウ</on>を<b><kun>ある</kun><oku>く</oku></b>。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<b><on> 歩[ホ]</on></b><on> 道[ドウ]</on>を<b><kun> 歩[ある]</kun><oku>く</oku></b>。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<b><on> 歩[ホ]</on></b><on> 道[ドウ]</on>を<b><kun> 歩[ある]</kun><oku>く</oku></b>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> ホ[歩]</on></b><on> ドウ[道]</on>を<b><kun> ある[歩]</kun><oku>く</oku></b>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><on> ホ[歩]</on></b><on> ドウ[道]</on>を<b><kun> ある[歩]</kun><oku>く</oku></b>。"
+        ),
+    )
+    test(
         test_name="Should merge if furigana doesn't have enough mora for kanji - with highlight",
         kanji="",
         # This case would be due to incorrect furigana input
