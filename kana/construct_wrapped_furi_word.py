@@ -299,7 +299,16 @@ def construct_wrapped_furi_word(
                     is_num = False  # Result is number+counter, not pure number
                     tag = cur_tag_res["tag"]
                     highlight = cur_tag_res["highlight"]
-                # Otherwise keep them separate (will create <mix> for number, separate tag for counter)
+            elif next_tag_res["furigana"] == "":
+                # Gracefully handle incorrect furigana input where there was more kanji than
+                # mora provided - merge empty furigana entries into previous to avoid broken output.
+                logger.debug(f"Merging empty furigana entry: {cur_tag_res}, {next_tag_res}")
+                do_merge = True
+                tag = cur_tag_res["tag"]
+                highlight = cur_tag_res["highlight"]
+                is_num = cur_tag_res["is_num"]
+
+            # Otherwise keep them separate (will create <mix> for number, separate tag for counter)
             if do_merge:
                 cur_tag_res = {
                     "kanji": cur_tag_res["kanji"] + next_tag_res["kanji"],

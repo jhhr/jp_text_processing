@@ -13,9 +13,9 @@ try:
 except ImportError:
     from ..mecab_controller.kana_conv import to_hiragana, is_katakana_str
 try:
-    from regex.mora import ALL_MORA_REC
+    from regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
 except ImportError:
-    from ..regex.mora import ALL_MORA_REC
+    from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
 
 
 class MoraSplitResult(TypedDict):
@@ -65,5 +65,16 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
             else:
                 new_list.append(mora)
         mora_list = new_list
+
+    # If the furigana contained long vowels represented by ー, and we didn't get enough mora,
+    # convert the ー into the previous vowel and splice it in as its own mora
+    if "ー" in furigana and len(mora_list) < kanji_count:
+        mora_list = mora_list.copy()
+        for i, mora in enumerate(mora_list):
+            if len(mora) >= 2 and mora[-1] == "ー" and mora[-2] in LONG_VOWEL_MAP:
+                # Split off the long vowel mark into its own mora
+                before_last_char = mora[:-1]
+                mora_list[i] = before_last_char
+                mora_list.insert(i + 1, LONG_VOWEL_MAP[mora[-2]])
 
     return MoraSplitResult(mora_list=mora_list, was_katakana=was_katakana)

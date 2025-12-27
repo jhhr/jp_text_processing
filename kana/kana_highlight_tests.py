@@ -103,7 +103,8 @@ def main():
                     try:
                         kana_highlight(*rerun_args)
                     except Exception as e:
-                        print(f"Error during rerun with debug logging: {e}")
+                        logger.error(f"Error during rerun with debug logging: {e}")
+                        raise e
 
                 if rerun_test_with_debug is None:
                     rerun_test_with_debug = rerun
@@ -197,6 +198,60 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged=(
             "この<on> クイキ[区域]</on>は<b><kun> にお[匂]</kun><oku>い</oku></b>がする。"
         ),
+    )
+    test(
+        test_name="Should gracefully handle empty furigana - no highlight",
+        kanji="",
+        sentence="今日[]は天気[てんき]がいい。",
+        # Kana becomes empty
+        expected_kana_only="はテンキがいい。",
+        # Furigana can show the kanji with empty reading
+        expected_furigana="今日は 天気[テンキ]がいい。",
+        # To hide the kanji with empty furigana, a placeholder is used
+        expected_furikanji=" □[今日]は テンキ[天気]がいい。",
+        # kana_only can't show tags for empty furigana
+        expected_kana_only_with_tags_split="は<on>テン</on><on>キ</on>がいい。",
+        expected_kana_only_with_tags_merged="は<on>テンキ</on>がいい。",
+        # furigan/furikanji uses <err> tag for empty furigana
+        expected_furigana_with_tags_split="<err>今日</err>は<on> 天[テン]</on><on> 気[キ]</on>がいい。",
+        expected_furigana_with_tags_merged="<err>今日</err>は<on> 天気[テンキ]</on>がいい。",
+        expected_furikanji_with_tags_split="<err> □[今日]</err>は<on> テン[天]</on><on> キ[気]</on>がいい。",
+        expected_furikanji_with_tags_merged="<err> □[今日]</err>は<on> テンキ[天気]</on>がいい。",
+    )
+    test(
+        test_name="Should gracefully handle empty furigana - with highlight",
+        kanji="今",
+        sentence="今日[]は天気[てんき]がいい。",
+        # Kana is the same as no highlight since kanji with empty furigana is skipped
+        expected_kana_only="はテンキがいい。",
+        expected_kana_only_with_tags_split="は<on>テン</on><on>キ</on>がいい。",
+        expected_kana_only_with_tags_merged="は<on>テンキ</on>がいい。",
+        # Furigana/furikanji highglights the kanji
+        expected_furigana="<b>今</b>日は 天気[テンキ]がいい。",
+        expected_furikanji=" □[<b>今</b>日]は テンキ[天気]がいい。",
+        expected_furigana_with_tags_split=(
+            "<err><b>今</b>日</err>は<on> 天[テン]</on><on> 気[キ]</on>がいい。"
+        ),
+        expected_furigana_with_tags_merged="<err><b>今</b>日</err>は<on> 天気[テンキ]</on>がいい。",
+        expected_furikanji_with_tags_split=(
+            "<err> □[<b>今</b>日]</err>は<on> テン[天]</on><on> キ[気]</on>がいい。"
+        ),
+        expected_furikanji_with_tags_merged="<err> □[<b>今</b>日]</err>は<on> テンキ[天気]</on>がいい。",
+    )
+    test(
+        test_name="Should merge if furigana doesn't have enough mora for kanji - with highlight",
+        kanji="",
+        # This case would be due to incorrect furigana input
+        sentence="今日[きょ]",
+        expected_kana_only="きょ",
+        expected_furigana=" 今日[きょ]",
+        expected_furikanji=" きょ[今日]",
+        expected_kana_only_with_tags_split="<juk>きょ</juk>",
+        expected_furigana_with_tags_split="<juk> 今日[きょ]</juk>",
+        expected_furikanji_with_tags_split="<juk> きょ[今日]</juk>",
+        expected_kana_only_with_tags_merged="<juk>きょ</juk>",
+        expected_furigana_with_tags_merged="<juk> 今日[きょ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> きょ[今日]</juk>",
     )
     test(
         test_name="Should not incorrectly match onyomi twice 1/",
@@ -2194,6 +2249,20 @@ Return type: {return_type}
         expected_kana_only_with_tags_split="<juk>ちゃー</juk><on>メン</on>",
         expected_furigana_with_tags_split="<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
         expected_furikanji_with_tags_split="<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
+    )
+    test(
+        test_name="should convert long vowel mark ー to vowel kana if not enough mora otherwise",
+        kanji="",
+        sentence="嗚呼[あー]",
+        expected_kana_only="ああ",
+        expected_furigana=" 嗚呼[ああ]",
+        expected_furikanji=" ああ[嗚呼]",
+        expected_kana_only_with_tags_split="<juk>あ</juk><juk>あ</juk>",
+        expected_furigana_with_tags_split="<juk> 嗚[あ]</juk><juk> 呼[あ]</juk>",
+        expected_furikanji_with_tags_split="<juk> あ[嗚]</juk><juk> あ[呼]</juk>",
+        expected_kana_only_with_tags_merged="<juk>ああ</juk>",
+        expected_furigana_with_tags_merged="<juk> 嗚呼[ああ]</juk>",
+        expected_furikanji_with_tags_merged="<juk> ああ[嗚呼]</juk>",
     )
     test(
         test_name=(

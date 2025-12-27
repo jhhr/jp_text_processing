@@ -24,7 +24,7 @@ KANJI_AND_REPEATER_RE = r"([\u4e00-\u9faf\u3400-\u4dbf]々)"
 KANJI_AND_REPEATER_REC = re.compile(KANJI_AND_REPEATER_RE)
 
 # Regex matching any kanji and furigana + hiragana after the furigana
-KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.+?)\]([ぁ-ん]*)"
+KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.*?)\]([ぁ-ん]*)"
 KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGANA_RE)
 
 HIRAGANA_RE = "([ぁ-ん])"

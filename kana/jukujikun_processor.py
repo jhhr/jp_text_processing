@@ -230,9 +230,18 @@ def process_jukujikun_positions(
 
         # Get remaining mora (not consumed), merge the lists back into a single string and then
         # split into mora again with split_to_mora_list
-        juku_mora_str = "".join([
-            mora for idx, mora in enumerate(alignment["mora_split"]) if idx not in consumed_indices
-        ])
+        try:
+            unconsumed_mora = [
+                "".join(moras)
+                for idx, moras in enumerate(alignment["mora_split"])
+                if idx not in consumed_indices
+            ]
+            juku_mora_str = "".join(unconsumed_mora)
+        except Exception:
+            logger.error(
+                "process_jukujikun_positions - Error building juku_mora_str, alignment:"
+                f" {alignment}, consumed_indices: {consumed_indices}, word: {word}"
+            )
         logger.debug(
             f"process_jukujikun_positions - remaining mora for jukujikun: {juku_mora_str},"
             f" consumed_indices: {consumed_indices}, alignment.mora_split:"
@@ -253,18 +262,18 @@ def process_jukujikun_positions(
 
         # Assign redistributed mora to jukujikun positions
         for idx, pos in enumerate(alignment["jukujikun_positions"]):
+            kanji = word[pos]
             mora_portion = redistributed_mora[idx]
-
             # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
             # 為 with readings し/さ is the irregular verb する
-            is_suru_verb = word[pos] == "為" and mora_portion in ["し", "さ"]
-            tag = "kun" if (word[pos].isdigit() or is_suru_verb) else "juk"
+            is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
+            tag = "kun" if (kanji.isdigit() or is_suru_verb) else "juk"
             jukujikun_parts[pos] = {
-                "kanji": word[pos],
+                "kanji": kanji,
                 "tag": tag,
                 "highlight": False,
                 "furigana": mora_portion,
-                "is_num": word[pos].isdigit(),
+                "is_num": kanji.isdigit(),
             }
 
     # Handle okurigana extraction if last kanji is jukujikun

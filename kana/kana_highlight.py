@@ -1003,10 +1003,6 @@ def reconstruct_from_alignment(
     if was_katakana:
         for entry in entries:
             entry["furigana"] = to_katakana(entry["furigana"])
-        if okurigana:
-            okurigana = to_katakana(okurigana)
-        if rest_kana:
-            rest_kana = to_katakana(rest_kana)
 
     # Determine highlight span (include repeater following the target kanji)
     highlight_start = kanji_to_highlight_pos
@@ -1175,6 +1171,27 @@ def kana_highlight(
             f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
             f" {okurigana}"
         )
+        # if furigana is empty, use a placeholder for furigana and try to return something sensible
+        if not full_furigana:
+            if return_type == "kana_only":
+                # no furigana, so we return just the okurigana, we can't determine if it's okurigana
+                # for the word, so we can't put tags either
+                return okurigana
+            if kanji_to_highlight and kanji_to_highlight in full_word:
+                # There's a kanji to highlight, add <b> around the kanji
+                full_word = full_word.replace(kanji_to_highlight, f"<b>{kanji_to_highlight}</b>")
+            if return_type == "furigana":
+                if with_tags_def.with_tags:
+                    # Wrap the whole word in <err> tag since we have no furigana
+                    return f"<err>{full_word}</err>{okurigana}"
+                return f"{full_word}{okurigana}"
+            if return_type == "furikanji":
+                # Since it's expected that the kanji should be hidden, add a placeholder
+                placeholder = "□"
+                if with_tags_def.with_tags:
+                    # Wrap with <err> tag too
+                    return f"<err> {placeholder}[{full_word}]</err>{okurigana}"
+                return f" {placeholder}[{full_word}]{okurigana}"
         # Replace doubled kanji with the repeater character
         full_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
         logger.debug(f"furigana_replacer - word after double kanji: {full_word}")
