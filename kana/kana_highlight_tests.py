@@ -123,13 +123,18 @@ def main():
                 cur_test_num = test_count
 
                 # Highlight the diff between the expected and the result
-                diff = f"""\033[91mTest {cur_test_num}: {test_name}
+                red = "\033[91m"
+                yellow = "\033[93m"
+                green = "\033[92m"
+                reset = "\033[0m"
+                check = green + "✓" if expected == result else red + "✗"
+                diff = f"""{red}Test {cur_test_num}: {test_name}
 Return type: {return_type}
 {'No tags' if not with_tags_def.with_tags else ''}{'Tags split' if with_tags_def.with_tags and not with_tags_def.merge_consecutive else ''}{'Tags merged' if with_tags_def.with_tags and with_tags_def.merge_consecutive else ''}
-\033[93mExpected: {expected}
-\033[92mGot:      {result}
-{expected == result and "\033[92m✓" or "\033[91m✗"}
-\033[0m"""
+{yellow}Expected: {expected}
+{green}Got:      {result}
+{check}
+{reset}"""
 
                 # Store the first failed test with logging enabled to see what went wrong
                 def rerun():
@@ -488,6 +493,16 @@ Return type: {return_type}
             "<b><kun> とな[隣]</kun><oku>り</oku></b><kun> あ[合]</kun><oku>わせ</oku>の"
             "<kun> まち[町]</kun>。"
         ),
+    )
+    test(
+        test_name="Should be able to clean furigana that bridges over some okurigana 3/",
+        kanji="",
+        # Can in fact use kana_highlight to generate correct furigana by simply putting the full kana
+        # reading into brackets after text
+        sentence="見逃した映画をみる[みのがしたえいがをみる]",
+        expected_kana_only="みのがしたエイガをみる",
+        expected_furigana=" 見逃[みのが]した 映画[エイガ]をみる",
+        expected_furikanji=" みのが[見逃]した エイガ[映画]をみる",
     )
     test(
         test_name="Should work for 4-kanji word",
