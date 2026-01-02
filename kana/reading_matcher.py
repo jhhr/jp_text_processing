@@ -244,6 +244,10 @@ def match_kunyomi_to_mora(
     """
 
     kunyomi = kanji_data.get("kunyomi", "")
+    logger.debug(
+        f"match_kunyomi_to_mora - kanji: {kanji}, mora_sequence: {mora_sequence}, "
+        f"okurigana: {okurigana}, is_last_kanji: {is_last_kanji}, kunyomi: {kunyomi}"
+    )
     if not kunyomi:
         return None
 
@@ -327,8 +331,8 @@ def match_kunyomi_to_mora(
                     okurigana="",
                     rest_kana="",
                 )
-                # If we are at the last kanji and have okurigana to match, score this candidate
-                if is_last_kanji and okurigana:
+                # If we were given okurigana to match, score this candidate
+                if okurigana:
                     # If this reading has an okurigana marker, check how well it matches
                     if "." in original_reading:
                         reading_okurigana = original_reading.split(".", 1)[1]
@@ -357,6 +361,13 @@ def match_kunyomi_to_mora(
                             reading=original_reading,
                             word_data=word_data,
                             highlight_args=highlight_args,
+                        )
+                        # Set okurigana/rest_kana in candidate
+                        candidate["okurigana"] = res.okurigana
+                        candidate["rest_kana"] = res.rest_kana
+                        logger.debug(
+                            f"match_kunyomi_to_mora - scoring candidate: {candidate}, "
+                            f"okurigana match result: {res}"
                         )
                         # Score by length of matched okuri (prefer full matches)
                         score = len(res.okurigana)

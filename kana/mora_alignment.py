@@ -157,6 +157,13 @@ def find_first_complete_alignment(
             repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
             check_okurigana = is_last_kanji or (next_kanji_is_repeater and repeater_is_last)
 
+            logger.debug(
+                f"find_first_complete_alignment - processing kanji: {kanji}, mora_sequence:"
+                f" {mora_sequence}, is_last_kanji: {is_last_kanji},"
+                f" next_kanji_is_repeater: {next_kanji_is_repeater},"
+                f" check_okurigana: {check_okurigana}, okurigana: {okurigana}"
+            )
+
             # Try to match reading to either kunyomi or onyomi
             kunyomi_match, onyomi_match = match_reading_to_mora(
                 kanji=kanji,
@@ -174,31 +181,9 @@ def find_first_complete_alignment(
                 # No okurigana to check - use whichever match exists but prefer onyomi
                 match_info = onyomi_match if onyomi_match else kunyomi_match
             else:
-                # When there's okurigana to check, test both matches with extract_okurigana_for_match
-                kunyomi_okuri = ""
-                onyomi_okuri = ""
-
-                if kunyomi_match:
-                    kunyomi_okuri, kunyomi_rest_extracted = extract_okurigana_for_match(
-                        match_type=kunyomi_match["match_type"],
-                        dict_form=kunyomi_match["dict_form"],
-                        remaining_kana=okurigana,
-                        kanji=kanji,
-                        logger=logger,
-                    )
-                    kunyomi_match["okurigana"] = kunyomi_okuri
-                    kunyomi_match["rest_kana"] = kunyomi_rest_extracted
-
-                if onyomi_match:
-                    onyomi_okuri, onyomi_rest_extracted = extract_okurigana_for_match(
-                        match_type=onyomi_match["match_type"],
-                        dict_form=onyomi_match["dict_form"],
-                        remaining_kana=okurigana,
-                        kanji=kanji,
-                        logger=logger,
-                    )
-                    onyomi_match["okurigana"] = onyomi_okuri
-                    onyomi_match["rest_kana"] = onyomi_rest_extracted
+                # When there's okurigana to check, test both matches
+                kunyomi_okuri = kunyomi_match["okurigana"] if kunyomi_match else ""
+                onyomi_okuri = onyomi_match["okurigana"] if onyomi_match else ""
 
                 # Apply selection logic
                 if kunyomi_okuri and onyomi_okuri:
