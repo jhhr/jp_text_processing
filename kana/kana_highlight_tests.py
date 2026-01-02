@@ -3666,9 +3666,9 @@ Return type: {return_type}
 
     start_time = time.time()
     total_test_count = len(test_list)
-    total_failed_test_cases = len(failed_test_keys)
     for i, test_func in enumerate(test_list):
         test_func(i, total_test_count)
+    total_failed_test_cases = len(failed_test_keys)
     # Clear the last progress line
     print("\r\033[K", end="", flush=True)  # move to start, clear to end
     if len(failed_test_keys) == 0:

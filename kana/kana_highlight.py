@@ -803,10 +803,10 @@ def kana_highlight(
         nonlocal kanji_to_highlight
         full_word = match.group(1)
         full_furigana = match.group(2)
-        okurigana = match.group(3)
+        maybe_okuri = match.group(3)
         logger.debug(
             f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
-            f" {okurigana}"
+            f" {maybe_okuri}"
         )
         # Clean off non-kana characters from furigana, unless it becomes empty
         cleaned_furigana = re.sub(NON_KANA_REC, "", full_furigana)
@@ -824,8 +824,8 @@ def kana_highlight(
                 # return furigana as is, since it's either empty or invalid
                 # Since the kanji are omitted, there's nothing to highlight
                 if not full_furigana or not with_tags_def.with_tags:
-                    return f"{full_furigana}{okurigana}"
-                return f"<err>{full_furigana}</err>{okurigana}"
+                    return f"{full_furigana}{maybe_okuri}"
+                return f"<err>{full_furigana}</err>{maybe_okuri}"
             if kanji_to_highlight and kanji_to_highlight in full_word:
                 # There's a kanji to highlight, add <b> around the kanji
                 full_word = full_word.replace(kanji_to_highlight, f"<b>{kanji_to_highlight}</b>")
@@ -833,14 +833,14 @@ def kana_highlight(
                 if full_furigana:
                     if with_tags_def.with_tags:
                         # Wrap the whole word in <err> tag since the furigana is invalid
-                        return f"<err> {full_word}[{full_furigana}]</err>{okurigana}"
-                    return f" {full_word}[{full_furigana}]{okurigana}"
+                        return f"<err> {full_word}[{full_furigana}]</err>{maybe_okuri}"
+                    return f" {full_word}[{full_furigana}]{maybe_okuri}"
                 else:
                     # no furigana, don't add brackets
                     if with_tags_def.with_tags:
                         # Wrap the whole word in <err> tag since we have no furigana
-                        return f"<err>{full_word}</err>{okurigana}"
-                    return f"{full_word}{okurigana}"
+                        return f"<err>{full_word}</err>{maybe_okuri}"
+                    return f"{full_word}{maybe_okuri}"
             # Since it's expected that the kanji should be hidden, add a placeholder for empty
             # furigana
             if not full_furigana:
@@ -848,8 +848,8 @@ def kana_highlight(
             if return_type == "furikanji":
                 if with_tags_def.with_tags:
                     # Wrap with <err> tag too
-                    return f"<err> {full_furigana}[{full_word}]</err>{okurigana}"
-                return f" {full_furigana}[{full_word}]{okurigana}"
+                    return f"<err> {full_furigana}[{full_word}]</err>{maybe_okuri}"
+                return f" {full_furigana}[{full_word}]{maybe_okuri}"
 
         # Replace doubled kanji with the repeater character
         full_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
@@ -859,7 +859,7 @@ def kana_highlight(
             # This was something like 漢字[sound:...], we shouldn't modify the text in the brackets
             # as it'd break the audio tag. But we know the text to the right is kanji
             # (what is it doing there next to a sound tag?) so we'll just leave it out anyway
-            return full_furigana + okurigana
+            return full_furigana + maybe_okuri
 
         highlight_kanji_is_whole_word = kanji_to_highlight is not None and (
             full_word == kanji_to_highlight
@@ -876,20 +876,19 @@ def kana_highlight(
         exception_alignment = check_exception(
             word=full_word,
             furigana=full_furigana,
-            kanji_to_highlight=kanji_to_highlight or "",
-            return_type=return_type,
-            with_tags_def=with_tags_def,
+            logger=logger,
         )
+        logger.debug(f"furigana_replacer - exception_alignment: {exception_alignment}")
         if exception_alignment is not None:
             logger.debug(f"furigana_replacer - using exception alignment: {exception_alignment}")
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 alignment=exception_alignment,
-                remaining_kana=okurigana,
+                remaining_kana=maybe_okuri,
                 logger=logger,
             )
             use_okurigana = ""
-            use_rest_kana = okurigana
+            use_rest_kana = maybe_okuri
             if len(full_word) - 1 in exception_alignment["jukujikun_positions"]:
                 use_okurigana = juku_okurigana
                 use_rest_kana = juku_rest_kana
@@ -924,9 +923,8 @@ def kana_highlight(
             )
             alignment = find_first_complete_alignment(
                 word=alignment_word,
-                maybe_okuri=okurigana,
+                maybe_okuri=maybe_okuri,
                 possible_splits=possible_whole_word_splits,
-                is_whole_word=True,
                 logger=logger,
             )
         else:
@@ -935,9 +933,8 @@ def kana_highlight(
             logger.debug(f"furigana_replacer - partial_word_case mora_result: {mora_result}")
             alignment = find_first_complete_alignment(
                 word=alignment_word,
-                maybe_okuri=okurigana,
+                maybe_okuri=maybe_okuri,
                 mora_list=mora_result["mora_list"],
-                is_whole_word=False,
                 logger=logger,
             )
 
@@ -957,7 +954,7 @@ def kana_highlight(
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 alignment=alignment,
-                remaining_kana=okurigana,
+                remaining_kana=maybe_okuri,
                 logger=logger,
             )
             logger.debug(

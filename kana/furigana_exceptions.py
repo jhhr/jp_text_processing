@@ -10,14 +10,6 @@ and word edge splitting.
 from typing import TypedDict, Optional, List, Dict
 
 try:
-    from construct_wrapped_furi_word import FuriReconstruct
-except ImportError:
-    from .construct_wrapped_furi_word import FuriReconstruct
-try:
-    from all_types.main_types import WithTagsDef
-except ImportError:
-    from ..all_types.main_types import WithTagsDef
-try:
     from kana.mora_alignment import MoraAlignment
 except ImportError:
     from .mora_alignment import MoraAlignment
@@ -25,6 +17,10 @@ try:
     from all_types.main_types import ReadingMatchInfo
 except ImportError:
     from ..all_types.main_types import ReadingMatchInfo
+try:
+    from utils.logger import Logger
+except ImportError:
+    from ..utils.logger import Logger
 
 
 class ExceptionAlignmentEntry(TypedDict):
@@ -174,9 +170,7 @@ def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAli
 def check_exception(
     word: str,
     furigana: str,
-    kanji_to_highlight: str,
-    return_type: FuriReconstruct,
-    with_tags_def: WithTagsDef,
+    logger: Logger = Logger("error"),
 ) -> Optional[MoraAlignment]:
     """
     Check if word+furigana combination is in the exception dictionary and return a
@@ -187,6 +181,7 @@ def check_exception(
     :return: MoraAlignment for the exception, or None
     """
     exception_key = f"{word}_{furigana}"
+    logger.debug(f"check_exception: checking for exception key: {exception_key}")
     parts = FURIGANA_EXCEPTION_ALIGNMENTS.get(exception_key)
     if not parts:
         return None
