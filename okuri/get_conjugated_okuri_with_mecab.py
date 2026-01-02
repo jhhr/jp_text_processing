@@ -36,6 +36,31 @@ OkuriPrefix = Literal["kanji", "kanji_reading"]
 mecab = MecabController()
 
 
+def verb_conjugation_conditions(token, prev_token, next_token):
+    """Check if the token meets verb conjugation conditions."""
+    return (
+        # handle ている / でいる
+        (
+            token.part_of_speech == PartOfSpeech.particle
+            and (
+                token.word == "て"
+                or (token.word == "で" and next_token and next_token.headword == "いる")
+            )
+        )
+        or ((
+            token.part_of_speech == PartOfSpeech.verb
+            and token.headword == "いる"
+            and prev_token
+            and prev_token.word in ["て", "で"]
+        ))
+        or (
+            # -られ, -させ
+            token.part_of_speech == PartOfSpeech.verb
+            and token.headword in ["れる", "られる", "せる", "させる", "てる"]
+        )
+    )
+
+
 def get_conjugated_okuri_with_mecab(
     kanji: str,
     kanji_reading: str,
@@ -185,30 +210,17 @@ def get_conjugated_okuri_with_mecab(
     )
     rest_tokens = tokens[1:]
     for token_index, token in enumerate(rest_tokens):
+        prev_token = rest_tokens[token_index - 1] if token_index - 1 >= 0 else None
         next_token = rest_tokens[token_index + 1] if token_index + 1 < len(rest_tokens) else None
         add_to_conjugated_okuri = False
         if token.word in ["だろう", "でしょう", "なら", "から"]:
             add_to_conjugated_okuri = False
         elif is_verb:
             if (
-                (
-                    token.part_of_speech == PartOfSpeech.bound_auxiliary
-                    and token.inflection_type is not None
-                    and token.headword not in ["だ", "です"]
-                )
-                or (
-                    token.part_of_speech == PartOfSpeech.particle
-                    and (
-                        token.word == "て"
-                        or (token.word == "で" and next_token and next_token.headword == "いる")
-                    )
-                )
-                or (
-                    # -られ, -させ
-                    token.part_of_speech == PartOfSpeech.verb
-                    and token.headword in ["れる", "られる", "せる", "させる", "てる"]
-                )
-            ):
+                token.part_of_speech == PartOfSpeech.bound_auxiliary
+                and token.inflection_type is not None
+                and token.headword not in ["だ", "です"]
+            ) or verb_conjugation_conditions(token, prev_token, next_token):
                 add_to_conjugated_okuri = True
         elif is_i_adjective:
             if (
@@ -236,18 +248,7 @@ def get_conjugated_okuri_with_mecab(
             if (
                 (token.part_of_speech == PartOfSpeech.verb and token.headword == "する")
                 or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword != "だ")
-                or (
-                    token.part_of_speech == PartOfSpeech.particle
-                    and (
-                        token.word == "て"
-                        or (token.word == "で" and next_token and next_token.headword == "いる")
-                    )
-                )
-                or (
-                    # -られ, -させ
-                    token.part_of_speech == PartOfSpeech.verb
-                    and token.headword in ["れる", "られる", "せる", "させる", "てる"]
-                )
+                or verb_conjugation_conditions(token, prev_token, next_token)
             ):
                 add_to_conjugated_okuri = True
             if token.headword == "する":
@@ -283,7 +284,7 @@ def test(kanji, kanji_reading, maybe_okuri, expected, debug: bool = False):
     except AssertionError:
         # Re-run with logging enabled
         get_conjugated_okuri_with_mecab(kanji, kanji_reading, maybe_okuri, logger=Logger("debug"))
-        print(f"""\033[91mget_part_of_speech({maybe_okuri}, {kanji}, {kanji_reading})
+        print(f"""\033[91mget_conjugated_okuri_with_mecab({maybe_okuri}, {kanji}, {kanji_reading})
 \033[93mExpected: {expected}
 \033[92mGot:      {(result.okurigana, result.rest_kana, is_suru_verb)}
 \033[0m""")
@@ -299,14 +300,14 @@ def main():
     test("来", "く", "れたらいくよ", ("れたら", "いくよ", False))
     test("青", "あお", "かったらあかくぬって", ("かったら", "あかくぬって", False))
     test("大", "おお", "きくてやわらかい", ("きくて", "やわらかい", False))
-    test("勉強", "べんきょう", "している", ("して", "いる", True))
-    test("勉強", "べんきょう", "されている", ("されて", "いる", True))
+    test("勉強", "べんきょう", "している", ("している", "", True))
+    test("勉強", "べんきょう", "されている", ("されている", "", True))
     test("勉強", "べんきょう", "させられる", ("させられる", "", True))
     test("容易", "たやす", "くやったな", ("く", "やったな", False))
     test("清々", "すがすが", "しくない", ("しくない", "", False))
     # 恥ずかしげ gets categorized as a noun
     test("恥", "は", "ずかしげなかおで", ("ずかし", "げなかおで", False))
-    test("察", "さっ", "していなかった", ("して", "いなかった", False))
+    test("察", "さっ", "していなかった", ("していなかった", "", False))
     test("為", "さ", "れるだろう", ("れる", "だろう", False))
     test("知", "し", "ってるでしょう", ("ってる", "でしょう", False))
     test("為", "し", "なかった", ("なかった", "", False))
@@ -326,8 +327,8 @@ def main():
     test("止", "ど", "め", ("め", "", False))
     test("読", "よ", "みかた", ("み", "かた", False))
     test("悪", "あ", "しがわからない", ("し", "がわからない", False))
-    test("死", "し", "んでいない", ("んで", "いない", False))
-    test("聞", "き", "いていたかい", ("いて", "いたかい", False))
+    test("死", "し", "んでいない", ("んでいない", "", False))
+    test("聞", "き", "いていたかい", ("いていた", "かい", False))
     test("目論", "もくろ", "む", ("む", "", False))
     # 久ぶりに doesn't get split into ひさし and ぶりに and is instead treated as a single noun
     test("久", "ひさ", "しぶりに", ("し", "ぶりに", False))

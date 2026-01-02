@@ -19,48 +19,6 @@ class WithTagsDef(NamedTuple):
 Edge = Literal["left", "right", "middle", "whole", "none"]
 
 
-class WordData(TypedDict):
-    """
-    TypedDict for data about a single word that was matched in the text for the kanji_to_match
-    :param kanji_pos
-    :param kanji_count
-    :param word
-    :param furigana
-    :param okurigana
-    :param edge
-    """
-
-    kanji_pos: int
-    kanji_count: int
-    word: str
-    furigana: str
-    furigana_is_katakana: bool
-    okurigana: str
-    edge: Edge
-
-
-class HighlightArgs(TypedDict):
-    """
-    TypedDict for the base arguments passed to kana_highlight as these get passed around a lot
-    :param text
-    :param onyomi
-    :param kunyomi
-    :param kanji_to_match
-    :param kanji_to_highlight
-    :param add_highlight
-    :param edge
-    """
-
-    onyomi: str
-    kunyomi: str
-    kanji_to_match: str
-    kanji_to_highlight: Optional[str]
-    add_highlight: bool
-    edge: Edge
-    full_word: str
-    full_furigana: str
-
-
 MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
 
 

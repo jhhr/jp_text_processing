@@ -18,12 +18,10 @@ except ImportError:
 try:
     from kana.reading_matcher import (
         match_reading_to_mora,
-        extract_okurigana_for_match,
     )
 except ImportError:
     from .reading_matcher import (
         match_reading_to_mora,
-        extract_okurigana_for_match,
     )
 try:
     from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
@@ -65,7 +63,7 @@ def is_valid_split_for_repeaters(word: str, split: list[list[str]]) -> bool:
 
 def find_first_complete_alignment(
     word: str,
-    okurigana: str,
+    maybe_okuri: str,
     mora_list: Optional[list[str]] = None,
     possible_splits: Optional[list[list[str]]] = None,
     is_whole_word: bool = False,
@@ -81,7 +79,7 @@ def find_first_complete_alignment(
 
     :param word: The word to align (string of kanji, may include 々)
     :param all_kanji_data: Dictionary mapping kanji to their reading data
-    :param okurigana: The okurigana following the word (for last kanji extraction)
+    :param maybe_okuri: The kana following the word (for last kanji extraction)
     :param mora_list: List of mora units to distribute across kanji, optional if possible_splits
        provided
     :param possible_splits: Precomputed list of possible mora splits, optional, replaces mora_list
@@ -98,7 +96,7 @@ def find_first_complete_alignment(
             jukujikun_positions=[],
             is_complete=True,
             final_okurigana="",
-            final_rest_kana="",
+            final_rest_kana=maybe_okuri,
         )
 
     # Get all possible mora splits in order, if a ready-made list is not provided
@@ -126,7 +124,7 @@ def find_first_complete_alignment(
         kanji_matches: list[Optional[ReadingMatchInfo]] = []
         jukujikun_positions: list[int] = []
         final_okurigana = ""
-        final_rest_kana = ""
+        final_rest_kana = maybe_okuri
 
         # Try to match each kanji to its mora portion
         i = 0
@@ -161,7 +159,7 @@ def find_first_complete_alignment(
                 f"find_first_complete_alignment - processing kanji: {kanji}, mora_sequence:"
                 f" {mora_sequence}, is_last_kanji: {is_last_kanji},"
                 f" next_kanji_is_repeater: {next_kanji_is_repeater},"
-                f" check_okurigana: {check_okurigana}, okurigana: {okurigana}"
+                f" check_okurigana: {check_okurigana}, okurigana: {maybe_okuri}"
             )
 
             # Try to match reading to either kunyomi or onyomi
@@ -170,7 +168,7 @@ def find_first_complete_alignment(
                 word=word,
                 mora_sequence=mora_sequence,
                 kanji_data=kanji_data,
-                okurigana=okurigana if check_okurigana else "",
+                maybe_okuri=maybe_okuri if check_okurigana else "",
                 is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
                 logger=logger,
             )
@@ -178,7 +176,7 @@ def find_first_complete_alignment(
             # Select the appropriate match based on okurigana extraction
             match_info = None
 
-            if not (check_okurigana and okurigana):
+            if not (check_okurigana and maybe_okuri):
                 # No okurigana to check - use whichever match exists but prefer onyomi
                 match_info = onyomi_match if onyomi_match else kunyomi_match
             else:
@@ -231,7 +229,7 @@ def find_first_complete_alignment(
                     word=word,
                     mora_sequence=small,
                     kanji_data=kanji_data,
-                    okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
+                    maybe_okuri=maybe_okuri if is_last_kanji and not next_kanji_is_repeater else "",
                     is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
                     logger=logger,
                 )
@@ -319,22 +317,6 @@ def find_first_complete_alignment(
 
         logger.debug(f"find_first_complete_alignment - alignment result: {alignment}")
 
-        if (
-            alignment["kanji_matches"]
-            and alignment["kanji_matches"][kanji_count - 1]
-            and not alignment["final_okurigana"]
-        ):
-            last_match = alignment["kanji_matches"][kanji_count - 1]
-            okuri_extracted, rest_extracted = extract_okurigana_for_match(
-                match_type=last_match["match_type"],
-                dict_form=last_match["dict_form"],
-                remaining_kana=okurigana,
-                kanji=word[kanji_count - 1],
-                logger=logger,
-            )
-            alignment["final_okurigana"] = okuri_extracted
-            alignment["final_rest_kana"] = rest_extracted
-
         # Early exit: if we found a complete match, return immediately
         if alignment["is_complete"]:
             logger.debug("find_first_complete_alignment - complete alignment found")
@@ -393,5 +375,5 @@ def find_first_complete_alignment(
         jukujikun_positions=list(range(kanji_count)),
         is_complete=False,
         final_okurigana="",
-        final_rest_kana=okurigana,
+        final_rest_kana=maybe_okuri,
     )

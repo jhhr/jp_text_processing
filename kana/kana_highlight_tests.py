@@ -2897,7 +2897,7 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="Onyomi verb okurigana - with highlight",
+        test_name="Onyomi multi-kanji verb okurigana - with highlight",
         kanji="論",
         # 論 uses the onyomi ろ in 目論む and is an unusual of a godan mu verb
         sentence="目論[もくろ]む",
@@ -2912,7 +2912,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> モク[目]</on><b><on> ロ[論]</on><oku>む</oku></b>",
     )
     test(
-        test_name="Onyomi verb okurigana - no highlight",
+        test_name="Onyomi multi-kanji verb okurigana - no highlight",
         kanji="",
         sentence="目論[もくろ]む",
         expected_kana_only="モクロむ",
@@ -3459,10 +3459,10 @@ Return type: {return_type}
         kanji="",
         sentence="為[し]まった 為[し]ない 為[し]なかった 為[さ]せない 為[さ]せた 為[さ]せました",
         expected_kana_only_with_tags_split=(
-            "<kun>し</kun><oku>ま</oku>った <kun>し</kun><oku>ない</oku>"
+            "<kun>し</kun><oku>まった</oku> <kun>し</kun><oku>ない</oku>"
             " <kun>し</kun><oku>なかった</oku>"
-            " <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せ</oku>た"
-            " <kun>さ</kun><oku>せま</oku>した"
+            " <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せた</oku>"
+            " <kun>さ</kun><oku>せました</oku>"
         ),
     )
     test(
@@ -3470,9 +3470,9 @@ Return type: {return_type}
         kanji="",
         sentence="為[さ]せて 為[さ]せられ 為[さ]せろ 為[さ]せません 為[さ]せて 為[さ]せられた",
         expected_kana_only_with_tags_split=(
-            "<kun>さ</kun><oku>せ</oku>て <kun>さ</kun><oku>せられ</oku> <kun>さ</kun><oku>せ</oku>ろ"
-            " <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せ</oku>て"
-            " <kun>さ</kun><oku>せられ</oku>た"
+            "<kun>さ</kun><oku>せて</oku> <kun>さ</kun><oku>せられ</oku> <kun>さ</kun><oku>せろ</oku>"
+            " <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せて</oku>"
+            " <kun>さ</kun><oku>せられた</oku>"
         ),
     )
     test(
@@ -3535,9 +3535,9 @@ Return type: {return_type}
         kanji="",
         onyomi_to_katakana=False,
         sentence="博[はく]している",
-        expected_kana_only_with_tags_split="<on>はく</on><oku>して</oku>いる",
-        expected_furigana_with_tags_split="<on> 博[はく]</on><oku>して</oku>いる",
-        expected_furikanji_with_tags_split="<on> はく[博]</on><oku>して</oku>いる",
+        expected_kana_only_with_tags_split="<on>はく</on><oku>している</oku>",
+        expected_furigana_with_tags_split="<on> 博[はく]</on><oku>している</oku>",
+        expected_furikanji_with_tags_split="<on> はく[博]</on><oku>している</oku>",
     )
     test(
         test_name="matches single-kanji onyomi す/する verbs okuri /2",
@@ -3574,12 +3574,12 @@ Return type: {return_type}
         kanji="察",
         onyomi_to_katakana=False,
         sentence="察[さっ]していなかった",
-        expected_kana_only="<b>さっして</b>いなかった",
-        expected_furigana="<b> 察[さっ]して</b>いなかった",
-        expected_furikanji="<b> さっ[察]して</b>いなかった",
-        expected_kana_only_with_tags_split="<b><on>さっ</on><oku>して</oku></b>いなかった",
-        expected_furigana_with_tags_split="<b><on> 察[さっ]</on><oku>して</oku></b>いなかった",
-        expected_furikanji_with_tags_split="<b><on> さっ[察]</on><oku>して</oku></b>いなかった",
+        expected_kana_only="<b>さっしていなかった</b>",
+        expected_furigana="<b> 察[さっ]していなかった</b>",
+        expected_furikanji="<b> さっ[察]していなかった</b>",
+        expected_kana_only_with_tags_split="<b><on>さっ</on><oku>していなかった</oku></b>",
+        expected_furigana_with_tags_split="<b><on> 察[さっ]</on><oku>していなかった</oku></b>",
+        expected_furikanji_with_tags_split="<b><on> さっ[察]</on><oku>していなかった</oku></b>",
     )
     test(
         test_name="matches single-kanji onyomi small tsu す verbs okuri /2",
@@ -3640,12 +3640,12 @@ Return type: {return_type}
         expected_kana_only="べん<b>きょう</b>していません！",
         expected_furigana=" 勉[べん]<b> 強[きょう]</b>していません！",
         expected_furikanji=" べん[勉]<b> きょう[強]</b>していません！",
-        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>して</oku>いません！",
+        expected_kana_only_with_tags_split="<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
         expected_furigana_with_tags_split=(
-            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>して</oku>いません！"
+            "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>して</oku>いません！"
+            "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！"
         ),
     )
     test(
