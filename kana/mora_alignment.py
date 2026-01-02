@@ -167,6 +167,7 @@ def find_first_complete_alignment(
             # Try to match reading to either kunyomi or onyomi
             kunyomi_match, onyomi_match = match_reading_to_mora(
                 kanji=kanji,
+                word=word,
                 mora_sequence=mora_sequence,
                 kanji_data=kanji_data,
                 okurigana=okurigana if check_okurigana else "",
@@ -227,6 +228,7 @@ def find_first_complete_alignment(
                 # mora split to be tested fully after this loop
                 youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
                     kanji=kanji,
+                    word=word,
                     mora_sequence=small,
                     kanji_data=kanji_data,
                     okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",

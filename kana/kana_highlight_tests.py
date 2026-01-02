@@ -1,5 +1,6 @@
-from typing import Optional, Tuple, Callable
+import sys
 import time
+from typing import Optional, Tuple, Callable
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
@@ -14,10 +15,34 @@ except ImportError:
     from ..utils.logger import Logger
 
 
-def main():
-    failed_test_count: int = 0
-    test_count: int = 0
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+
+def main(test_nums: Optional[list[str]] = None):
+    failed_test_keys: list[str] = []
+    run_test_cases = 0
+    skipped_test_cases = 0
+    total_test_cases = 0
     rerun_test_with_debug: Optional[Callable] = None
+
+    test_list = []
+
+    restricted_tests: dict[int, set[int]] = {}
+    if test_nums:
+        for test_num in test_nums:
+            # test_num is in the format "X.Y" where X is the main test index and Y is the case index
+            # can either be "X" or "X.Y" to specify a whole test or a specific case in a test
+            parts = test_num.split(".")
+            if len(parts) >= 1 and parts[0].isdigit():
+                test_main_index = int(parts[0]) - 1
+                if test_main_index not in restricted_tests:
+                    restricted_tests[test_main_index] = set()
+            if len(parts) == 2 and parts[1].isdigit():
+                test_case_index = int(parts[1]) - 1
+                restricted_tests[test_main_index].add(test_case_index)
 
     def test(
         test_name: str,
@@ -38,8 +63,10 @@ def main():
         expected_kana_only_with_tags_merged: Optional[str] = None,
     ):
         """
-        Function that tests the kana_highlight function
+        Test setup function to run kana_highlight tests with various configurations. Adds
+        the test to a list to be executed later.
         """
+        nonlocal total_test_cases
         cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
             (
                 "furigana",
@@ -87,64 +114,86 @@ def main():
                 expected_kana_only_with_tags_merged,
             ),
         ]
-        for return_type, with_tags_def, expected in cases:
-            nonlocal rerun_test_with_debug, failed_test_count
-            if not expected:
-                continue
-            logger = Logger("debug") if debug else Logger("error")
-            rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
-            try:
-                result = kana_highlight(kanji, sentence, return_type, with_tags_def, logger=logger)
-            except Exception:
-                # Uncaught exception, rerun with debug logging
-                failed_test_count += 1
+        # Filter out cases where expected is None
+        cases = [case for case in cases if case[2] is not None]
+        total_test_cases += len(cases)
 
-                def rerun():
-                    try:
-                        kana_highlight(*rerun_args)
-                    except Exception as e:
-                        logger.error(f"Error during rerun with debug logging: {e}")
-                        raise e
+        def run_test(cur_test_index: int, total_tests: int = 1):
 
-                if rerun_test_with_debug is None:
-                    rerun_test_with_debug = rerun
-                continue
+            def print_progress(color):
+                print(f"\r{color}Test {cur_test_num} / {total_tests}{RESET}", end="", flush=True)
 
-            if debug:
-                print("\n\n")
-            try:
-                nonlocal test_count
-                test_count += 1
-                assert result == expected
-            except AssertionError:
-                if ignore_fail:
+            for case_idx, (return_type, with_tags_def, expected) in enumerate(cases):
+                nonlocal rerun_test_with_debug, failed_test_keys, restricted_tests, run_test_cases, skipped_test_cases
+                # Skip tests that don't match the specified test_num
+                if restricted_tests:
+                    # restricted_tests is a whitelist, so skip tests not in it or those where
+                    # no specific cases are defined
+                    if (
+                        cur_test_index not in restricted_tests
+                        or not restricted_tests[cur_test_index]
+                    ):
+                        skipped_test_cases += len(cases)
+                        break
+                    if case_idx not in restricted_tests[cur_test_index]:
+                        skipped_test_cases += 1
+                        continue
+                run_test_cases += 1
+                cur_test_num = f"{cur_test_index + 1}.{case_idx + 1}"
+                logger = Logger("debug") if debug else Logger("error")
+                rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
+                try:
+                    result = kana_highlight(
+                        kanji, sentence, return_type, with_tags_def, logger=logger
+                    )
+                    print_progress(GREEN)
+                except Exception:
+                    # Uncaught exception, rerun with debug logging
+
+                    def rerun():
+                        try:
+                            kana_highlight(*rerun_args)
+                        except Exception as e:
+                            logger.error(f"Error during rerun with debug logging: {e}")
+                            raise e
+
+                    if rerun_test_with_debug is None:
+                        rerun_test_with_debug = rerun
+                    failed_test_keys.append(cur_test_num)
+                    print_progress(RED)
                     continue
-                failed_test_count += 1
-                cur_test_num = test_count
 
-                # Highlight the diff between the expected and the result
-                red = "\033[91m"
-                yellow = "\033[93m"
-                green = "\033[92m"
-                reset = "\033[0m"
-                check = green + "✓" if expected == result else red + "✗"
-                diff = f"""{red}Test {cur_test_num}: {test_name}
+                if debug:
+                    print("\n\n")
+                try:
+                    assert result == expected
+                except AssertionError:
+                    print_progress(RED)
+                    if ignore_fail:
+                        continue
+
+                    # Highlight the diff between the expected and the result
+                    check = GREEN + "✓" if expected == result else RED + "✗"
+                    diff = f"""{RED}Test {cur_test_num}: {test_name}
 Return type: {return_type}
 {'No tags' if not with_tags_def.with_tags else ''}{'Tags split' if with_tags_def.with_tags and not with_tags_def.merge_consecutive else ''}{'Tags merged' if with_tags_def.with_tags and with_tags_def.merge_consecutive else ''}
-{yellow}Expected: {expected}
-{green}Got:      {result}
+{YELLOW}Expected: {expected}
+{GREEN}Got:      {result}
 {check}
-{reset}"""
+{RESET}"""
 
-                # Store the first failed test with logging enabled to see what went wrong
-                def rerun():
-                    kana_highlight(*rerun_args)
-                    print(diff)
+                    # Store the first failed test with logging enabled to see what went wrong
+                    def rerun():
+                        kana_highlight(*rerun_args)
+                        print(diff)
 
-                if rerun_test_with_debug is None:
-                    rerun_test_with_debug = rerun
+                    if rerun_test_with_debug is None:
+                        rerun_test_with_debug = rerun
+                    failed_test_keys.append(cur_test_num)
 
-    start_time = time.time()
+        nonlocal test_list
+        test_list.append(run_test)
+
     test(
         test_name="Should not crash with no kanji_to_highlight",
         kanji=None,
@@ -1271,12 +1320,12 @@ Return type: {return_type}
         expected_kana_only="<b>あっ</b>ケない",
         expected_furigana="<b> 呆[あっ]</b> 気[ケ]ない",
         expected_furikanji="<b> あっ[呆]</b> ケ[気]ない",
-        expected_kana_only_with_tags_split="<b><kun>あっ</kun></b><on>ケ</on>ない",
-        expected_furigana_with_tags_split="<b><kun> 呆[あっ]</kun></b><on> 気[ケ]</on>ない",
-        expected_furikanji_with_tags_split="<b><kun> あっ[呆]</kun></b><on> ケ[気]</on>ない",
-        expected_kana_only_with_tags_merged="<b><kun>あっ</kun></b><on>ケ</on>ない",
-        expected_furigana_with_tags_merged="<b><kun> 呆[あっ]</kun></b><on> 気[ケ]</on>ない",
-        expected_furikanji_with_tags_merged="<b><kun> あっ[呆]</kun></b><on> ケ[気]</on>ない",
+        expected_kana_only_with_tags_split="<b><kun>あっ</kun></b><on>ケ</on><oku>ない</oku>",
+        expected_furigana_with_tags_split="<b><kun> 呆[あっ]</kun></b><on> 気[ケ]</on><oku>ない</oku>",
+        expected_furikanji_with_tags_split="<b><kun> あっ[呆]</kun></b><on> ケ[気]</on><oku>ない</oku>",
+        expected_kana_only_with_tags_merged="<b><kun>あっ</kun></b><on>ケ</on><oku>ない</oku>",
+        expected_furigana_with_tags_merged="<b><kun> 呆[あっ]</kun></b><on> 気[ケ]</on><oku>ない</oku>",
+        expected_furikanji_with_tags_merged="<b><kun> あっ[呆]</kun></b><on> ケ[気]</on><oku>ない</oku>",
     )
     test(
         test_name="small tsu 7/",
@@ -2848,6 +2897,35 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="Onyomi verb okurigana - with highlight",
+        kanji="論",
+        # 論 uses the onyomi ろ in 目論む and is an unusual of a godan mu verb
+        sentence="目論[もくろ]む",
+        expected_kana_only="モク<b>ロむ</b>",
+        expected_furigana=" 目[モク]<b> 論[ロ]む</b>",
+        expected_furikanji=" モク[目]<b> ロ[論]む</b>",
+        expected_kana_only_with_tags_split="<on>モク</on><b><on>ロ</on><oku>む</oku></b>",
+        expected_furigana_with_tags_split="<on> 目[モク]</on><b><on> 論[ロ]</on><oku>む</oku></b>",
+        expected_furikanji_with_tags_split="<on> モク[目]</on><b><on> ロ[論]</on><oku>む</oku></b>",
+        expected_kana_only_with_tags_merged="<on>モク</on><b><on>ロ</on><oku>む</oku></b>",
+        expected_furigana_with_tags_merged="<on> 目[モク]</on><b><on> 論[ロ]</on><oku>む</oku></b>",
+        expected_furikanji_with_tags_merged="<on> モク[目]</on><b><on> ロ[論]</on><oku>む</oku></b>",
+    )
+    test(
+        test_name="Onyomi verb okurigana - no highlight",
+        kanji="",
+        sentence="目論[もくろ]む",
+        expected_kana_only="モクロむ",
+        expected_furigana=" 目論[モクロ]む",
+        expected_furikanji=" モクロ[目論]む",
+        expected_kana_only_with_tags_split="<on>モク</on><on>ロ</on><oku>む</oku>",
+        expected_furigana_with_tags_split="<on> 目[モク]</on><on> 論[ロ]</on><oku>む</oku>",
+        expected_furikanji_with_tags_split="<on> モク[目]</on><on> ロ[論]</on><oku>む</oku>",
+        expected_kana_only_with_tags_merged="<on>モクロ</on><oku>む</oku>",
+        expected_furigana_with_tags_merged="<on> 目論[モクロ]</on><oku>む</oku>",
+        expected_furikanji_with_tags_merged="<on> モクロ[目論]</on><oku>む</oku>",
+    )
+    test(
         test_name="Adjective okurigana test 1/",
         kanji="悲",
         sentence="彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",
@@ -3585,17 +3663,39 @@ Return type: {return_type}
         expected_furigana_with_tags_merged="<on> 勉強[べんきょう]</on>できるかい？",
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
     )
-    if failed_test_count == 0:
-        print(f"\n\033[92m All {test_count} tests passed\033[0m")
+
+    start_time = time.time()
+    total_test_count = len(test_list)
+    total_failed_test_cases = len(failed_test_keys)
+    for i, test_func in enumerate(test_list):
+        test_func(i, total_test_count)
+    # Clear the last progress line
+    print("\r\033[K", end="", flush=True)  # move to start, clear to end
+    if len(failed_test_keys) == 0:
+        print(f"\n{GREEN}Ran {run_test_cases} test cases and all passed!{RESET}")
     else:
-        print(f"\n\033[91m{failed_test_count}/{test_count} tests failed\033[0m")
+        print(f"\n{RED}{total_failed_test_cases}/{run_test_cases} test cases failed{RESET}")
+        print(f"{RED}Failed tests: {' '.join(failed_test_keys)}{RESET}")
+        print(
+            "\nTo rerun particular tests with debug logging, run: `python run_with_setup.py"
+            " kana_highlight_tests.py X.Y Z.W ...` where X.Y Z.W are the test numbers from above"
+        )
+    if skipped_test_cases > 0:
+        print(f"{YELLOW}Skipped {skipped_test_cases}/{total_test_cases} test cases.{RESET}")
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Tests completed in {elapsed_time:.2f} seconds.")
     if rerun_test_with_debug is not None:
-        print("\nDebug log for first failed test shown below.\n")
+        print(f"\nDebug log for first failed test: {failed_test_keys[0]}")
         rerun_test_with_debug()
 
 
 if __name__ == "__main__":
-    main()
+    # Get potential test_num from command line args
+    test_nums = None
+    if len(sys.argv) >= 3:
+        # Running with python run_with_setup.py ..., so test nums are those after the first two args
+        test_nums = sys.argv[2:]
+    else:
+        test_nums = sys.argv[1:]
+    main(test_nums)

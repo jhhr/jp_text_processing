@@ -291,12 +291,18 @@ def process_jukujikun_positions(
             juku_reading = jukujikun_parts[last_kanji_index - 1]["furigana"] + juku_reading
 
         # Use mecab to extract okurigana
-        okuri_result = get_conjugated_okuri_with_mecab(
+        logger.debug(
+            "process_jukujikun_positions - extracting okurigana for last jukujikun kanji:"
+            f" {last_kanji}, juku_reading: {juku_reading}, remaining_kana: {remaining_kana}"
+        )
+        okuri_result, is_noun_suru_verb = get_conjugated_okuri_with_mecab(
             kanji=last_kanji,
             kanji_reading=juku_reading,
             maybe_okuri=remaining_kana,
             okuri_prefix="kanji_reading",
+            logger=logger,
         )
+        juku_entry["is_noun_suru_verb"] = is_noun_suru_verb
         logger.debug(
             f"process_jukujikun_positions - okuri_result: {okuri_result}, remaining_kana:"
             f" {remaining_kana}, juku_reading: {juku_reading}, last_kanji: {last_kanji}"

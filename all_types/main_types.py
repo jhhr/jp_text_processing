@@ -73,6 +73,8 @@ class WrapMatchEntry(TypedDict):
     :param furigana: Reading for the kanji
     :param highlight: Whether this entry belongs to the highlighted span
     :param is_num: Whether the kanji represents a numeric block
+    :param is_noun_suru_verb: Whether this match is to a noun that functions as a suru-verb and has
+        okurigana attached (which is a する conjugation)
     """
 
     kanji: str
@@ -80,6 +82,7 @@ class WrapMatchEntry(TypedDict):
     furigana: str
     highlight: bool
     is_num: bool
+    is_noun_suru_verb: Optional[bool]
 
 
 class YomiMatchResult(TypedDict):
@@ -107,7 +110,7 @@ class FinalResult(TypedDict):
     :param highlight_segment_index: Index of the highlighted segment in `segments` or None
     :param word: The full word being reconstructed (used for spacing/okuri decisions)
     :param edge: Legacy edge position of the highlight for okuri tagging
-    :param match_type
+    :param highlight_match_type: The match type that was highlighted
     :param okurigana
     :param rest_kana
     :param was_katakana: Whether the original furigana was in katakana
@@ -198,6 +201,8 @@ class ReadingMatchInfo(TypedDict):
     :param kanji: The kanji character this match is for
     :param okurigana: Extracted okurigana (only for last kanji when is_last_kanji=True)
     :param rest_kana: Remaining kana after okurigana extraction
+    :param is_noun_suru_verb: Whether this match is to a noun that functions as a suru-verb and has
+        okurigana attached (which is a する conjugation)
     """
 
     reading: str
@@ -208,6 +213,7 @@ class ReadingMatchInfo(TypedDict):
     kanji: str
     okurigana: str
     rest_kana: str
+    is_noun_suru_verb: Optional[bool]
 
 
 class MoraAlignment(TypedDict):

@@ -40,6 +40,10 @@ try:
 except ImportError:
     from ..okuri.okurigana_dict import get_verb_noun_form_okuri
 try:
+    from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+except ImportError:
+    from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+try:
     from utils.logger import Logger
 except ImportError:
     from ..utils.logger import Logger
@@ -165,6 +169,7 @@ def check_reading_match(
 
 def match_onyomi_to_mora(
     kanji: str,
+    word: str,
     mora_sequence: str,
     kanji_data: dict,
     okurigana: str,
@@ -175,6 +180,7 @@ def match_onyomi_to_mora(
     Try to match onyomi readings to a mora sequence.
 
     :param kanji: The kanji character to match
+    :param word: The full word containing the kanji, needed for okurigana extraction with mecab
     :param mora_sequence: Joined mora string to match against
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param okurigana: The okurigana following the word (used for last kanji okurigana extraction)
@@ -187,6 +193,11 @@ def match_onyomi_to_mora(
 
     # Parse onyomi readings
     onyomi_readings = [r.strip() for r in onyomi.split("、")]
+
+    # When okurigana is present, prefer readings whose okurigana marker best matches the remaining
+    # kana. Collect candidates and pick best.
+    best_candidate: Optional[ReadingMatchInfo] = None
+    best_candidate_score: int = -1
 
     for onyomi_reading in onyomi_readings:
         # Remove parentheses content
@@ -203,10 +214,8 @@ def match_onyomi_to_mora(
             mora_sequence,
             okurigana if is_last_kanji else "",
         )
-
         if matched_reading:
-            # For now, set okurigana/rest_kana to empty (will be extracted in step 4)
-            return ReadingMatchInfo(
+            candidate = ReadingMatchInfo(
                 reading=matched_reading,
                 dict_form=onyomi_reading,  # Store original reading
                 match_type="onyomi",
@@ -215,7 +224,40 @@ def match_onyomi_to_mora(
                 kanji=kanji,
                 okurigana="",
                 rest_kana="",
+                is_suru_verb=False,
             )
+            if not okurigana:
+                # No okurigana to match, return first found
+                return candidate
+            else:
+                # If we were given okurigana to match, score this candidate
+                # Kanji onyomi data does not have okurigana markers, so we need to use mecab
+                okuri_result, is_suru_verb = get_conjugated_okuri_with_mecab(
+                    kanji=word,
+                    kanji_reading=matched_reading,
+                    maybe_okuri=okurigana,
+                    okuri_prefix="kanji",
+                    logger=logger,
+                )
+                # Set okurigana/rest_kana in candidate
+                candidate["okurigana"] = okuri_result.okurigana
+                candidate["rest_kana"] = okuri_result.rest_kana
+                candidate["is_noun_suru_verb"] = is_suru_verb
+                logger.debug(
+                    f"match_kunyomi_to_mora - scoring candidate: {candidate}, "
+                    f"okurigana match result: {okuri_result}"
+                )
+                # Score by length of matched okuri (prefer full matches)
+                score = len(okuri_result.okurigana)
+                if okuri_result.result == "full_okuri":
+                    # Perfect match, return immediately
+                    return candidate
+                if score > best_candidate_score:
+                    best_candidate = candidate
+                    best_candidate_score = score
+
+    if best_candidate:
+        return best_candidate
 
     return None
 
@@ -269,8 +311,8 @@ def match_kunyomi_to_mora(
     # Parse kunyomi readings
     kunyomi_readings = [r.strip() for r in kunyomi.split("、")]
 
-    # When this is the last kanji and okurigana is present, prefer readings whose
-    # okurigana marker best matches the remaining kana. Collect candidates and pick best.
+    # When okurigana is present, prefer readings whose okurigana marker best matches the remaining
+    # kana. Collect candidates and pick best.
     best_candidate: Optional[ReadingMatchInfo] = None
     best_candidate_score: int = -1
 
@@ -331,8 +373,11 @@ def match_kunyomi_to_mora(
                     okurigana="",
                     rest_kana="",
                 )
-                # If we were given okurigana to match, score this candidate
-                if okurigana:
+                if not okurigana:
+                    # No okurigana to match, return first found
+                    return candidate
+                else:
+                    # If we were given okurigana to match, score this candidate
                     # If this reading has an okurigana marker, check how well it matches
                     if "." in original_reading:
                         reading_okurigana = original_reading.split(".", 1)[1]
@@ -379,9 +424,6 @@ def match_kunyomi_to_mora(
                             best_candidate_score = score
                         # Continue checking other readings to find a better match
                         continue
-                else:
-                    # Not last kanji or no okurigana to match, return first found
-                    return candidate
                 # If not scoring or no okurigana marker, fall back to first matched candidate
                 if best_candidate is None:
                     best_candidate = candidate
@@ -392,6 +434,7 @@ def match_kunyomi_to_mora(
 
 def match_reading_to_mora(
     kanji: str,
+    word: str,
     mora_sequence: str,
     kanji_data: dict,
     okurigana: str,
@@ -406,6 +449,7 @@ def match_reading_to_mora(
     When no okurigana, onyomi is checked first for performance.
 
     :param kanji: The kanji character to match
+    :param word: The full word containing the kanji
     :param mora_sequence: Joined mora string to match against
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param okurigana: The okurigana following the word (used for last kanji okurigana extraction)
@@ -418,13 +462,13 @@ def match_reading_to_mora(
             kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
         onyomi_match = match_onyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji, word, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
         return (kunyomi_match, onyomi_match)
     else:
         # When no okurigana, prefer onyomi for performance
         onyomi_match = match_onyomi_to_mora(
-            kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
+            kanji, word, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
         if onyomi_match:
             return (None, onyomi_match)

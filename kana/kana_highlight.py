@@ -255,25 +255,10 @@ def reconstruct_furigana(
         f" {reconstruct_type}, wrap_with_tags: {with_tags_def.with_tags}, merge_consecutive:"
         f" {with_tags_def.merge_consecutive}"
     )
-    segments = furi_okuri_result.get("segments", [])
-    highlight_idx = furi_okuri_result.get("highlight_segment_index")
-    match_type = furi_okuri_result.get("match_type", "none")
-    okurigana = furi_okuri_result.get("okurigana", "")
-    rest_kana = furi_okuri_result.get("rest_kana", "")
-    word = furi_okuri_result.get("word", "")
-
-    # Keep okuri out of the highlight if it is not supposed to be included
-    okuri_out_of_highlight = (
-        not with_tags_def.include_suru_okuri
-        and match_type == "onyomi"
-        and (len(word) > 1 or okurigana == "する")
-    )
-    logger.debug(
-        f"reconstruct_furigana - okuri_out_of_highlight: {okuri_out_of_highlight},"
-        f" include_suru_okuri: {with_tags_def.include_suru_okuri}, is onyomi match_type:"
-        f" {match_type == 'onyomi'}, word length: {len(word)}, okurigana is suru:"
-        f" {okurigana == 'する'}"
-    )
+    segments: list[list[WrapMatchEntry]] = furi_okuri_result.get("segments", [])
+    highlight_idx: Optional[int] = furi_okuri_result.get("highlight_segment_index")
+    okurigana: str = furi_okuri_result.get("okurigana", "")
+    rest_kana: str = furi_okuri_result.get("rest_kana", "")
 
     if okurigana and with_tags_def.with_tags:
         okurigana = f"<oku>{okurigana}</oku>"
@@ -322,9 +307,19 @@ def reconstruct_furigana(
         f" {rendered_segments}, okurigana: {okurigana}, rest_kana: {rest_kana}"
     )
     if rendered_segments and okurigana:
+        last_segment_part: Optional[WrapMatchEntry] = segments[-1][-1] if segments[-1] else None
+        okuri_out_of_highlight = (
+            not with_tags_def.include_suru_okuri
+            and last_segment_part is not None
+            and last_segment_part.get("is_noun_suru_verb", False)
+        )
+        logger.debug(
+            "reconstruct_furigana - okurigana exists, checking if okurigana should be outside"
+            f" highlight: {okuri_out_of_highlight}"
+        )
         # Append okurigana to the last segment if it exists, also handling highlight
-        last_segment = rendered_segments[-1]
-        if last_segment != highlight_segment:
+        last_rendered_segment = rendered_segments[-1]
+        if last_rendered_segment != highlight_segment:
             # No highlight in last segment, just add okurigana
             rendered_segments[-1] = f"{rendered_segments[-1]}{okurigana}"
             # Handle highlight segment if it exists
@@ -974,15 +969,21 @@ def reconstruct_from_alignment(
             reading = part["furigana"]
             tag = part["tag"]
             is_num = part["is_num"]
+            is_noun_suru_verb = part.get("is_noun_suru_verb", False)
         elif alignment["kanji_matches"][i]:
             match_info = alignment["kanji_matches"][i]
+            is_noun_suru_verb = match_info.get("is_noun_suru_verb", False)
             reading = match_info["matched_mora"]
-            match_type = match_info["match_type"]
+            highlight_match_type = match_info["match_type"]
 
-            if with_tags_def.onyomi_to_katakana and match_type == "onyomi":
+            if with_tags_def.onyomi_to_katakana and highlight_match_type == "onyomi":
                 reading = to_katakana(reading)
 
-            tag = "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
+            tag = (
+                "on"
+                if highlight_match_type == "onyomi"
+                else "kun" if highlight_match_type == "kunyomi" else "juk"
+            )
             is_num = surface_kanji.isdigit()
         else:
             logger.error(
@@ -998,6 +999,7 @@ def reconstruct_from_alignment(
             "furigana": reading,
             "highlight": False,
             "is_num": is_num,
+            "is_noun_suru_verb": is_noun_suru_verb,
         })
     logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
 
@@ -1089,17 +1091,17 @@ def reconstruct_from_alignment(
         f" {kanji_to_highlight_pos}, kanji_matches: {alignment['kanji_matches']},"
     )
     # Determine match type of the highlight segment
-    match_type = "none"
+    highlight_match_type = "none"
     if kanji_to_highlight_pos >= 0 and alignment["kanji_matches"][kanji_to_highlight_pos]:
-        match_type = alignment["kanji_matches"][kanji_to_highlight_pos]["match_type"]
+        highlight_match_type = alignment["kanji_matches"][kanji_to_highlight_pos]["match_type"]
     elif kanji_to_highlight_pos >= 0 and juku_parts:
-        match_type = "jukujikun"
+        highlight_match_type = "jukujikun"
 
     final_result: FinalResult = {
         "segments": segments,
         "highlight_segment_index": highlight_segment_index,
         "word": word,
-        "match_type": match_type,
+        "highlight_match_type": highlight_match_type,
         "okurigana": okurigana,
         "rest_kana": rest_kana,
         "was_katakana": was_katakana,
