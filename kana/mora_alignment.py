@@ -148,29 +148,84 @@ def find_first_complete_alignment(
                     f" kanji_count for word '{word}': {mora_split} vs {kanji_count}"
                 )
 
-            # IMPORTANT: For repeater kanji, do NOT include the next position's mora
-            # We match ONLY the first occurrence, then validate the second separately
-
             # Get kanji data
             kanji_data = all_kanji_data.get(kanji, None)
             if kanji_data is None:
                 logger.error(f"Kanji data not found for '{kanji}'")
                 kanji_data = {}
 
-            # Try to match reading
-            match_info = match_reading_to_mora(
+            repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
+            check_okurigana = is_last_kanji or (next_kanji_is_repeater and repeater_is_last)
+
+            # Try to match reading to either kunyomi or onyomi
+            kunyomi_match, onyomi_match = match_reading_to_mora(
                 kanji=kanji,
                 mora_sequence=mora_sequence,
                 kanji_data=kanji_data,
-                okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
+                okurigana=okurigana if check_okurigana else "",
                 is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
-                prefer_kunyomi=is_whole_word,
                 logger=logger,
             )
+
+            # Select the appropriate match based on okurigana extraction
+            match_info = None
+
+            if not (check_okurigana and okurigana):
+                # No okurigana to check - use whichever match exists but prefer onyomi
+                match_info = onyomi_match if onyomi_match else kunyomi_match
+            else:
+                # When there's okurigana to check, test both matches with extract_okurigana_for_match
+                kunyomi_okuri = ""
+                onyomi_okuri = ""
+
+                if kunyomi_match:
+                    kunyomi_okuri, kunyomi_rest_extracted = extract_okurigana_for_match(
+                        match_type=kunyomi_match["match_type"],
+                        dict_form=kunyomi_match["dict_form"],
+                        remaining_kana=okurigana,
+                        kanji=kanji,
+                        logger=logger,
+                    )
+                    kunyomi_match["okurigana"] = kunyomi_okuri
+                    kunyomi_match["rest_kana"] = kunyomi_rest_extracted
+
+                if onyomi_match:
+                    onyomi_okuri, onyomi_rest_extracted = extract_okurigana_for_match(
+                        match_type=onyomi_match["match_type"],
+                        dict_form=onyomi_match["dict_form"],
+                        remaining_kana=okurigana,
+                        kanji=kanji,
+                        logger=logger,
+                    )
+                    onyomi_match["okurigana"] = onyomi_okuri
+                    onyomi_match["rest_kana"] = onyomi_rest_extracted
+
+                # Apply selection logic
+                if kunyomi_okuri and onyomi_okuri:
+                    # Both extracted okurigana - use longer one, or kunyomi if same length
+                    if len(kunyomi_okuri) >= len(onyomi_okuri):
+                        match_info = kunyomi_match
+                    else:
+                        match_info = onyomi_match
+                elif kunyomi_okuri:
+                    # Only kunyomi extracted okurigana
+                    match_info = kunyomi_match
+                elif onyomi_okuri:
+                    # Only onyomi extracted okurigana
+                    match_info = onyomi_match
+                elif onyomi_match:
+                    # Neither extracted okurigana - prefer onyomi
+                    match_info = onyomi_match
+                elif kunyomi_match:
+                    # Only kunyomi match available
+                    match_info = kunyomi_match
+
             logger.debug(
                 f"find_first_complete_alignment - kanji: {kanji}, mora_sequence: {mora_sequence},"
-                f" match_info: {match_info}"
+                f" kunyomi_match: {kunyomi_match}, onyomi_match: {onyomi_match},"
+                f" selected match_info: {match_info}"
             )
+
             # Test for possible youon match
             prev_mora_sequence = mora_split[i - 1] if i > 0 else None
             if (
@@ -185,15 +240,15 @@ def find_first_complete_alignment(
                 small = mora_sequence[1]
                 # If the current kanji matches the small kana as yōon, we'll make a new youon
                 # mora split to be tested fully after this loop
-                youon_match_info = match_reading_to_mora(
+                youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
                     kanji=kanji,
                     mora_sequence=small,
                     kanji_data=kanji_data,
                     okurigana=okurigana if is_last_kanji and not next_kanji_is_repeater else "",
                     is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
-                    prefer_kunyomi=is_whole_word,
                     logger=logger,
                 )
+                youon_match_info = youon_onyomi_match if youon_onyomi_match else youon_kunyomi_match
                 if youon_match_info:
                     youon_mora_split = mora_split.copy()
                     # Adjust previous mora to include base kana
@@ -225,51 +280,31 @@ def find_first_complete_alignment(
                                 if rendaku_matched:
                                     break
 
-                    # Add match for first kanji
-                    kanji_matches.append(match_info)
-
                     # Add duplicate match for 々 (copy reading but mark as second occurrence)
                     repeater_match = match_info.copy()
                     repeater_match["matched_mora"] = second_mora
                     repeater_match["kanji"] = "々"
 
-                    # Check if repeater is the last kanji - if so, extract okurigana
-                    repeater_is_last = (i + 1) == kanji_count - 1
-                    if repeater_is_last:
-                        okuri_extracted, rest_extracted = extract_okurigana_for_match(
-                            match_type=repeater_match["match_type"],
-                            dict_form=repeater_match["dict_form"],
-                            remaining_kana=okurigana,
-                            # Use the original kanji being repeated for okurigana extraction,
-                            # not the repeater glyph itself
-                            kanji=word[i],
-                            logger=logger,
-                        )
-                        repeater_match["okurigana"] = okuri_extracted
-                        repeater_match["rest_kana"] = rest_extracted
-                        final_okurigana = okuri_extracted
-                        final_rest_kana = rest_extracted
+                    # Add match for first kanji
+                    # We'll remove the okurigana from the first match for now as it should only
+                    # apply to the last kanji in the word
+                    match_info["okurigana"] = ""
+                    match_info["rest_kana"] = ""
+                    kanji_matches.append(match_info)
+
+                    final_okurigana = repeater_match["okurigana"]
+                    final_rest_kana = repeater_match["rest_kana"]
 
                     kanji_matches.append(repeater_match)
 
                     # Skip next position since we handled repeater
                     i += 2
                     continue
-
-                # Extract okurigana if this is the last kanji (and not repeater)
-                if is_last_kanji:
-                    okuri_extracted, rest_extracted = extract_okurigana_for_match(
-                        match_type=match_info["match_type"],
-                        dict_form=match_info["dict_form"],
-                        remaining_kana=okurigana,
-                        kanji=kanji,
-                        logger=logger,
-                    )
-                    match_info["okurigana"] = okuri_extracted
-                    match_info["rest_kana"] = rest_extracted
-                    final_okurigana = okuri_extracted
-                    final_rest_kana = rest_extracted
-
+                elif is_last_kanji:
+                    # This is the last kanji (and not repeater)
+                    final_okurigana = match_info["okurigana"]
+                    final_rest_kana = match_info["rest_kana"]
+                # Add match info to list
                 kanji_matches.append(match_info)
             else:
                 # No match - mark as jukujikun
@@ -294,6 +329,8 @@ def find_first_complete_alignment(
             final_okurigana=final_okurigana,
             final_rest_kana=final_rest_kana,
         )
+
+        logger.debug(f"find_first_complete_alignment - alignment result: {alignment}")
 
         if (
             alignment["kanji_matches"]

@@ -385,50 +385,46 @@ def match_reading_to_mora(
     kanji_data: dict,
     okurigana: str,
     is_last_kanji: bool,
-    prefer_kunyomi: bool = False,
     logger: Logger = Logger("error"),
-) -> Optional[ReadingMatchInfo]:
+) -> Tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
     """
     Try to match any reading (onyomi or kunyomi) to a mora sequence.
 
-    Tries onyomi first, then kunyomi unless prefer_kunyomi is True.
+    Returns both kunyomi and onyomi matches as a tuple.
+    When okurigana is present, both are checked.
+    When no okurigana, onyomi is checked first for performance.
 
     :param kanji: The kanji character to match
     :param mora_sequence: Joined mora string to match against
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param okurigana: The okurigana following the word (used for last kanji okurigana extraction)
     :param is_last_kanji: Whether this is the last kanji in the word
-    :param prefer_kunyomi: Whether to prefer kunyomi first (overrides default logic)
-    :return: ReadingMatchInfo if match found, None otherwise
+    :return: Tuple of (kunyomi_match, onyomi_match), either can be None
     """
-    if prefer_kunyomi:
-        # Try kunyomi first when okurigana is present and kunyomi is more likely
+    if okurigana:
+        # When okurigana is present, check both
         kunyomi_match = match_kunyomi_to_mora(
             kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
-        if kunyomi_match:
-            return kunyomi_match
-
         onyomi_match = match_onyomi_to_mora(
             kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
-        if onyomi_match:
-            return onyomi_match
+        return (kunyomi_match, onyomi_match)
     else:
-        # Default order: onyomi then kunyomi
+        # When no okurigana, prefer onyomi for performance
         onyomi_match = match_onyomi_to_mora(
             kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
         if onyomi_match:
-            return onyomi_match
+            return (None, onyomi_match)
 
         kunyomi_match = match_kunyomi_to_mora(
             kanji, mora_sequence, kanji_data, okurigana, is_last_kanji, logger
         )
         if kunyomi_match:
-            return kunyomi_match
+            return (kunyomi_match, None)
 
-    return None
+    return (None, None)
 
 
 def extract_okurigana_for_match(

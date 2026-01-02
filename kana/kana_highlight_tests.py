@@ -2816,6 +2816,38 @@ Return type: {return_type}
         expected_furikanji_with_tags_split="<b><kun> こころ[試]</kun><oku>みる</oku></b>",
     )
     test(
+        test_name="Verb okurigana test 14/",
+        kanji="掛",
+        # 掛 has both onyomi カ and kunyomi か.ける, should use the kunyomi if there is okurigana
+        sentence="掛[か]ける。",
+        expected_kana_only="<b>かける</b>。",
+        expected_furigana="<b> 掛[か]ける</b>。",
+        expected_furikanji="<b> か[掛]ける</b>。",
+        expected_kana_only_with_tags_split="<b><kun>か</kun><oku>ける</oku></b>。",
+        expected_furigana_with_tags_split="<b><kun> 掛[か]</kun><oku>ける</oku></b>。",
+        expected_furikanji_with_tags_split="<b><kun> か[掛]</kun><oku>ける</oku></b>。",
+        expected_kana_only_with_tags_merged="<b><kun>か</kun><oku>ける</oku></b>。",
+        expected_furigana_with_tags_merged="<b><kun> 掛[か]</kun><oku>ける</oku></b>。",
+        expected_furikanji_with_tags_merged="<b><kun> か[掛]</kun><oku>ける</oku></b>。",
+    )
+    test(
+        test_name="Verb okurigana test 15/",
+        kanji="掛",
+        # Same if 掛ける is used in a compound word
+        sentence="仕[し] 掛[か]ける。",
+        expected_kana_only="シ <b>かける</b>。",
+        expected_furigana=" 仕[シ]<b> 掛[か]ける</b>。",
+        expected_furikanji=" シ[仕]<b> か[掛]ける</b>。",
+        expected_kana_only_with_tags_split="<on>シ</on> <b><kun>か</kun><oku>ける</oku></b>。",
+        expected_furigana_with_tags_split="<on> 仕[シ]</on><b><kun> 掛[か]</kun><oku>ける</oku></b>。",
+        expected_furikanji_with_tags_split="<on> シ[仕]</on><b><kun> か[掛]</kun><oku>ける</oku></b>。",
+        expected_kana_only_with_tags_merged="<on>シ</on> <b><kun>か</kun><oku>ける</oku></b>。",
+        expected_furigana_with_tags_merged="<on> 仕[シ]</on><b><kun> 掛[か]</kun><oku>ける</oku></b>。",
+        expected_furikanji_with_tags_merged=(
+            "<on> シ[仕]</on><b><kun> か[掛]</kun><oku>ける</oku></b>。"
+        ),
+    )
+    test(
         test_name="Adjective okurigana test 1/",
         kanji="悲",
         sentence="彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",
@@ -3385,30 +3417,40 @@ Return type: {return_type}
         kanji="",
         sentence="嗅[か]がせろって",
         expected_kana_only_with_tags_split="<kun>か</kun><oku>がせろ</oku>って",
+        expected_furigana_with_tags_split="<kun> 嗅[か]</kun><oku>がせろ</oku>って",
+        expected_furikanji_with_tags_split="<kun> か[嗅]</kun><oku>がせろ</oku>って",
     )
     test(
         test_name="matches okuri for causative imperative godan mu verb",
         kanji="",
         sentence="飲[の]ませろ!",
         expected_kana_only_with_tags_split="<kun>の</kun><oku>ませろ</oku>!",
+        expected_furigana_with_tags_split="<kun> 飲[の]</kun><oku>ませろ</oku>!",
+        expected_furikanji_with_tags_split="<kun> の[飲]</kun><oku>ませろ</oku>!",
     )
     test(
         test_name="matches okuri for causative imperative godan su verb",
         kanji="",
         sentence="話[はな]させろ!",
         expected_kana_only_with_tags_split="<kun>はな</kun><oku>させろ</oku>!",
+        expected_furigana_with_tags_split="<kun> 話[はな]</kun><oku>させろ</oku>!",
+        expected_furikanji_with_tags_split="<kun> はな[話]</kun><oku>させろ</oku>!",
     )
     test(
         test_name="matches okuri for causative imperative ichidan verb",
         kanji="",
         sentence="食[た]べさせろ!",
         expected_kana_only_with_tags_split="<kun>た</kun><oku>べさせろ</oku>!",
+        expected_furigana_with_tags_split="<kun> 食[た]</kun><oku>べさせろ</oku>!",
+        expected_furikanji_with_tags_split="<kun> た[食]</kun><oku>べさせろ</oku>!",
     )
     test(
         test_name="matches okuri for causative imperative godan aru verb",
         kanji="",
         sentence="有[あ]らせろ!",
         expected_kana_only_with_tags_split="<kun>あ</kun><oku>らせろ</oku>!",
+        expected_furigana_with_tags_split="<kun> 有[あ]</kun><oku>らせろ</oku>!",
+        expected_furikanji_with_tags_split="<kun> あ[有]</kun><oku>らせろ</oku>!",
     )
     test(
         test_name="matches single-kanji onyomi す/する verbs okuri /1",
@@ -3416,6 +3458,8 @@ Return type: {return_type}
         onyomi_to_katakana=False,
         sentence="博[はく]している",
         expected_kana_only_with_tags_split="<on>はく</on><oku>して</oku>いる",
+        expected_furigana_with_tags_split="<on> 博[はく]</on><oku>して</oku>いる",
+        expected_furikanji_with_tags_split="<on> はく[博]</on><oku>して</oku>いる",
     )
     test(
         test_name="matches single-kanji onyomi す/する verbs okuri /2",
@@ -3423,6 +3467,8 @@ Return type: {return_type}
         onyomi_to_katakana=False,
         sentence="愛[あい]せるか？",
         expected_kana_only_with_tags_split="<b><on>あい</on><oku>せる</oku></b>か？",
+        expected_furigana_with_tags_split="<b><on> 愛[あい]</on><oku>せる</oku></b>か？",
+        expected_furikanji_with_tags_split="<b><on> あい[愛]</on><oku>せる</oku></b>か？",
     )
     test(
         test_name="matches single-kanji onyomi す/する verbs okuri /3",
@@ -3430,6 +3476,8 @@ Return type: {return_type}
         onyomi_to_katakana=False,
         sentence="化[か]させない",
         expected_kana_only_with_tags_split="<on>か</on><oku>させない</oku>",
+        expected_furigana_with_tags_split="<on> 化[か]</on><oku>させない</oku>",
+        expected_furikanji_with_tags_split="<on> か[化]</on><oku>させない</oku>",
     )
     test(
         test_name="matches single-kanji onyomi す/する verbs okuri /4",
