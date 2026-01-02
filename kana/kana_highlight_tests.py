@@ -129,13 +129,13 @@ def main(test_nums: Optional[list[str]] = None):
                 if restricted_tests:
                     # restricted_tests is a whitelist, so skip tests not in it or those where
                     # no specific cases are defined
-                    if (
-                        cur_test_index not in restricted_tests
-                        or not restricted_tests[cur_test_index]
-                    ):
+                    if cur_test_index not in restricted_tests:
                         skipped_test_cases += len(cases)
                         break
-                    if case_idx not in restricted_tests[cur_test_index]:
+                    if (
+                        restricted_tests[cur_test_index]
+                        and case_idx not in restricted_tests[cur_test_index]
+                    ):
                         skipped_test_cases += 1
                         continue
                 run_test_cases += 1
@@ -950,6 +950,22 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<kun>たけだけ</kun><oku>しい</oku>",
         expected_furigana_with_tags_merged="<kun> 猛々[たけだけ]</kun><oku>しい</oku>",
         expected_furikanji_with_tags_merged="<kun> たけだけ[猛々]</kun><oku>しい</oku>",
+    )
+    test(
+        test_name="Handles repeater with non repeating furigana 1/",
+        kanji="",
+        # An edge case: the furigana does not repeat completely, for example 蝶々 can sometimes
+        # be colloquially written as ちょうちょ
+        sentence="蝶々[ちょうちょ]",
+        expected_kana_only="チョウチョ",
+        expected_furigana=" 蝶々[チョウチョ]",
+        expected_furikanji=" チョウチョ[蝶々]",
+        expected_kana_only_with_tags_split="<on>チョウチョ</on>",
+        expected_furigana_with_tags_split="<on> 蝶々[チョウチョ]</on>",
+        expected_furikanji_with_tags_split="<on> チョウチョ[蝶々]</on>",
+        expected_kana_only_with_tags_merged="<on>チョウチョ</on>",
+        expected_furigana_with_tags_merged="<on> 蝶々[チョウチョ]</on>",
+        expected_furikanji_with_tags_merged="<on> チョウチョ[蝶々]</on>",
     )
     test(
         test_name="Should be able to clean furigana that bridges over some okurigana 3/",

@@ -24,7 +24,7 @@ def get_ordered_sublists(list_to_split: T, split_count: int) -> list[list[T]]:
     """
     n = len(list_to_split)
 
-    # Edge cases
+    # Return nothing for invalid split counts
     if split_count <= 0 or split_count > n:
         return []
 

@@ -104,6 +104,11 @@ FURIGANA_EXCEPTION_ALIGNMENTS: Dict[str, List[ExceptionAlignmentEntry]] = {
         {"type": "kunyomi", "mora": "いよ"},
         {"type": "kunyomi", "mora": "いよ"},
     ],
+    # 蝶々 can be written shortened where the furigana doesn't repeat completely
+    "蝶々_ちょうちょ": [
+        {"type": "onyomi", "mora": "ちょう"},
+        {"type": "onyomi", "mora": "ちょ"},
+    ],
 }
 
 
