@@ -29,14 +29,6 @@ try:
 except ImportError:
     from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 try:
-    from kanji.all_kanji_data import all_kanji_data
-except ImportError:
-    from ..kanji.all_kanji_data import all_kanji_data
-try:
-    from mecab_controller.kana_conv import to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana
-try:
     from utils.logger import Logger
 except ImportError:
     from ..utils.logger import Logger
@@ -169,49 +161,6 @@ def process_jukujikun_positions(
                             "rest_kana": "",
                         }
                 start_search = start + len(ex_word)
-
-            # Synthesize matches for prefix/suffix positions without matches
-            def synthesize_match_for_pos(pos: int):
-                if pos < 0 or pos >= len(word):
-                    return
-                if alignment["kanji_matches"][pos]:
-                    return
-                if pos in alignment["jukujikun_positions"]:
-                    return
-                mora_seq = "".join(alignment["mora_split"][pos])
-                if not mora_seq:
-                    return
-                kanji_char = word[pos]
-                data = all_kanji_data.get(kanji_char, {})
-                on_readings = [to_hiragana(r) for r in data.get("on", "").split("、") if r]
-                kun_readings = [
-                    to_hiragana(r.split(".")[0]) for r in data.get("kun", "").split("、") if r
-                ]
-                match_type = (
-                    "onyomi"
-                    if mora_seq in on_readings
-                    else ("kunyomi" if mora_seq in kun_readings else "onyomi")
-                )
-                alignment["kanji_matches"][pos] = {
-                    "reading": mora_seq,
-                    "dict_form": mora_seq,
-                    "match_type": match_type,
-                    "reading_variant": "plain",
-                    "matched_mora": mora_seq,
-                    "kanji": kanji_char,
-                    "okurigana": "",
-                    "rest_kana": "",
-                }
-
-            # Prefix [0, start)
-            for p in range(0, start):
-                synthesize_match_for_pos(p)
-            # Suffix (start + len(entries)) .. end
-            end = start + len(entries)
-            for p in range(end, len(word)):
-                synthesize_match_for_pos(p)
-            # Stop after first match; remaining positions handled by alignment
-            break
 
     # If exception mapping did not set any juku parts, fall back to redistributing
     if not jukujikun_parts:
