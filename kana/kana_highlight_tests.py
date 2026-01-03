@@ -121,7 +121,12 @@ def main(test_nums: Optional[list[str]] = None):
         def run_test(cur_test_index: int, total_tests: int = 1):
 
             def print_progress(color):
-                print(f"\r{color}Test {cur_test_num} / {total_tests}{RESET}", end="", flush=True)
+                failed = f"{RED} {len(failed_test_keys)} failed" if failed_test_keys else ""
+                print(
+                    f"\r{color}Test {cur_test_num} / {total_tests}{failed}{RESET}",
+                    end="",
+                    flush=True,
+                )
 
             for case_idx, (return_type, with_tags_def, expected) in enumerate(cases):
                 nonlocal rerun_test_with_debug, failed_test_keys, restricted_tests, run_test_cases, skipped_test_cases
@@ -3710,8 +3715,12 @@ Return type: {return_type}
 
     start_time = time.time()
     total_test_count = len(test_list)
-    for i, test_func in enumerate(test_list):
-        test_func(i, total_test_count)
+    try:
+        for i, test_func in enumerate(test_list):
+            test_func(i, total_test_count)
+    except KeyboardInterrupt:
+        print("\r\033[K", end="", flush=True)  # Clear progress line
+        print(f"\n{YELLOW}Tests interrupted by user{RESET}")
     total_failed_test_cases = len(failed_test_keys)
     # Clear the last progress line
     print("\r\033[K", end="", flush=True)  # move to start, clear to end
