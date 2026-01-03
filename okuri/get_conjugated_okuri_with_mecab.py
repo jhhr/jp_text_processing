@@ -127,7 +127,7 @@ def get_conjugated_okuri_with_mecab(
     if not word_type:
         # If the first token is not one of the processable types, try again with kanji_reading
         # as the prefix
-        if okuri_prefix == "word":
+        if okuri_prefix == "word" and reading:
             logger.debug(
                 f"First token not valid: {first_token.word}, PartOfSpeech:"
                 f" {first_token.part_of_speech}, Retrying with reading as"

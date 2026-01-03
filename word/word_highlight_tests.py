@@ -275,6 +275,13 @@ def main():
         text="このケーキって、おいしくなくて 残念[ザンねん]だったな！",
         expected="このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
     )
+    test(
+        test_name="Shouldn't crash with mixture of furigana and non-furigana in word",
+        word="総[そう]勃ち",
+        text="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
+        # Unable to highlight correctly, but at least shouldn't crash
+        expected="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃</b>ち だよ",
+    )
     print("\n\033[92mTests passed\033[0m")
 
 
