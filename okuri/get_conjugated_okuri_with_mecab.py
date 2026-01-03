@@ -128,7 +128,7 @@ def get_conjugated_okuri_with_mecab(
             rest_kana = maybe_okuri[1:]
             return OkuriResults("し", rest_kana, okuri_type, "adj-i"), is_suru_verb
 
-    tokens: list[MecabParsedToken] = list(mecab._analyze(text_to_parse))
+    tokens: list[MecabParsedToken] = list(mecab.translate(text_to_parse))
     logger.debug(
         f"Parsed text: {text_to_parse} ->\n"
         + "\n".join([f"{token.word}, PartOfSpeech: {token.part_of_speech}" for token in tokens]),
