@@ -140,8 +140,8 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         word occurrences in the text.
     """
     logger.debug(f"word_highlight: text='{text}', word='{word}'")
-    if not text or not word:
-        return []
+    if not text or not word or not word.strip():
+        return text
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
         # This is either a simple case or a complex one needing inflection matching
@@ -259,7 +259,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 logger.debug("No valid inflected form found")
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
             # Insert <b> tags into the text at the found indices
-            result = text
+        result = text
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]

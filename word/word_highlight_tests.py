@@ -49,6 +49,36 @@ def test(
 
 def main():
     test(
+        test_name="Crash test - empty text",
+        word="何[なに]",
+        text="",
+        expected="",
+    )
+    test(
+        test_name="Crash test - None text",
+        word="何[なに]",
+        text=None,
+        expected=None,
+    )
+    test(
+        test_name="Crash test - empty word",
+        word="",
+        text="何[なに]を しています か？",
+        expected="何[なに]を しています か？",
+    )
+    test(
+        test_name="Crash test - None word",
+        word=None,
+        text="何[なに]を しています か？",
+        expected="何[なに]を しています か？",
+    )
+    test(
+        test_name="Crash test - word is just whitespace",
+        word="   ",
+        text="何[なに]を しています か？",
+        expected="何[なに]を しています か？",
+    )
+    test(
         test_name="Furigana - non-inflected noun in middle of text",
         word="日本語[にほんご]",
         text="私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
