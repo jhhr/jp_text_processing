@@ -24,7 +24,7 @@ except ImportError:
     from ..utils.logger import Logger
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
-    r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)"
+    r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
 LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbf])々?(?:\[([^\]]*?)\])?$"
 
@@ -161,7 +161,18 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         f"Parsed word - word_without_furigana: '{word_without_furigana}', furigana: '{furigana}',"
         f" ending_okurigana: '{ending_okurigana}'"
     )
-    if not ending_okurigana and furigana:
+
+    if not ending_okurigana and not furigana:
+        logger.debug("No ending kana and no furigana but have kanji -> simple regex match")
+        # Most simple case, we can regex search for the word directly
+        pattern = make_word_pattern(word)
+
+        def replace_match(match: re.Match) -> str:
+            return f"<b>{match.group(0)}</b>"
+
+        result = re.sub(pattern, replace_match, text)
+        return result
+    elif not ending_okurigana and furigana:
         logger.debug("No ending kana but has furigana -> split and regex match, then reconstruct")
         # Relatively simple case, we can regex search for the word
         # However, we need to make sure the word's furigana matches the text's furigana and
@@ -189,7 +200,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         result = re.sub(r"^(<b>)? ", r"\1", result)
         return result
 
-    # Need to handle possible inflections
+    # Getting more complicated, need to handle possible inflections
     word = word[: -len(ending_okurigana)]
     logger.debug(
         f"Found ending kana, handling possible inflections: ending_okurigana='{ending_okurigana}',"
@@ -197,13 +208,16 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     )
 
     if not furigana:
+        logger.debug(
+            "No furigana but have kanji with okuri, use regex + mecab to find inflected forms"
+        )
         pattern = make_word_pattern(word)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += r"([ぁ-んア-ン]*)"
         matches = re.finditer(pattern, text)
         result_indices: list[tuple[int, int]] = []
         for m in matches:
-            maybe_okuri = m.group(2)
+            maybe_okuri = m.group(1)
             logger.debug(
                 f"Found potential match at indices ({m.start(0)}, {m.end(0)}),"
                 f" maybe_okuri: '{maybe_okuri}'"
@@ -232,8 +246,16 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
             # Insert <b> tags into the text at the found indices
             result = text
-        for start, end in result_indices:
+
+        for idx in range(len(result_indices)):
+            start, end = result_indices[idx]
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
+            # Adjust subsequent indices due to added tag lengths
+            for j in range(idx + 1, len(result_indices)):
+                s, e = result_indices[j]
+                result_indices[j] = (s + 7, e + 7)
+        logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        return result
     else:
         logger.debug("Furigana present, using kana_highlight for inflection matching")
         # Furigana is present, so use kana_highlight to find the inflected forms for the last kanji
