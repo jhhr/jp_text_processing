@@ -923,6 +923,7 @@ def kana_highlight(
             )
             alignment = find_first_complete_alignment(
                 word=alignment_word,
+                furigana=full_furigana,
                 maybe_okuri=maybe_okuri,
                 possible_splits=possible_whole_word_splits,
                 logger=logger,
@@ -933,6 +934,7 @@ def kana_highlight(
             logger.debug(f"furigana_replacer - partial_word_case mora_result: {mora_result}")
             alignment = find_first_complete_alignment(
                 word=alignment_word,
+                furigana=full_furigana,
                 maybe_okuri=maybe_okuri,
                 mora_list=mora_result["mora_list"],
                 logger=logger,

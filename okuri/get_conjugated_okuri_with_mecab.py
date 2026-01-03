@@ -31,7 +31,7 @@ except ImportError:
         PartOfSpeech,
     )
 
-OkuriPrefix = Literal["kanji", "kanji_reading"]
+OkuriPrefix = Literal["word", "reading"]
 
 mecab = MecabController()
 
@@ -62,51 +62,51 @@ def verb_conjugation_conditions(token, prev_token, next_token):
 
 
 def get_conjugated_okuri_with_mecab(
-    kanji: str,
-    kanji_reading: str,
+    word: str,
+    reading: str,
     maybe_okuri: str,
-    okuri_prefix: OkuriPrefix = "kanji",
+    okuri_prefix: OkuriPrefix = "word",
     logger: Logger = Logger("error"),
 ) -> tuple[OkuriResults, bool]:
     """
     Determines the portion of text that is the conjugated okurigana for a kanji reading.
     :param maybe_okuri: The okurigana to check
-    :param kanji: The kanji character
-    :param kanji_reading: The reading of the kanji occurring before the okurigana
+    :param word: The kanji or word
+    :param reading: The reading of the kanji or word occurring before the okurigana
     :param logger: Logger instance for debugging
     :return: A tuple of the okurigana that is part of the conjugation for threading
             and the rest of the okurigana, along with a boolean indicating if it is a suru verb
     """
     logger.debug(
-        f"get_conjugated_okuri - maybe_okuri: {maybe_okuri}, kanji: {kanji}, kanji_reading:"
-        f" {kanji_reading}, okuri_prefix: {okuri_prefix}"
+        f"get_conjugated_okuri - maybe_okuri: {maybe_okuri}, word: {word}, reading:"
+        f" {reading}, okuri_prefix: {okuri_prefix}"
     )
     if not maybe_okuri:
         logger.debug("get_conjugated_okuri - No okurigana provided, no processing needed.")
         return OkuriResults("", "", "no_okuri", None), False
     parse_text_prefix = None
-    if okuri_prefix == "kanji":
-        if kanji:
+    if okuri_prefix == "word":
+        if word:
             # Exception for 為 as its headword doesn't get detected correctly so process it using
             # the kanji reading
-            if (kanji == "為" and kanji_reading == "し") or kanji == "抉":
-                parse_text_prefix = kanji_reading
-                okuri_prefix = "kanji_reading"
+            if (word == "為" and reading == "し") or word == "抉":
+                parse_text_prefix = reading
+                okuri_prefix = "reading"
             else:
-                parse_text_prefix = kanji
-        elif kanji_reading:
-            parse_text_prefix = kanji_reading
-            okuri_prefix = "kanji_reading"
-    elif okuri_prefix == "kanji_reading":
-        if kanji_reading:
-            parse_text_prefix = kanji_reading
-        elif kanji:
-            parse_text_prefix = kanji
-            okuri_prefix = "kanji"
+                parse_text_prefix = word
+        elif reading:
+            parse_text_prefix = reading
+            okuri_prefix = "reading"
+    elif okuri_prefix == "reading":
+        if reading:
+            parse_text_prefix = reading
+        elif word:
+            parse_text_prefix = word
+            okuri_prefix = "word"
     if not parse_text_prefix:
         logger.error(
             f"get_conjugated_okuri - cannot set parse_text_prefix, okuri_prefix: {okuri_prefix},"
-            f" kanji: {kanji}, kanji_reading: {kanji_reading}"
+            f" kanji: {word}, kanji_reading: {reading}"
         )
         return OkuriResults("", maybe_okuri, "no_okuri", None), False
     text_to_parse = f"{parse_text_prefix}{maybe_okuri}"
@@ -115,9 +115,9 @@ def get_conjugated_okuri_with_mecab(
     is_suru_verb = False
 
     # exceptions that parsing gets wrong
-    if kanji == "久" and kanji_reading == "ひさ" and maybe_okuri.startswith("しぶり"):
+    if word == "久" and reading == "ひさ" and maybe_okuri.startswith("しぶり"):
         return OkuriResults("し", maybe_okuri[1:], okuri_type, "adj-i"), is_suru_verb
-    if kanji == "仄々" and kanji_reading == "ほのぼの":
+    if word == "仄々" and reading == "ほのぼの":
         if maybe_okuri.startswith("した"):
             rest_kana = maybe_okuri[2:]
             return OkuriResults("した", rest_kana, okuri_type, None), is_suru_verb
@@ -164,29 +164,27 @@ def get_conjugated_okuri_with_mecab(
     if not (is_i_adjective or is_na_adjective or is_verb or is_adverb or is_noun):
         # If the first token is not one of the processable types, try again with kanji_reading
         # as the prefix
-        if okuri_prefix == "kanji":
+        if okuri_prefix == "word":
             logger.debug(
                 f"First token not valid: {first_token.word}, PartOfSpeech:"
-                f" {first_token.part_of_speech}, Retrying with kanji_reading as"
+                f" {first_token.part_of_speech}, Retrying with reading as"
                 " prefix."
             )
             return get_conjugated_okuri_with_mecab(
-                kanji,
-                kanji_reading,
+                word,
+                reading,
                 maybe_okuri,
-                okuri_prefix="kanji_reading",
+                okuri_prefix="reading",
                 logger=logger,
             )
-        elif okuri_prefix == "kanji_reading":
+        elif okuri_prefix == "reading":
             logger.debug(
                 f"First token is not a verb or adjective: {first_token.word}, PartOfSpeech:"
                 f" {first_token.part_of_speech}, Returning empty okuri."
             )
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         else:
-            logger.error(
-                f"Unknown okuri_prefix: {okuri_prefix}. Expected 'kanji' or 'kanji_reading'."
-            )
+            logger.error(f"Unknown okuri_prefix: {okuri_prefix}. Expected 'word' or 'reading'.")
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
     # The first token will actually include the conjugation stem, so we need to extract it
     conjugated_okuri = first_token.word[len(parse_text_prefix) :]

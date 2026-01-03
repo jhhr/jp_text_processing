@@ -20,21 +20,9 @@ try:
 except ImportError:
     from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 try:
-    from all_types.main_types import MatchType, OkuriResults
-except ImportError:
-    from ..all_types.main_types import MatchType, OkuriResults
-try:
     from okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
 except ImportError:
     from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
-try:
-    from okuri.okurigana_dict import ONYOMI_GODAN_SU_FIRST_KANA
-except ImportError:
-    from ..okuri.okurigana_dict import ONYOMI_GODAN_SU_FIRST_KANA
-try:
-    from kanji.all_kanji_data import all_kanji_data
-except ImportError:
-    from ..kanji.all_kanji_data import all_kanji_data
 try:
     from okuri.okurigana_dict import get_verb_noun_form_okuri
 except ImportError:
@@ -170,6 +158,7 @@ def check_reading_match(
 def match_onyomi_to_mora(
     kanji: str,
     word: str,
+    furigana: str,
     mora_sequence: str,
     kanji_data: dict,
     maybe_okuri: str,
@@ -181,6 +170,7 @@ def match_onyomi_to_mora(
 
     :param kanji: The kanji character to match
     :param word: The full word containing the kanji, needed for okurigana extraction with mecab
+    :param furigana: The full reading of the word in kana, needed for okurigana extraction with mecab
     :param mora_sequence: Joined mora string to match against
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param maybe_okuri: The kana following the word (used for last kanji okurigana extraction)
@@ -193,11 +183,6 @@ def match_onyomi_to_mora(
 
     # Parse onyomi readings
     onyomi_readings = [r.strip() for r in onyomi.split("、")]
-
-    # When okurigana is present, prefer readings whose okurigana marker best matches the remaining
-    # kana. Collect candidates and pick best.
-    best_candidate: Optional[ReadingMatchInfo] = None
-    best_candidate_score: int = -1
 
     for onyomi_reading in onyomi_readings:
         # Remove parentheses content
@@ -215,50 +200,25 @@ def match_onyomi_to_mora(
             maybe_okuri if is_last_kanji else "",
         )
         if matched_reading:
-            candidate = ReadingMatchInfo(
+            # Get okurigana with mecab since onyomi readings don't have okurigana markers
+            okuri_result, is_noun_suru_verb = get_conjugated_okuri_with_mecab(
+                word=word,
+                reading=furigana,
+                maybe_okuri=maybe_okuri,
+                okuri_prefix="word",
+                logger=logger,
+            )
+            return ReadingMatchInfo(
                 reading=matched_reading,
                 dict_form=onyomi_reading,  # Store original reading
                 match_type="onyomi",
                 reading_variant=reading_variant,
                 matched_mora=mora_sequence,
                 kanji=kanji,
-                # Initially we assume there's no okurigana; will adjust below if needed
-                okurigana="",
-                rest_kana=maybe_okuri,
-                is_suru_verb=False,
+                okurigana=okuri_result.okurigana,
+                rest_kana=okuri_result.rest_kana,
+                is_noun_suru_verb=is_noun_suru_verb,
             )
-            if not maybe_okuri:
-                # No okurigana to match, return first found
-                return candidate
-            else:
-                # If we were given okurigana to match, score this candidate
-                # Kanji onyomi data does not have okurigana markers, so we need to use mecab
-                okuri_result, is_suru_verb = get_conjugated_okuri_with_mecab(
-                    kanji=word,
-                    kanji_reading=matched_reading,
-                    maybe_okuri=maybe_okuri,
-                    okuri_prefix="kanji",
-                    logger=logger,
-                )
-                # Set okurigana/rest_kana in candidate
-                candidate["okurigana"] = okuri_result.okurigana
-                candidate["rest_kana"] = okuri_result.rest_kana
-                candidate["is_noun_suru_verb"] = is_suru_verb
-                logger.debug(
-                    f"match_kunyomi_to_mora - scoring candidate: {candidate}, "
-                    f"okurigana match result: {okuri_result}"
-                )
-                # Score by length of matched okuri (prefer full matches)
-                score = len(okuri_result.okurigana)
-                if okuri_result.result == "full_okuri":
-                    # Perfect match, return immediately
-                    return candidate
-                if score > best_candidate_score:
-                    best_candidate = candidate
-                    best_candidate_score = score
-
-    if best_candidate:
-        return best_candidate
 
     return None
 
@@ -427,6 +387,7 @@ def match_kunyomi_to_mora(
 def match_reading_to_mora(
     kanji: str,
     word: str,
+    furigana: str,
     mora_sequence: str,
     kanji_data: dict,
     maybe_okuri: str,
@@ -442,6 +403,7 @@ def match_reading_to_mora(
 
     :param kanji: The kanji character to match
     :param word: The full word containing the kanji
+    :param furigana: The full reading of the word in kana
     :param mora_sequence: Joined mora string to match against
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param maybe_okuri: The okurigana following the word (used for last kanji okurigana extraction)
@@ -454,13 +416,13 @@ def match_reading_to_mora(
             kanji, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
         )
         onyomi_match = match_onyomi_to_mora(
-            kanji, word, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
         )
         return (kunyomi_match, onyomi_match)
     else:
         # When no okurigana, prefer onyomi for performance
         onyomi_match = match_onyomi_to_mora(
-            kanji, word, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
         )
         if onyomi_match:
             return (None, onyomi_match)
@@ -472,157 +434,3 @@ def match_reading_to_mora(
             return (kunyomi_match, None)
 
     return (None, None)
-
-
-def extract_okurigana_for_match(
-    match_type: MatchType,
-    dict_form: str,
-    remaining_kana: str,
-    kanji: str,
-    logger: Logger = Logger("error"),
-) -> Tuple[str, str]:
-    """
-    Extract okurigana from remaining kana after the last kanji's reading match.
-
-    This function handles okurigana extraction for both onyomi and kunyomi readings
-    when they appear at the end of a word (last kanji).
-
-    :param match_type: Whether this is an onyomi or kunyomi match
-    :param dict_form: The dictionary form reading (for kunyomi, includes "." marker like "か.く")
-    :param remaining_kana: The kana following the matched reading
-    :param kanji: The kanji character this match is for
-    :return: Tuple of (okurigana, rest_kana)
-    """
-    logger.debug(
-        f"extract_okurigana_for_match - match_type: {match_type}, dict_form: {dict_form}, "
-        f"remaining_kana: {remaining_kana}, kanji: {kanji}"
-    )
-    if not remaining_kana:
-        return "", ""
-
-    # Use the check_okurigana_for_inflection function to match against inflections
-    # Create minimal word_data and highlight_args for the function
-    word_data = {
-        "okurigana": remaining_kana,
-        "word": kanji,
-        "kanji_pos": 0,
-        "kanji_count": 1,
-        "furigana": "",
-        "furigana_is_katakana": False,
-        "edge": "whole",
-    }
-    highlight_args = {
-        "kanji_to_match": kanji,
-        "kanji_to_highlight": kanji,
-        "add_highlight": False,
-        "edge": "whole",
-        "full_word": kanji,
-        "full_furigana": "",
-    }
-
-    if match_type == "onyomi":
-        highlight_args["onyomi"] = dict_form
-        highlight_args["kunyomi"] = ""
-        # Check for godan su verbs that have okurigana
-        if remaining_kana and remaining_kana[0] in ONYOMI_GODAN_SU_FIRST_KANA:
-            if remaining_kana.startswith("する"):
-                # If this is just a straight up suru verb, we can take okurigana up to する
-                logger.debug(
-                    "extract_okurigana_for_match - onyomi match found with する okurigana:"
-                    f" word_data: {remaining_kana}, kanji: {kanji}"
-                )
-                return "する", remaining_kana[2:]
-            else:
-                logger.debug(
-                    "extract_okurigana_for_match - onyomi match found with godan す verb okurigana:"
-                    f" word_data: {remaining_kana}, kanji: {kanji}"
-                )
-                # onyomi godan verbs are always す verbs, e.g 呈す, 博す and have almost the same
-                # inflection as する but not quite, so check both possiblities and pick the one that
-                # matches the most of the okurigana
-                inflection_results: list[OkuriResults] = []
-                inflection_results.append(
-                    check_okurigana_for_inflection(
-                        reading_okurigana="す",
-                        reading=dict_form,
-                        word_data=word_data,
-                        highlight_args=highlight_args,
-                        logger=logger,
-                    )
-                )
-                # In order to check for する, we need override the part_of_speech to check for
-                # vs (normal suru) inflections
-                inflection_results.append(
-                    check_okurigana_for_inflection(
-                        reading_okurigana="る",
-                        reading=dict_form,
-                        word_data=word_data,
-                        highlight_args=highlight_args,
-                        part_of_speech="vs",
-                        logger=logger,
-                    )
-                )
-                # Pick the longest okurigana match
-                res = max(inflection_results, key=lambda x: len(x.okurigana))
-                logger.debug(
-                    f"extract_okurigana_for_match - check_okurigana_for_inflection result: {res}"
-                )
-                if res.result != "no_okuri":
-                    return res.okurigana, res.rest_kana
-                else:
-                    # If there is no okurigana, we just return empty
-                    return "", remaining_kana
-
-        # No okurigana for other onyomi cases
-        return "", remaining_kana
-
-    elif match_type == "kunyomi":
-        # For kunyomi, extract the okurigana marker portion from dict_form
-        # e.g., "か.く" → reading_okurigana = "く"
-        if "." in dict_form:
-            reading_okurigana = dict_form.split(".", 1)[1]
-            dict_form_to_use = dict_form
-        else:
-            # No okurigana marker in dict_form, but we have remaining_kana
-            # This happens when a kunyomi without okurigana marker was matched first
-            # (e.g., "みず" matched before "みず.しい" for repeater kanji)
-            # Try to find an alternative reading with okurigana marker that matches
-
-            kanji_data = all_kanji_data.get(kanji, {})
-            kunyomi = kanji_data.get("kunyomi", "")
-
-            if kunyomi:
-                kunyomi_readings = [r.strip() for r in kunyomi.split("、")]
-                # Look for readings with okurigana markers
-                for reading in kunyomi_readings:
-                    reading = reading.split("(")[0].strip()
-                    if "." in reading:
-                        stem = reading.split(".")[0]
-                        # Check if this reading's stem matches the dict_form we have
-                        # For repeater kanji, dict_form might be just the stem
-                        if dict_form == stem or dict_form == reading.replace(".", ""):
-                            # Found a reading with okurigana marker that has the same stem
-                            reading_okurigana = reading.split(".", 1)[1]
-                            dict_form_to_use = reading
-                            break
-                else:
-                    # No reading with okurigana marker found
-                    return "", remaining_kana
-            else:
-                return "", remaining_kana
-
-        highlight_args["onyomi"] = ""
-        highlight_args["kunyomi"] = dict_form_to_use
-
-        result = check_okurigana_for_inflection(
-            reading_okurigana=reading_okurigana,
-            reading=dict_form_to_use,
-            word_data=word_data,
-            highlight_args=highlight_args,
-            logger=logger,
-        )
-
-        return result.okurigana, result.rest_kana
-
-    # For jukujikun or unmatched, return empty okurigana
-    return "", remaining_kana

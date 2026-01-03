@@ -245,10 +245,10 @@ def process_jukujikun_positions(
             f" {last_kanji}, juku_reading: {juku_reading}, remaining_kana: {remaining_kana}"
         )
         okuri_result, is_noun_suru_verb = get_conjugated_okuri_with_mecab(
-            kanji=last_kanji,
-            kanji_reading=juku_reading,
+            word=last_kanji,
+            reading=juku_reading,
             maybe_okuri=remaining_kana,
-            okuri_prefix="kanji_reading",
+            okuri_prefix="reading",
             logger=logger,
         )
         juku_entry["is_noun_suru_verb"] = is_noun_suru_verb

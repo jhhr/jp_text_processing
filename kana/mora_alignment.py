@@ -63,6 +63,7 @@ def is_valid_split_for_repeaters(word: str, split: list[list[str]]) -> bool:
 
 def find_first_complete_alignment(
     word: str,
+    furigana: str,
     maybe_okuri: str,
     mora_list: Optional[list[str]] = None,
     possible_splits: Optional[list[list[str]]] = None,
@@ -77,6 +78,7 @@ def find_first_complete_alignment(
     If no complete match exists, returns the best partial alignment (fewest jukujikun positions).
 
     :param word: The word to align (string of kanji, may include 々)
+    :param furigana: The full reading of the word in kana
     :param all_kanji_data: Dictionary mapping kanji to their reading data
     :param maybe_okuri: The kana following the word (for last kanji extraction)
     :param mora_list: List of mora units to distribute across kanji, optional if possible_splits
@@ -182,6 +184,7 @@ def find_first_complete_alignment(
             kunyomi_match, onyomi_match = match_reading_to_mora(
                 kanji=kanji,
                 word=word,
+                furigana=furigana,
                 mora_sequence=mora_sequence,
                 kanji_data=kanji_data,
                 maybe_okuri=maybe_okuri if check_okurigana else "",
@@ -243,6 +246,7 @@ def find_first_complete_alignment(
                 youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
                     kanji=kanji,
                     word=word,
+                    furigana=furigana,
                     mora_sequence=small,
                     kanji_data=kanji_data,
                     maybe_okuri=maybe_okuri if is_last_kanji and not next_kanji_is_repeater else "",
