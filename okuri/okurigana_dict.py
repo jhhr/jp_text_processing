@@ -98,6 +98,9 @@ GODAN_FORM_VERB_ENDINGS: dict[str, str] = {
     "る": "り",
 }
 
+# Reverse mapping for godan verb endings to get dictionary form from noun form
+GODAN_FORM_VERB_STARTINGS: dict[str, str] = {v: k for k, v in GODAN_FORM_VERB_ENDINGS.items()}
+
 ONYOMI_GODAN_SU_FIRST_KANA: set[str] = {
     "す",
     "し",
@@ -246,7 +249,7 @@ def get_okuri_dict_for_okurigana(
 ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] = [
     (1, "い"),
     (1, "くない"),
-    (1, "くないです"),
+    # (1, "くないです"), # shouldn't include です in okurigana
     (1, "くありません"),
     (1, "かった"),
     (1, "かったです"),

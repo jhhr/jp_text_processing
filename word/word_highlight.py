@@ -1,6 +1,12 @@
 import re
 
 try:
+    from highlight_inflected_words_with_mecab import highlight_inflected_words_with_mecab
+except ImportError:
+    from .highlight_inflected_words_with_mecab import (
+        highlight_inflected_words_with_mecab,
+    )
+try:
     from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 except ImportError:
     from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
@@ -9,9 +15,9 @@ try:
 except ImportError:
     from ..kana.kana_highlight import kana_highlight, WithTagsDef
 try:
-    from mecab_controller.kana_conv import to_katakana, to_hiragana
+    from mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
 except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana, to_hiragana
+    from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
 try:
     from utils.logger import Logger
 except ImportError:
@@ -136,7 +142,16 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     logger.debug(f"word_highlight: text='{text}', word='{word}'")
     if not text or not word:
         return []
-    # Remove kana from the end of the word to match if present
+    # Convert word to hiragana for matching
+    word = to_hiragana(word)
+    if is_kana_str(word):
+        logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
+        # This is either a simple case or a complex one needing inflection matching, can't tell
+        # until we analyze with mecab, so both cases are handled the same way
+        return highlight_inflected_words_with_mecab(text, word, logger=logger)
+
+    # We have some kanji in the word to match
+    # First, remove kana from the end of the word, to see if there is any okurigana
     word_match = re.search(KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE, word)
     logger.debug(f"word_match groups: {word_match.groups() if word_match else None}")
     ending_okurigana = word_match.group(3) if word_match else ""
@@ -150,12 +165,11 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug("No ending kana or kanji found, simple match")
         # Simple case, we can just regex search for the word
         pattern = make_word_pattern(word)
-        matches = re.finditer(pattern, text)
-        indices = [(m.start(0), m.end(0)) for m in matches]
-        result = text
-        for start, end in indices:
-            result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
-        return result
+
+        def replace_match(match: re.Match) -> str:
+            return f"<b>{match.group(0)}</b>"
+
+        return re.sub(pattern, replace_match, text)
 
     # Need to handle possible inflections
     word = word[: -len(ending_okurigana)]
@@ -213,8 +227,8 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         last_kanji = last_kanji_match.group(1) if last_kanji_match else ""
         last_kanji_furigana = last_kanji_match.group(2) if last_kanji_match else ""
         logger.debug(
-            f"last_kanji_match: {last_kanji_match}, last_kanji: '{last_kanji}',"
-            f" last_kanji_furigana: '{last_kanji_furigana}'"
+            f"last_kanji_match: {last_kanji_match.groups() if last_kanji_match else None},"
+            f" last_kanji: '{last_kanji}', last_kanji_furigana: '{last_kanji_furigana}'"
         )
         # Split the whole text similarly
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
@@ -223,7 +237,8 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         pattern = make_word_pattern(word_with_readings_split)
         pattern += r"([ぁ-んア-ン]*)"
         logger.debug(f"Regex pattern for matching: '{pattern}'")
-        matches = re.finditer(pattern, text_with_readings_split)
+        matches = list(re.finditer(pattern, text_with_readings_split))
+        logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             # For each match, check if the last kanji's furigana can be inflected to match
@@ -285,15 +300,21 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             else:
                 logger.debug("No valid inflected form found with kana_highlight")
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
-            # Insert <b> tags into the text at the found indices
-            result = text_with_readings_split
-            for start, end in result_indices:
-                result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
-            logger.debug(f"Intermediate result with <b> tags: '{result}'")
-            # Re-merge any consecutive furigana parts that were split earlier
-            result = merge_consecutive_furigana(result)
-            # Remove space from beginning as it's not required
-            result = re.sub(r"^(<b>)? ", r"\1", result)
-            return result
+
+        # Insert <b> tags into the text at the found indices
+        result = text_with_readings_split
+        for idx in range(len(result_indices)):
+            start, end = result_indices[idx]
+            result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
+            # Adjust subsequent indices due to added tag lengths
+            for j in range(idx + 1, len(result_indices)):
+                s, e = result_indices[j]
+                result_indices[j] = (s + 7, e + 7)
+        logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        # Re-merge any consecutive furigana parts that were split earlier
+        result = merge_consecutive_furigana(result)
+        # Remove space from beginning as it's not required
+        result = re.sub(r"^(<b>)? ", r"\1", result)
+        return result
 
     return text

@@ -70,13 +70,6 @@ def main():
         expected="<b>食[た]べさせる</b>な!",
     )
     test(
-        test_name="Kana only verb inflection /1",
-        text="いじめないで！",
-        word="いじめる",
-        expected="<b>いじめないで</b>！",
-        ignore_fail=True,
-    )
-    test(
         test_name="Verb inflection juku word /1",
         text="聴牌[テンパ]ってた",
         word="聴牌[テンパ]る",
@@ -107,23 +100,67 @@ def main():
         expected="<b>早[はや]</b> 読[よ]みするぜ",
     )
     test(
-        test_name="Furigana is in katakana /1",
-        text="垂[タ]レ 込[コ]ミがあった",
+        test_name="Furigana is in katakana in text, word in hiragana",
+        text="垂[タ]レ 込[コ]ミがあった、オイ！",
         word="垂[た]れ 込[こ]み",
-        expected="<b>垂[タ]レ 込[コ]ミ</b>があった",
+        expected="<b>垂[タ]レ 込[コ]ミ</b>があった、オイ！",
     )
     test(
-        test_name="Katakana word /1",
+        test_name="Furigana is in hiragana in text, word in katakana",
+        text="垂[た]れ 込[こ]みがあった",
+        word="垂[タ]レ 込[コ]ミ",
+        expected="<b>垂[た]れ 込[こ]み</b>があった",
+    )
+    test(
+        test_name="Word occurs more than once, simple match",
+        text="彼[かれ]は 走[はし]った。彼[かれ]は 速[はや]い。",
+        word="彼[かれ]",
+        expected="<b>彼[かれ]</b>は 走[はし]った。<b>彼[かれ]</b>は 速[はや]い。",
+    )
+    test(
+        test_name="Word occurs more than once, inflected match",
+        text="彼[かれ]は 走[はし]った。 彼[かれ]の 走[はし]り 方[かた]は 速[はや]い。",
+        word="走[はし]る",
+        expected="彼[かれ]は<b> 走[はし]った</b>。 彼[かれ]の<b> 走[はし]り</b> 方[かた]は 速[はや]い。",
+    )
+    test(
+        test_name="Furigana is colloquial /1",
+        # Needs some kind of exception handling, can only work when furigana are used
+        text="無[ねえ]な",
+        word="無[ない]",
+        expected="<b>無[ねえ]な</b>",
+        ignore_fail=True,
+    )
+    # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
+    test(
+        test_name="Katakana word in text, word in hiragana",
         text="タレコミがあった",
         word="たれこみ",
         expected="<b>タレコミ</b>があった",
     )
     test(
-        test_name="Furigana is colloquial /1",
-        text="無[ねえ]な",
-        word="無[ない]",
-        expected="<b>無[ねえ]な</b>",
-        ignore_fail=True,
+        test_name="Hiragana word in text, word in katakana",
+        text="たれこみがあった",
+        word="タレコミ",
+        expected="<b>たれこみ</b>があった",
+    )
+    test(
+        test_name="Kana only verb inflection /2",
+        text="いじめなくていれないのか、お 前[オマエ]は？",
+        word="いじめる",
+        expected="<b>いじめなくて</b>いれないのか、お 前[オマエ]は？",
+    )
+    test(
+        test_name="Kana only adjective inflection /1",
+        text="このケーキ、おいしくない？",
+        word="おいしい",
+        expected="このケーキ、<b>おいしくない</b>？",
+    )
+    test(
+        test_name="Kana only adjective inflection /2",
+        text="このケーキって、おいしくなくて 残念[ザンねん]だったな！",
+        word="おいしい",
+        expected="このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
     )
     print("\n\033[92mTests passed\033[0m")
 

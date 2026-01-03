@@ -1,6 +1,19 @@
 import sys
-from typing import Literal
 
+try:
+    from mecab_common import (
+        OkuriPrefix,
+        get_all_conjugation_conditions,
+        get_word_type_from_mecab_token,
+        mecab,
+    )
+except ImportError:
+    from .mecab_common import (
+        OkuriPrefix,
+        get_all_conjugation_conditions,
+        get_word_type_from_mecab_token,
+        mecab,
+    )
 try:
     from all_types.main_types import (
         OkuriResults,
@@ -15,49 +28,12 @@ except ImportError:
     from ..utils.logger import Logger
 
 try:
-    from mecab_controller.mecab_controller import MecabController
-except ImportError:
-    from ..mecab_controller.mecab_controller import MecabController
-try:
     from mecab_controller.basic_types import (
-        Inflection,
         MecabParsedToken,
-        PartOfSpeech,
     )
 except ImportError:
     from ..mecab_controller.basic_types import (
-        Inflection,
         MecabParsedToken,
-        PartOfSpeech,
-    )
-
-OkuriPrefix = Literal["word", "reading"]
-
-mecab = MecabController()
-
-
-def verb_conjugation_conditions(token, prev_token, next_token):
-    """Check if the token meets verb conjugation conditions."""
-    return (
-        # handle ている / でいる
-        (
-            token.part_of_speech == PartOfSpeech.particle
-            and (
-                token.word == "て"
-                or (token.word == "で" and next_token and next_token.headword == "いる")
-            )
-        )
-        or ((
-            token.part_of_speech == PartOfSpeech.verb
-            and token.headword == "いる"
-            and prev_token
-            and prev_token.word in ["て", "で"]
-        ))
-        or (
-            # -られ, -させ
-            token.part_of_speech == PartOfSpeech.verb
-            and token.headword in ["れる", "られる", "せる", "させる", "てる"]
-        )
     )
 
 
@@ -143,25 +119,12 @@ def get_conjugated_okuri_with_mecab(
         logger.error(f"get_conjugated_okuri - No PartOfSpeech found for {text_to_parse}")
         return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
 
-    is_i_adjective = first_token.part_of_speech == PartOfSpeech.i_adjective or (
-        # i-adjective inflected to く gets categorized as an adverb
-        first_token.part_of_speech == PartOfSpeech.adverb
-        and first_token.word.endswith("く")
-    )
-    is_na_adjective = first_token.part_of_speech == PartOfSpeech.noun and (
-        first_token.word.endswith("か")
-    )
-    is_verb = first_token.part_of_speech == PartOfSpeech.verb
-    is_adverb = first_token.part_of_speech == PartOfSpeech.adverb
-    # Need to check nouns for words like 止め or 恥ずかしげな
-    is_noun = first_token.part_of_speech == PartOfSpeech.noun
+    word_type = get_word_type_from_mecab_token(first_token)
     logger.debug(
         f"First token: {first_token.word},  PartOfSpeech: {first_token.part_of_speech},"
-        f" is_i_adjective: {is_i_adjective}, is_na_adjective: {is_na_adjective}, is_verb:"
-        f" {is_verb}, is_adverb: {is_adverb}, is_noun: {is_noun}, continue:"
-        f" {not (is_i_adjective or is_na_adjective or is_verb or is_adverb or is_noun)}."
+        f" first_token word_type: {word_type}"
     )
-    if not (is_i_adjective or is_na_adjective or is_verb or is_adverb or is_noun):
+    if not word_type:
         # If the first token is not one of the processable types, try again with kanji_reading
         # as the prefix
         if okuri_prefix == "word":
@@ -190,7 +153,7 @@ def get_conjugated_okuri_with_mecab(
     conjugated_okuri = first_token.word[len(parse_text_prefix) :]
     # Exception for nouns like 恥ずかしげな where the げ should be considered not a conjugation
     # as it is in fact 恥ずかし気な
-    if is_noun and first_token.word.endswith("げ"):
+    if word_type == "noun" and first_token.word.endswith("げ"):
         conjugated_okuri = first_token.word[len(parse_text_prefix) : -1]
         okuri_type = "full_okuri"
         logger.debug(
@@ -207,61 +170,23 @@ def get_conjugated_okuri_with_mecab(
         f" {first_token.word}, PartOfSpeech: {first_token.part_of_speech}"
     )
     rest_tokens = tokens[1:]
-    for token_index, token in enumerate(rest_tokens):
-        prev_token = rest_tokens[token_index - 1] if token_index - 1 >= 0 else None
-        next_token = rest_tokens[token_index + 1] if token_index + 1 < len(rest_tokens) else None
-        add_to_conjugated_okuri = False
-        if token.word in ["だろう", "でしょう", "なら", "から"]:
-            add_to_conjugated_okuri = False
-        elif is_verb:
-            if (
-                token.part_of_speech == PartOfSpeech.bound_auxiliary
-                and token.inflection_type is not None
-                and token.headword not in ["だ", "です"]
-            ) or verb_conjugation_conditions(token, prev_token, next_token):
-                add_to_conjugated_okuri = True
-        elif is_i_adjective:
-            if (
-                (
-                    # -ない, -なかっ(た)
-                    token.part_of_speech == PartOfSpeech.bound_auxiliary
-                    and (
-                        token.inflection_type
-                        in [
-                            Inflection.continuative_ta,
-                            Inflection.hypothetical,
-                        ]
-                        or token.word in ["た", "ない"]
-                    )
-                )
-                or (token.part_of_speech == PartOfSpeech.particle and token.word in ["て", "ば"])
-                or token.word == "さ"
-                or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword == "う")
-            ):
-                add_to_conjugated_okuri = True
-        elif is_na_adjective:
-            if token.word == "な":
-                add_to_conjugated_okuri = True
-        elif is_adverb or is_noun:
-            # handle suru verbs
-            if (
-                (token.part_of_speech == PartOfSpeech.verb and token.headword == "する")
-                or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword != "だ")
-                or verb_conjugation_conditions(token, prev_token, next_token)
-                or (token.part_of_speech == PartOfSpeech.particle and token.word == "って")
-            ):
-                add_to_conjugated_okuri = True
-            if token.headword == "する":
-                is_suru_verb = True
-
+    for token in rest_tokens:
+        add_to_conjugated_okuri, was_suru_verb = get_all_conjugation_conditions(
+            token,
+            rest_tokens,
+            word_type,
+            logger,
+        )
         if add_to_conjugated_okuri:
             conjugated_okuri += token.word
             # Remove the text from the rest of the okurigana
             rest_kana = rest_kana[len(token.word) :]
             logger.debug(
-                f"Added to okuri: {token.word}, PartOfSpeech: {token.part_of_speech}, new okuri:"
+                f"Added to okuri: {token.word}, headword: {token.headword}, new okuri:"
                 f" {conjugated_okuri}, rest_kana: {rest_kana}"
             )
+            if was_suru_verb:
+                is_suru_verb = True
         else:
             # If we hit a non-auxiliary token, stop processing
             logger.debug(
