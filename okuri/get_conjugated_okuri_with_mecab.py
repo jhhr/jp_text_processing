@@ -236,6 +236,7 @@ def get_conjugated_okuri_with_mecab(
                 )
                 or (token.part_of_speech == PartOfSpeech.particle and token.word in ["て", "ば"])
                 or token.word == "さ"
+                or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword == "う")
             ):
                 add_to_conjugated_okuri = True
         elif is_na_adjective:

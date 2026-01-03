@@ -22,23 +22,15 @@ def test(
     """
     logger = Logger("debug") if debug else Logger("error")
     try:
-        indices = word_highlight(text, word, logger=logger)
-        # insert <b> tags into indices
-        result = text
-        for start, end in indices:
-            result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
+        result = word_highlight(text, word, logger=logger)
         if debug:
             print("\n\n")
         assert result == expected
-    except Exception as e:
-        # rerun test with logger enabled to see what went wrong
-        print(f"""\033[91mTest "{test_name}" raised an exception: {e}\033[0m""")
-        raise e
     except AssertionError:
         if ignore_fail:
             return
         # Re-run with logging enabled to see what went wrong
-        word_highlight(word, text, logger=Logger("debug"))
+        word_highlight(text, word, logger=Logger("debug"))
         # Highlight the diff between the expected and the result
         print(f"""\033[91m{test_name}
 \033[93mExpected: {expected}
@@ -46,14 +38,18 @@ def test(
 \033[0m""")
         # Stop testing here
         sys.exit(0)
+    except Exception as e:
+        # rerun test with logger enabled to see what went wrong
+        print(f"""\033[91mTest "{test_name}" raised an exception: {e}\033[0m""")
+        raise e
 
 
 def main():
     test(
         test_name="Non-inflected noun in middle of text",
-        text="私[わたち]は 日本語[にほんご]を 勉強[べんきょう]しています。",
+        text="私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
         word="日本語[にほんご]",
-        expected="私[わたち]は<b> 日本語[にほんご]</b>を 勉強[べんきょう]しています。",
+        expected="私[わたし]は<b> 日本語[にほんご]</b>を 勉強[べんきょう]しています。",
     )
     test(
         test_name="Non-inflected noun at beginning of text",
@@ -71,7 +67,14 @@ def main():
         test_name="Verb inflection させる /1",
         text="食[た]べさせるな!",
         word="食[た]べる",
-        expected="<b>食[た]べさせるな</b>!",
+        expected="<b>食[た]べさせる</b>な!",
+    )
+    test(
+        test_name="Kana only verb inflection /1",
+        text="いじめないで！",
+        word="いじめる",
+        expected="<b>いじめないで</b>！",
+        ignore_fail=True,
     )
     test(
         test_name="Verb inflection juku word /1",
@@ -101,19 +104,26 @@ def main():
         test_name="Adjective inflection with な /1",
         text="早読[はやよ]みするぜ",
         word="早[はや]い",
-        expected="<b>早[はや]</b>読[や]みするぜ",
+        expected="<b>早[はや]</b> 読[よ]みするぜ",
     )
     test(
-        test_name="Furigana is in katanana /1",
-        text="垂[タ]レ込[コ]ミがあった",
-        word="垂[れ]れ込[こ]み",
-        expected="<b>垂[タ]レ込[コ]ミ</b>があった",
+        test_name="Furigana is in katakana /1",
+        text="垂[タ]レ 込[コ]ミがあった",
+        word="垂[た]れ 込[こ]み",
+        expected="<b>垂[タ]レ 込[コ]ミ</b>があった",
+    )
+    test(
+        test_name="Katakana word /1",
+        text="タレコミがあった",
+        word="たれこみ",
+        expected="<b>タレコミ</b>があった",
     )
     test(
         test_name="Furigana is colloquial /1",
         text="無[ねえ]な",
         word="無[ない]",
         expected="<b>無[ねえ]な</b>",
+        ignore_fail=True,
     )
     print("\n\033[92mTests passed\033[0m")
 

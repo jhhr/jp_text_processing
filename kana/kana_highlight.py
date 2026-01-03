@@ -996,7 +996,7 @@ def kana_highlight(
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
     logger.debug(f"processed_text: {processed_text}")
     # Clean any double spaces that might have been created by the furigana reconstruction
-    # Including those right before a<b> tag as the space is added with those
+    # Including those right before a <b> tag as the space is added with those
     processed_text = re.sub(r" {2}", " ", processed_text)
     processed_text = re.sub(r" <(b|on|kun|juk|mix)> ", r"<\1> ", processed_text)
     return re.sub(r" <b><(on|kun|juk|mix)> ", r"<b><\1> ", processed_text)
