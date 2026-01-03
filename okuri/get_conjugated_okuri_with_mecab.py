@@ -81,8 +81,8 @@ def get_conjugated_okuri_with_mecab(
             okuri_prefix = "word"
     if not parse_text_prefix:
         logger.error(
-            f"get_conjugated_okuri - cannot set parse_text_prefix, okuri_prefix: {okuri_prefix},"
-            f" kanji: {word}, kanji_reading: {reading}"
+            f"get_conjugated_okuri - cannot set parse_text_prefix, okuri_prefix: '{okuri_prefix}',"
+            f" word: '{word}', reading: '{reading}'"
         )
         return OkuriResults("", maybe_okuri, "no_okuri", None), False
     text_to_parse = f"{parse_text_prefix}{maybe_okuri}"

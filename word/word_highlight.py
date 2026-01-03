@@ -161,15 +161,33 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         f"Parsed word - word_without_furigana: '{word_without_furigana}', furigana: '{furigana}',"
         f" ending_okurigana: '{ending_okurigana}'"
     )
-    if not ending_okurigana:
-        logger.debug("No ending kana or kanji found, simple match")
-        # Simple case, we can just regex search for the word
-        pattern = make_word_pattern(word)
+    if not ending_okurigana and furigana:
+        logger.debug("No ending kana but has furigana -> split and regex match, then reconstruct")
+        # Relatively simple case, we can regex search for the word
+        # However, we need to make sure the word's furigana matches the text's furigana and
+        # the text isn't including more or less kanji in the word
+
+        # So, we need to split the word and text into individual kanji-furigana parts and
+        # then match those parts, reconstructing the furigana back afterwards
+        word_with_readings_split = split_furi_text_into_individual_kanji_furigana(word)
+        logger.debug(f"word_with_readings_split: {word_with_readings_split}")
+
+        text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
+        logger.debug(f"text_with_readings_split: {text_with_readings_split}")
+
+        pattern = make_word_pattern(word_with_readings_split)
 
         def replace_match(match: re.Match) -> str:
             return f"<b>{match.group(0)}</b>"
 
-        return re.sub(pattern, replace_match, text)
+        result = re.sub(pattern, replace_match, text_with_readings_split)
+
+        # Re-merge any consecutive furigana parts that were split earlier
+        result = merge_consecutive_furigana(result)
+
+        # Remove space from beginning as it's not required
+        result = re.sub(r"^(<b>)? ", r"\1", result)
+        return result
 
     # Need to handle possible inflections
     word = word[: -len(ending_okurigana)]
@@ -222,19 +240,34 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # while matching the beginning part with direct regex search
         word_with_readings_split = split_furi_text_into_individual_kanji_furigana(word)
         logger.debug(f"word_with_readings_split: {word_with_readings_split}")
-        # Get the last kanji character and its furigana
-        last_kanji_match = re.search(LAST_KANJI_FURIGANA_RE, word_with_readings_split)
-        last_kanji = last_kanji_match.group(1) if last_kanji_match else ""
-        last_kanji_furigana = last_kanji_match.group(2) if last_kanji_match else ""
+        # Get the last kanji character and its furigana, while removing it from the split word
+        last_kanji = ""
+        last_kanji_furigana = ""
+
+        def remove_from_split_word(match: re.Match) -> str:
+            nonlocal last_kanji, last_kanji_furigana
+            last_kanji = match.group(1) if match else ""
+            last_kanji_furigana = match.group(2) if match else ""
+            return ""
+
+        word_with_readings_split = re.sub(
+            LAST_KANJI_FURIGANA_RE, remove_from_split_word, word_with_readings_split
+        )
+
         logger.debug(
-            f"last_kanji_match: {last_kanji_match.groups() if last_kanji_match else None},"
-            f" last_kanji: '{last_kanji}', last_kanji_furigana: '{last_kanji_furigana}'"
+            f" last_kanji: '{last_kanji}', last_kanji_furigana: '{last_kanji_furigana}', "
+            f" remaining word_with_readings_split: '{word_with_readings_split}'"
         )
         # Split the whole text similarly
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug(f"text_with_readings_split: {text_with_readings_split}")
         # Find all occurrences of the word_with_readings_split in the text_with_readings_split
         pattern = make_word_pattern(word_with_readings_split)
+        # Replace the furigana part for the last kanji in the regex pattern so that all
+        # kana are allowed, this allows for matching inflected forms where the base reading
+        # changes, like rendaku, small tsu, vowel changes etc.
+        if last_kanji:
+            pattern += rf"{last_kanji}\[[^\]]+\]"
         pattern += r"([ぁ-んア-ン]*)"
         logger.debug(f"Regex pattern for matching: '{pattern}'")
         matches = list(re.finditer(pattern, text_with_readings_split))
