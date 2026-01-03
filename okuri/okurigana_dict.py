@@ -181,8 +181,8 @@ def get_part_of_speech(
 
     # Adjective patterns
     if okurigana == "い":
-        if kanji == "良":  # Special case for よい/いい
-            return "adj-ix"
+        # if kanji == "良":  # Special case for よい/いい
+        #     return "adj-ix"
         return "adj-i"
     if okurigana.endswith("い"):
         return "adj-i"

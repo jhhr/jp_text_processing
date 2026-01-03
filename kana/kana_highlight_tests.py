@@ -3169,6 +3169,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_split="<b><kun> えぐ[刳]</kun><oku>かった</oku></b>よな",
     )
     test(
+        test_name="adjective okurigana test 7/",
+        kanji="良",
+        sentence="良[よ]かろう",
+        expected_kana_only="<b>よかろう</b>",
+        expected_furigana="<b> 良[よ]かろう</b>",
+        expected_furikanji="<b> よ[良]かろう</b>",
+        expected_kana_only_with_tags_split="<b><kun>よ</kun><oku>かろう</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 良[よ]</kun><oku>かろう</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> よ[良]</kun><oku>かろう</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>よ</kun><oku>かろう</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 良[よ]</kun><oku>かろう</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> よ[良]</kun><oku>かろう</oku></b>",
+    )
+    test(
         test_name="numbers of people /1",
         kanji="一",
         sentence="一人[ひとり]",
