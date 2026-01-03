@@ -127,19 +127,23 @@ def get_conjugated_okuri_with_mecab(
     if not word_type:
         # If the first token is not one of the processable types, try again with kanji_reading
         # as the prefix
-        if okuri_prefix == "word" and reading:
+        if okuri_prefix == "word":
             logger.debug(
                 f"First token not valid: {first_token.word}, PartOfSpeech:"
                 f" {first_token.part_of_speech}, Retrying with reading as"
                 " prefix."
             )
-            return get_conjugated_okuri_with_mecab(
-                word,
-                reading,
-                maybe_okuri,
-                okuri_prefix="reading",
-                logger=logger,
-            )
+            if reading:
+                return get_conjugated_okuri_with_mecab(
+                    word,
+                    reading,
+                    maybe_okuri,
+                    okuri_prefix="reading",
+                    logger=logger,
+                )
+            else:
+                logger.debug("No reading available to retry with, returning no okuri.")
+                return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         elif okuri_prefix == "reading":
             logger.debug(
                 f"First token is not a verb or adjective: {first_token.word}, PartOfSpeech:"

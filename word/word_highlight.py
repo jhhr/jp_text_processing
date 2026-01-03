@@ -142,13 +142,27 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     logger.debug(f"word_highlight: text='{text}', word='{word}'")
     if not text or not word:
         return []
-    # Convert word to hiragana for matching
-    word = to_hiragana(word)
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
-        # This is either a simple case or a complex one needing inflection matching, can't tell
-        # until we analyze with mecab, so both cases are handled the same way
+        # This is either a simple case or a complex one needing inflection matching
+        # First try a simple regex match
+        pattern = make_word_pattern(word)
+        logger.debug(f"Using pattern: {pattern}")
+
+        def replace_match(match: re.Match) -> str:
+            return f"<b>{match.group(0)}</b>"
+
+        result = re.sub(pattern, replace_match, text)
+
+        if result != text:
+            # If that worked, return the result
+            return result
+
+        # Otherwise, use MeCab to find inflected forms
         return highlight_inflected_words_with_mecab(text, word, logger=logger)
+
+    # Convert word to hiragana for matching with other methods
+    word = to_hiragana(word)
 
     # We have some kanji in the word to match
     # First, remove kana from the end of the word, to see if there is any okurigana

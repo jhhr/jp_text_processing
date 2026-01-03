@@ -24,9 +24,19 @@ except ImportError:
         MecabWordType,
     )
 try:
-    from mecab_controller.kana_conv import to_hiragana, to_katakana
+    from mecab_controller.kana_conv import (
+        to_hiragana,
+        to_katakana,
+        is_hiragana_str,
+        is_katakana_str,
+    )
 except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana, to_katakana
+    from ..mecab_controller.kana_conv import (
+        to_hiragana,
+        to_katakana,
+        is_hiragana_str,
+        is_katakana_str,
+    )
 try:
     from okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 except ImportError:
@@ -42,7 +52,7 @@ except ImportError:
 
 
 def highlight_inflected_words_with_mecab(
-    text: str, base_form_word: str, logger: Logger = Logger("error")
+    text: str, base_form_word: str, logger: Logger = Logger("error"), depth: int = 0
 ) -> str:
     """
     Find inflected words in the given text using MeCab.
@@ -51,10 +61,16 @@ def highlight_inflected_words_with_mecab(
     """
     if not text or not base_form_word:
         return text
+    if depth >= 2:
+        logger.debug(
+            f"Maximum recursion depth reached ({depth}) for text: '{text}',"
+            f" base_form_word: '{base_form_word}'"
+        )
+        return text
 
     # Determine the word type from the base form word
     word_type: Optional[MecabWordType] = None
-    base_form_word_ending = base_form_word[-1]
+    base_form_word_ending = to_hiragana(base_form_word[-1])
     possible_parts_of_speech: list[PartOfSpeech] = []
     # Check if the last character is in the conjugatable okuri list
     if base_form_word_ending in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH:
@@ -63,8 +79,11 @@ def highlight_inflected_words_with_mecab(
         # Or, if it's a godan verb in noun form, convert to dictionary form
         base_form_word_ending = GODAN_FORM_VERB_STARTINGS[base_form_word_ending]
         possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(base_form_word_ending)
+
     word_stem = base_form_word[:-1]
     # Set noun form verbs to basic verb from, so that token.headword can match them
+    if is_katakana_str(word_stem):
+        base_form_word_ending = to_katakana(base_form_word_ending)
     base_form_word = word_stem + base_form_word_ending
     for pos in possible_parts_of_speech:
         if pos.startswith("v"):
@@ -78,27 +97,10 @@ def highlight_inflected_words_with_mecab(
         f" possible_parts_of_speech: {possible_parts_of_speech}"
     )
 
-    # Convert text to hiragana with regex, store the matched indexes to later convert back
-    katakana_indexes: list[tuple[int, int]] = []
-
-    def replace_katakana(match: re.Match) -> str:
-        start, end = match.span()
-        katakana_indexes.append((start, end))
-        return to_hiragana(match.group(0))
-
-    hiragana_text = re.sub(r"[ァ-ン]+", replace_katakana, text)
-
-    def increment_katakana_indexes(after_index, offset: int) -> None:
-        """Helpter to increment katakana indexes after text modifications, e.g. adding tags."""
-        for i in range(len(katakana_indexes)):
-            start, end = katakana_indexes[i]
-            if start >= after_index:
-                katakana_indexes[i] = (start + offset, end + offset)
-
     # Also, store indexes of all whitespace as mecab wipes them out
     space_indexes: dict[int, str] = {}
-    for match in re.finditer(r"\s+", hiragana_text):
-        start, end = match.span()
+    for match in re.finditer(r"\s+", text):
+        start, _ = match.span()
         space_indexes[start] = match.group(0)
 
     def increment_space_indexes(after_index, offset: int) -> None:
@@ -112,11 +114,7 @@ def highlight_inflected_words_with_mecab(
         space_indexes.clear()
         space_indexes.update(new_space_indexes)
 
-    logger.debug(
-        f"Converted text to hiragana: '{hiragana_text}', katakana_indexes: {katakana_indexes}"
-    )
-
-    all_tokens: list[MecabParsedToken] = list(mecab.translate(hiragana_text))
+    all_tokens: list[MecabParsedToken] = list(mecab.translate(text))
     result = ""
 
     found_word = False
@@ -141,7 +139,6 @@ def highlight_inflected_words_with_mecab(
             else:
                 logger.debug(f"Ending highlight for conjugated okuri: {token.word}")
                 result += "</b>" + token.word
-                increment_katakana_indexes(text_char_idx, 4)
                 increment_space_indexes(text_char_idx, 4)
                 text_char_idx += len(token.word) + 4
                 opened_bold = False
@@ -152,7 +149,6 @@ def highlight_inflected_words_with_mecab(
             logger.debug(f"Found beginning of word to highlight: {token.word}")
             found_word = True
             result += "<b>" + token.word
-            increment_katakana_indexes(text_char_idx, 3)
             increment_space_indexes(text_char_idx, 3)
             text_char_idx += len(token.word) + 3
             opened_bold = True
@@ -164,7 +160,6 @@ def highlight_inflected_words_with_mecab(
             if opened_bold:
                 logger.debug("Closing previously opened bold tag")
                 result += "</b>"
-                increment_katakana_indexes(text_char_idx, 4)
                 increment_space_indexes(text_char_idx, 4)
                 text_char_idx += 4
                 opened_bold = False
@@ -172,7 +167,6 @@ def highlight_inflected_words_with_mecab(
     if opened_bold:
         logger.debug("Closing bold tag at end of text")
         result += "</b>"
-        increment_katakana_indexes(text_char_idx, 4)
 
     logger.debug(f"Final highlighted result before restoring katakana/spaces: '{result}'")
     # Restore spaces in the result string first as the katakana restoration uses indexes created
@@ -181,9 +175,23 @@ def highlight_inflected_words_with_mecab(
         space_str = space_indexes[index]
         result = result[:index] + space_str + result[index:]
     logger.debug(f"Restored spaces result: '{result}'")
-    # Restore katakana in the result string with to_hiragana
-    for start, end in katakana_indexes:
-        result = result[:start] + to_katakana(result[start:end]) + result[end:]
-    logger.debug(f"Restored katakana result: '{result}'")
+    if "<b>" not in result:
+        # Try again with word converted to hiragana/katakana
+        logger.debug(
+            "No highlights found, retrying with base_form_word converted to hiragana/katakana."
+        )
+        if is_hiragana_str(base_form_word):
+            return highlight_inflected_words_with_mecab(
+                text, to_katakana(base_form_word), logger, depth + 1
+            )
+        elif is_katakana_str(base_form_word):
+            return highlight_inflected_words_with_mecab(
+                text, to_hiragana(base_form_word), logger, depth + 1
+            )
+        else:
+            # Mixed kana, convert to hiragana, the next recursion will convert to katakana
+            return highlight_inflected_words_with_mecab(
+                text, to_hiragana(base_form_word), logger, 0
+            )
 
     return result
