@@ -2308,6 +2308,20 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<juk>から</juk><b><juk>か</juk><oku>う</oku></b>",
     )
     test(
+        test_name="multi-kanji jukujikun verb okurigana - not matched",
+        kanji="",
+        sentence="聴牌[テンパ]ってた",
+        expected_kana_only="テンパってた",
+        expected_furigana=" 聴牌[テンパ]ってた",
+        expected_furikanji=" テンパ[聴牌]ってた",
+        expected_kana_only_with_tags_split="<juk>テン</juk><juk>パ</juk><oku>ってた</oku>",
+        expected_furigana_with_tags_split="<juk> 聴[テン]</juk><juk> 牌[パ]</juk><oku>ってた</oku>",
+        expected_furikanji_with_tags_split="<juk> テン[聴]</juk><juk> パ[牌]</juk><oku>ってた</oku>",
+        expected_kana_only_with_tags_merged="<juk>テンパ</juk><oku>ってた</oku>",
+        expected_furigana_with_tags_merged="<juk> 聴牌[テンパ]</juk><oku>ってた</oku>",
+        expected_furikanji_with_tags_merged="<juk> テンパ[聴牌]</juk><oku>ってた</oku>",
+    )
+    test(
         test_name="Should be able to handle vowel change /1",
         kanji="端",
         sentence="端折[はしょ]る",

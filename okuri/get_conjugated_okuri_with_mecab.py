@@ -70,8 +70,8 @@ def get_conjugated_okuri_with_mecab(
 ) -> tuple[OkuriResults, bool]:
     """
     Determines the portion of text that is the conjugated okurigana for a kanji reading.
-    :param maybe_okuri: The okurigana to check
     :param word: The kanji or word
+    :param maybe_okuri: The okurigana to check
     :param reading: The reading of the kanji or word occurring before the okurigana
     :param logger: Logger instance for debugging
     :return: A tuple of the okurigana that is part of the conjugation for threading
@@ -247,6 +247,7 @@ def get_conjugated_okuri_with_mecab(
                 (token.part_of_speech == PartOfSpeech.verb and token.headword == "する")
                 or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword != "だ")
                 or verb_conjugation_conditions(token, prev_token, next_token)
+                or (token.part_of_speech == PartOfSpeech.particle and token.word == "って")
             ):
                 add_to_conjugated_okuri = True
             if token.headword == "する":
@@ -271,9 +272,13 @@ def get_conjugated_okuri_with_mecab(
 
 
 # Tests
-def test(kanji, kanji_reading, maybe_okuri, expected, debug: bool = False):
+def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug: bool = False):
     result, is_suru_verb = get_conjugated_okuri_with_mecab(
-        kanji, kanji_reading, maybe_okuri, logger=Logger("debug" if debug else "error")
+        kanji,
+        kanji_reading,
+        maybe_okuri,
+        okuri_prefix,
+        logger=Logger("debug" if debug else "error"),
     )
     try:
         assert result.okurigana == expected[0]
@@ -347,6 +352,9 @@ def main():
     # えぐくて is too niche for mecab...
     # test("抉", "えぐ", "くてやわらかい", ("くて", "やわらかい", False))
     test("", "として", "いるのは", ("", "いるのは", False))
+    test("送", "おく", "ってた", ("ってた", "", False))
+    test("聴牌", "テンパ", "ります", ("ります", "", False))
+    test("聴牌", "テンパ", "ってた", ("ってた", "", False))
     print("\033[92mTests passed\033[0m")
 
 

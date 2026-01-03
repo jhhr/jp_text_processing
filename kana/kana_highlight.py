@@ -883,6 +883,7 @@ def kana_highlight(
             logger.debug(f"furigana_replacer - using exception alignment: {exception_alignment}")
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
+                furigana=full_furigana,
                 alignment=exception_alignment,
                 remaining_kana=maybe_okuri,
                 logger=logger,
@@ -955,6 +956,7 @@ def kana_highlight(
             # extraction for jukujikun exception cases like 清々しい.
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
+                furigana=full_furigana,
                 alignment=alignment,
                 remaining_kana=maybe_okuri,
                 logger=logger,

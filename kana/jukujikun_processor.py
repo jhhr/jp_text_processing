@@ -82,6 +82,7 @@ def split_mora_for_jukujikun(
 
 def process_jukujikun_positions(
     word: str,
+    furigana: str,
     alignment: MoraAlignment,
     remaining_kana: str,
     logger: Logger = Logger("error"),
@@ -95,6 +96,7 @@ def process_jukujikun_positions(
     - Last kanji jukujikun: Extract okurigana using mecab
 
     :param word: The full word
+    :param furigana: The full furigana reading for the word
     :param alignment: The mora alignment result containing jukujikun positions
     :param with_tags: Whether to wrap jukujikun portions in <juk> tags
     :param remaining_kana: The kana following the word (for okurigana extraction)
@@ -244,13 +246,27 @@ def process_jukujikun_positions(
             "process_jukujikun_positions - extracting okurigana for last jukujikun kanji:"
             f" {last_kanji}, juku_reading: {juku_reading}, remaining_kana: {remaining_kana}"
         )
-        okuri_result, is_noun_suru_verb = get_conjugated_okuri_with_mecab(
+        # Either the full word or the last kanji may produce okurigana correctly, check both
+        kanji_okuri_result, kanji_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
             word=last_kanji,
             reading=juku_reading,
             maybe_okuri=remaining_kana,
             okuri_prefix="reading",
             logger=logger,
         )
+        if kanji_okuri_result.okurigana:
+            okuri_result = kanji_okuri_result
+            is_noun_suru_verb = kanji_is_noun_suru_verb
+        else:
+            word_okuri_result, word_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
+                word=word,
+                reading=furigana,
+                maybe_okuri=remaining_kana,
+                okuri_prefix="reading",
+                logger=logger,
+            )
+            okuri_result = word_okuri_result
+            is_noun_suru_verb = word_is_noun_suru_verb
         juku_entry["is_noun_suru_verb"] = is_noun_suru_verb
         logger.debug(
             f"process_jukujikun_positions - okuri_result: {okuri_result}, remaining_kana:"
