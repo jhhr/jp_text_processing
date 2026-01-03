@@ -21,15 +21,19 @@ def test(
         test_name: Name of the test case.
     """
     logger = Logger("debug") if debug else Logger("error")
-    indices = word_highlight(text, word, logger=logger)
-    # insert <b> tags into indices
-    result = text
-    for start, end in indices:
-        result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
-    if debug:
-        print("\n\n")
     try:
+        indices = word_highlight(text, word, logger=logger)
+        # insert <b> tags into indices
+        result = text
+        for start, end in indices:
+            result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
+        if debug:
+            print("\n\n")
         assert result == expected
+    except Exception as e:
+        # rerun test with logger enabled to see what went wrong
+        print(f"""\033[91mTest "{test_name}" raised an exception: {e}\033[0m""")
+        raise e
     except AssertionError:
         if ignore_fail:
             return
@@ -98,6 +102,18 @@ def main():
         text="早読[はやよ]みするぜ",
         word="早[はや]い",
         expected="<b>早[はや]</b>読[や]みするぜ",
+    )
+    test(
+        test_name="Furigana is in katanana /1",
+        text="垂[タ]レ込[コ]ミがあった",
+        word="垂[れ]れ込[こ]み",
+        expected="<b>垂[タ]レ込[コ]ミ</b>があった",
+    )
+    test(
+        test_name="Furigana is colloquial /1",
+        text="無[ねえ]な",
+        word="無[ない]",
+        expected="<b>無[ねえ]な</b>",
     )
     print("\n\033[92mTests passed\033[0m")
 
