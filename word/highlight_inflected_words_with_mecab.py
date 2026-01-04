@@ -1,4 +1,3 @@
-import re
 from typing import Optional
 
 try:
@@ -37,6 +36,10 @@ except ImportError:
         is_hiragana_str,
         is_katakana_str,
     )
+try:
+    from use_text_part_storage import use_text_part_storage
+except ImportError:
+    from .use_text_part_storage import use_text_part_storage
 try:
     from okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 except ImportError:
@@ -97,35 +100,30 @@ def highlight_inflected_words_with_mecab(
         f" possible_parts_of_speech: {possible_parts_of_speech}"
     )
 
-    # Also, store indexes of all whitespace as mecab wipes them out
-    space_indexes: dict[int, str] = {}
-    for match in re.finditer(r"\s+", text):
-        start, _ = match.span()
-        space_indexes[start] = match.group(0)
+    # Store indexes of all whitespace as mecab wipes them out
+    space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
+        text, part_regex=r"\s+", logger=logger
+    )
 
-    def increment_space_indexes(after_index, offset: int) -> None:
-        """Helper to increment space indexes after text modifications, e.g. adding tags."""
-        new_space_indexes = {}
-        for index, space_str in space_indexes.items():
-            if index >= after_index:
-                new_space_indexes[index + offset] = space_str
-            else:
-                new_space_indexes[index] = space_str
-        space_indexes.clear()
-        space_indexes.update(new_space_indexes)
+    # Clean html tags from the text temporarily
+    html_free_text, increment_tag_indexes, restore_tags, tag_indexes = use_text_part_storage(
+        space_free_text, logger=logger
+    )
 
-    all_tokens: list[MecabParsedToken] = list(mecab.translate(text))
+    def increment_indexes(start: int, offset: int, end: Optional[int] = None) -> None:
+        increment_space_indexes(start, offset, end)
+        increment_tag_indexes(start, offset, end)
+
+    all_tokens: list[MecabParsedToken] = list(mecab.translate(html_free_text))
     result = ""
 
     found_word = False
     opened_bold = False
     text_char_idx = 0
+    open_bold_idx = -1
     for token in all_tokens:
-        logger.debug(
-            f"Processing token: {token.word}, headword: {token.headword}, POS:"
-            f" {token.part_of_speech}, Inflection: {token.inflection_type}, found_word:"
-            f" {found_word}, opened_bold: {opened_bold}"
-        )
+        logger.debug(f"\33[90mtag_indexes: {tag_indexes}\033[0m")
+        logger.debug(f"token.word: '{token.word}', cur result: \33[32m'{result}'\033[0m")
         if found_word:
             add_to_conjugated_okuri, _ = get_all_conjugation_conditions(
                 token,
@@ -139,7 +137,7 @@ def highlight_inflected_words_with_mecab(
             else:
                 logger.debug(f"Ending highlight for conjugated okuri: {token.word}")
                 result += "</b>" + token.word
-                increment_space_indexes(text_char_idx, 4)
+                increment_indexes(open_bold_idx, 7)
                 text_char_idx += len(token.word) + 4
                 opened_bold = False
                 found_word = False
@@ -149,7 +147,7 @@ def highlight_inflected_words_with_mecab(
             logger.debug(f"Found beginning of word to highlight: {token.word}")
             found_word = True
             result += "<b>" + token.word
-            increment_space_indexes(text_char_idx, 3)
+            open_bold_idx = text_char_idx
             text_char_idx += len(token.word) + 3
             opened_bold = True
         else:
@@ -157,24 +155,19 @@ def highlight_inflected_words_with_mecab(
             result += token.word
             text_char_idx += len(token.word)
             found_word = False
+            # This is just safe-keeping in case of some logic error, we shouldn't really get here
             if opened_bold:
                 logger.debug("Closing previously opened bold tag")
                 result += "</b>"
-                increment_space_indexes(text_char_idx, 4)
                 text_char_idx += 4
+                increment_indexes(open_bold_idx, 7)
                 opened_bold = False
 
     if opened_bold:
         logger.debug("Closing bold tag at end of text")
         result += "</b>"
+        text_char_idx += 4
 
-    logger.debug(f"Final highlighted result before restoring katakana/spaces: '{result}'")
-    # Restore spaces in the result string first as the katakana restoration uses indexes created
-    # before spaces were removed
-    for index in sorted(space_indexes.keys()):
-        space_str = space_indexes[index]
-        result = result[:index] + space_str + result[index:]
-    logger.debug(f"Restored spaces result: '{result}'")
     if "<b>" not in result:
         # Try again with word converted to hiragana/katakana
         logger.debug(
@@ -193,5 +186,17 @@ def highlight_inflected_words_with_mecab(
             return highlight_inflected_words_with_mecab(
                 text, to_hiragana(base_form_word), logger, 0
             )
+    logger.debug(f"Final highlighted result before restoring tags/spaces: '{result}'")
+
+    # Restore html tags in the result string
+    result = restore_tags(result)
+    logger.debug(f"Restored html tags result: '{result}'")
+
+    # Restore spaces in the result string
+    result = restore_spaces(result)
+    logger.debug(f"Restored spaces result: '{result}'")
+
+    # Make some fixes to spaces
+    result = result.replace("</b >", "</b> ")
 
     return result

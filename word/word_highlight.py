@@ -7,6 +7,10 @@ except ImportError:
         highlight_inflected_words_with_mecab,
     )
 try:
+    from use_text_part_storage import use_text_part_storage
+except ImportError:
+    from .use_text_part_storage import use_text_part_storage
+try:
     from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 except ImportError:
     from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
@@ -142,6 +146,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     logger.debug(f"word_highlight: text='{text}', word='{word}'")
     if not text or not word or not word.strip():
         return text
+
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
         # This is either a simple case or a complex one needing inflection matching
@@ -181,10 +186,18 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # Most simple case, we can regex search for the word directly
         pattern = make_word_pattern(word)
 
+        # Remove tags from text temporarily
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+            text, logger=logger
+        )
+
         def replace_match(match: re.Match) -> str:
+            increment_tag_indexes(match.start(0), 7, match.end(0))
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, text)
+        result = re.sub(pattern, replace_match, html_free_text)
+        logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        result = restore_tags(result)
         return result
     elif not ending_okurigana and furigana:
         logger.debug("No ending kana but has furigana -> split and regex match, then reconstruct")
@@ -202,10 +215,21 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
 
         pattern = make_word_pattern(word_with_readings_split)
 
+        # Remove tags from text temporarily
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+            text_with_readings_split, logger=logger
+        )
+
         def replace_match(match: re.Match) -> str:
+            increment_tag_indexes(match.start(0), 7, match.end(0))
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, text_with_readings_split)
+        result = re.sub(pattern, replace_match, html_free_text)
+        logger.debug(f"Intermediate result with <b> tags: '{result}'")
+
+        # Restore tags now, as the tag indexes are based on the split text
+        result = restore_tags(result)
+        logger.debug(f"Restored html tags result: '{result}'")
 
         # Re-merge any consecutive furigana parts that were split earlier
         result = merge_consecutive_furigana(result)
@@ -222,13 +246,15 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     )
 
     if not furigana:
-        logger.debug(
-            "No furigana but have kanji with okuri, use regex + mecab to find inflected forms"
-        )
+        logger.debug("No furigana but have kanji with okuri, use mecab to find inflected forms")
         pattern = make_word_pattern(word)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += r"([ぁ-んア-ン]*)"
-        matches = re.finditer(pattern, text)
+        # Remove tags from text temporarily
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+            text, logger=logger
+        )
+        matches = re.finditer(pattern, html_free_text)
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             maybe_okuri = m.group(1)
@@ -258,17 +284,24 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             else:
                 logger.debug("No valid inflected form found")
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
-            # Insert <b> tags into the text at the found indices
-        result = text
+
+        # Insert <b> tags into the text at the found indices
+        result = html_free_text
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
+            increment_tag_indexes(start, 7, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        result = restore_tags(result)
+        logger.debug(f"Restored html tags result: '{result}'")
+        # Tag fixes
+        # Closing tag right before opening <b>, should be other way round
+        result = re.sub(r"<b>(</[^>]+>)", r"\1<b>", result)
         return result
     else:
         logger.debug("Furigana present, using kana_highlight for inflection matching")
@@ -306,14 +339,19 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             pattern += rf"{last_kanji}\[[^\]]+\]"
         pattern += r"([ぁ-んア-ン]*)"
         logger.debug(f"Regex pattern for matching: '{pattern}'")
-        matches = list(re.finditer(pattern, text_with_readings_split))
+
+        # Remove tags from text temporarily
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+            text_with_readings_split, logger=logger
+        )
+        matches = list(re.finditer(pattern, html_free_text))
         logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
-            matched_text = text_with_readings_split[m.start(0) : m.end(0)]
+            matched_text = html_free_text[m.start(0) : m.end(0)]
             maybe_okuri = m.group(1)
             logger.debug(
                 f"Matched text for kana_highlight inflection check: '{matched_text}',"
@@ -371,15 +409,22 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
-        result = text_with_readings_split
+        result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
+            increment_tag_indexes(start, 7, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        # Restore tags now, as the tag indexes are based on the split text
+        result = restore_tags(result)
+        logger.debug(f"Restored html tags result: '{result}'")
+        # Tag fixes
+        # Closing tag right before opening <b>, should be other way round
+        result = re.sub(r"<b>(</[^>]+>)", r"\1<b>", result)
         # Re-merge any consecutive furigana parts that were split earlier
         result = merge_consecutive_furigana(result)
         # Remove space from beginning as it's not required

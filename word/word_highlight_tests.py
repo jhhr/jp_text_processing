@@ -137,8 +137,8 @@ def main():
     test(
         test_name="Furigana - inflected verb as part of larger verb in text",
         word="付[つ]ける",
-        text="彼女[かのじょ]への 伝言[でんごん]を 言付[ことづ]けた</k>の。",
-        expected="彼女[かのじょ]への 伝言[でんごん]を 言[こと]<b> 付[づ]けた</b></k>の。",
+        text="彼女[かのじょ]への 伝言[でんごん]を 言付[ことづ]けたの。",
+        expected="彼女[かのじょ]への 伝言[でんごん]を 言[こと]<b> 付[づ]けた</b>の。",
     )
     test(
         test_name="Furigana - verb inflection ている /1",
@@ -219,6 +219,58 @@ def main():
         expected="彼[かれ]は<b> 走[はし]った</b>。 彼[かれ]の<b> 走[はし]り</b> 方[かた]は 速[はや]い。",
     )
     test(
+        test_name="Furigana - word is split by html tags in text",
+        word="何[なん]でも 無[な]い",
+        text=(
+            "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<k> 何[なん]</k>でも<k>"
+            " 無[な]い</k> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
+            " 特大[とくだい]ブーメランじゃねぇ？」</div>"
+        ),
+        expected=(
+            "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<b><k> 何[なん]</k>"
+            "でも<k> 無[な]い</k></b> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
+            " 特大[とくだい]ブーメランじゃねぇ？」</div>"
+        ),
+    )
+    test(
+        test_name="Furigana - tags in text, inflectable word /1",
+        word="火照[ほて]る",
+        text=(
+            "<k> 然[しか]し</k>... 今日[きょう]はマジで 暑[あつ]いな。 何[なに]か... 凄[すご]い..."
+            " 身体[からだ]が 火照[ほて]る"
+        ),
+        expected=(
+            "<k> 然[しか]し</k>... 今日[きょう]はマジで 暑[あつ]いな。 何[なに]か... 凄[すご]い..."
+            " 身体[からだ]が<b> 火照[ほて]る</b>"
+        ),
+    )
+    test(
+        test_name="Furigana - tags in text, inflectable word /2",
+        word="褒[ほ]める",
+        text=(
+            "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《<k> 御[お]</k>"
+            " 褒[ほ]めの<k> 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k>"
+            " 御座[ござ]います</k>》</div>"
+        ),
+        expected=(
+            "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《<k> 御[お]</k><b>"
+            " 褒[ほ]め</b>の<k> 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k>"
+            " 御座[ござ]います</k>》</div>"
+        ),
+    )
+    test(
+        test_name="Furigana - tags in text, inflected verb /3",
+        word="護[まも]る",
+        text=(
+            "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
+            " 人々[ひとびと]を 護[まも]りましょう"
+        ),
+        expected=(
+            "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
+            " 人々[ひとびと]を<b> 護[まも]りましょう</b>"
+        ),
+    )
+    test(
         test_name="Furigana is colloquial /1",
         # Needs some kind of exception handling, can only work when furigana are used
         word="無[ない]",
@@ -274,6 +326,42 @@ def main():
         text="このケーキって、美味しくなくて 残念だったな！",
         expected="このケーキって、<b>美味しくなくて</b> 残念だったな！",
     )
+    test(
+        test_name="No furigana with kanji - word is split by html tags in text",
+        word="何でも無い",
+        text=(
+            "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<k>何</k>でも<k>無い</k>女の会話。"
+            "」</div><div>「<k>其れ</k>、特大ブーメランじゃねぇ？」</div>"
+        ),
+        expected=(
+            "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<b><k>何</k>でも<k>無い</k></b>女の会話。"
+            "」</div><div>「<k>其れ</k>、特大ブーメランじゃねぇ？」</div>"
+        ),
+    )
+    test(
+        test_name="No furigana with kanji - tags in text, inflectable word /1",
+        word="火照る",
+        text="<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が火照る",
+        expected="<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が<b>火照る</b>",
+    )
+    test(
+        test_name="No furigana with kanji - tags in text, inflectable word /2",
+        word="褒める",
+        text=(
+            "《咄嗟の障壁<k>巧い</k>ね》<br><div>《<k>御</k>褒めの<k>御</k>言葉<k>有難う</k>"
+            "<k>御座います</k>》</div>"
+        ),
+        expected=(
+            "《咄嗟の障壁<k>巧い</k>ね》<br><div>《<k>御</k><b>褒め</b>の<k>御</k>言葉"
+            "<k>有難う</k><k>御座います</k>》</div>"
+        ),
+    )
+    test(
+        test_name="No furigana with kanji - tags in text, inflected verb /3",
+        word="護る",
+        text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を護りましょう",
+        expected="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>護りましょう</b>",
+    )
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     test(
         test_name="Kana only - katakana word in text, word in hiragana",
@@ -317,6 +405,44 @@ def main():
         word="おいしい",
         text="このケーキって、おいしくなくて 残念[ザンねん]だったな！",
         expected="このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
+    )
+    test(
+        test_name="Kana only - tags in text, inflectable word /1",
+        word="めげる",
+        text=(
+            "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
+            " 寒[さむ]いんだよね。 行[い]きたくないなぁ…。"
+            "」</div>「もうめげ始[はじ]めている…」<br>"
+        ),
+        expected=(
+            "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
+            " 寒[さむ]いんだよね。 行[い]きたくないなぁ…。"
+            "」</div>「もう<b>めげ</b>始[はじ]めている…」<br>"
+        ),
+    )
+    test(
+        test_name="Kana only - tags in text, inflectable word /2",
+        word="ほめる",
+        text=(
+            "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《おほめの<k>"
+            " 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k> 御座[ござ]います</k>》</div>"
+        ),
+        expected=(
+            "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《お<b>ほめ</b>の<k>"
+            " 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k> 御座[ござ]います</k>》</div>"
+        ),
+    )
+    test(
+        test_name="Kana only - tags in text, inflectable word /3",
+        word="まもる",
+        text=(
+            "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
+            " 人々[ひとびと]をまもりましょう"
+        ),
+        expected=(
+            "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
+            " 人々[ひとびと]を<b>まもりましょう</b>"
+        ),
     )
     test(
         test_name="Shouldn't crash with mixture of furigana and non-furigana in word",
