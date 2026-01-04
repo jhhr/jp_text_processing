@@ -219,7 +219,7 @@ def main():
         expected="彼[かれ]は<b> 走[はし]った</b>。 彼[かれ]の<b> 走[はし]り</b> 方[かた]は 速[はや]い。",
     )
     test(
-        test_name="Furigana - word is split by html tags in text",
+        test_name="Furigana - word is split by html tags in text /1",
         word="何[なん]でも 無[な]い",
         text=(
             "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<k> 何[なん]</k>でも<k>"
@@ -230,6 +230,32 @@ def main():
             "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<b><k> 何[なん]</k>"
             "でも<k> 無[な]い</k></b> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
             " 特大[とくだい]ブーメランじゃねぇ？」</div>"
+        ),
+    )
+    test(
+        test_name="Furigana - word is split by html tags in text /2",
+        word="花一匁[はないちもんめ]",
+        text=(
+            "<k> 此[こ]れ</k>ってなんか 花[はな]<k> 一匁[いちもんめ]</k>だっけ？<k>"
+            " 彼[あれ]</k><k> 位[ぐらい]</k>の<k> 乗[ノリ]</k>？"
+        ),
+        expected=(
+            "<k> 此[こ]れ</k>ってなんか<b> 花[はな]<k> 一匁[いちもんめ]</k></b>だっけ？<k>"
+            " 彼[あれ]</k><k> 位[ぐらい]</k>の<k> 乗[ノリ]</k>？"
+        ),
+    )
+    test(
+        test_name="Furigana - word with repeater and okuri",
+        word="嬉々[きき]として",
+        text=(
+            "通常[つうじょう]で<k> 有[あ]れば</k> 忌[い]み 嫌[きら]われる<k> 筈[はず]</k>の<k>"
+            " 此[こ]れ</k>ら<k> 糞[クソ]</k>ゲーを 嬉々[きき]として 求[もと]める 者[もの]<k>"
+            " 達[たち]</k>"
+        ),
+        expected=(
+            "通常[つうじょう]で<k> 有[あ]れば</k> 忌[い]み 嫌[きら]われる<k> 筈[はず]</k>の<k>"
+            " 此[こ]れ</k>ら<k> 糞[クソ]</k>ゲーを<b> 嬉々[きき]として</b> 求[もと]める 者[もの]<k>"
+            " 達[たち]</k>"
         ),
     )
     test(
@@ -327,7 +353,7 @@ def main():
         expected="このケーキって、<b>美味しくなくて</b> 残念だったな！",
     )
     test(
-        test_name="No furigana with kanji - word is split by html tags in text",
+        test_name="No furigana with kanji - word is split by html tags in text /1",
         word="何でも無い",
         text=(
             "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<k>何</k>でも<k>無い</k>女の会話。"
@@ -336,6 +362,26 @@ def main():
         expected=(
             "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<b><k>何</k>でも<k>無い</k></b>女の会話。"
             "」</div><div>「<k>其れ</k>、特大ブーメランじゃねぇ？」</div>"
+        ),
+    )
+    test(
+        test_name="No furigana with kanji - word is split by html tags in text /2",
+        word="花一匁",
+        text="<k>此れ</k>ってなんか花<k>一匁</k>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
+        expected="<k>此れ</k>ってなんか<b>花<k>一匁</k></b>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
+    )
+    test(
+        test_name="No furigana with kanji - word with repeater and okuri",
+        word="嬉々として",
+        text=(
+            "通常で<k>有れば</k>忌み嫌われる<k>筈</k>の<k>"
+            "此れ</k>ら<k>糞</k>ゲーを嬉々として求める者<k>"
+            "達</k>"
+        ),
+        expected=(
+            "通常で<k>有れば</k>忌み嫌われる<k>筈</k>の<k>"
+            "此れ</k>ら<k>糞</k>ゲーを<b>嬉々として</b>求める者<k>"
+            "達</k>"
         ),
     )
     test(
@@ -448,8 +494,8 @@ def main():
         test_name="Shouldn't crash with mixture of furigana and non-furigana in word",
         word="総[そう]勃ち",
         text="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
-        # Unable to highlight correctly, but at least shouldn't crash
-        expected="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃</b>ち だよ",
+        # Might not always highlight correctly, though this one does, but at least shouldn't crash
+        expected="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
     )
     print("\n\033[92mTests passed\033[0m")
 

@@ -30,7 +30,7 @@ except ImportError:
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbf])々?(?:\[([^\]]*?)\])?$"
+LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbf])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
     r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[([^\]]*?)\])(?:"
@@ -214,11 +214,13 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"text_with_readings_split: {text_with_readings_split}")
 
         pattern = make_word_pattern(word_with_readings_split)
+        logger.debug(f"Using pattern: {pattern}")
 
         # Remove tags from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
             text_with_readings_split, logger=logger
         )
+        logger.debug(f"html_free_text for matching: '{html_free_text}'")
 
         def replace_match(match: re.Match) -> str:
             increment_tag_indexes(match.start(0), 7, match.end(0))
@@ -249,11 +251,12 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug("No furigana but have kanji with okuri, use mecab to find inflected forms")
         pattern = make_word_pattern(word)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
-        pattern += r"([ぁ-んア-ン]*)"
+        pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         # Remove tags from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
             text, logger=logger
         )
+        logger.debug(f"html_free_text for matching: '{html_free_text}'")
         matches = re.finditer(pattern, html_free_text)
         result_indices: list[tuple[int, int]] = []
         for m in matches:
@@ -262,6 +265,11 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 f"Found potential match at indices ({m.start(0)}, {m.end(0)}),"
                 f" maybe_okuri: '{maybe_okuri}'"
             )
+            if maybe_okuri == ending_okurigana:
+                # Exact match, no need to check inflection
+                logger.debug("Exact match found, no inflection check needed")
+                result_indices.append((m.start(0), m.end(0)))
+                continue
             # Check if the maybe_okuri contains a valid inflection for the ending_okurigana
             okuri_result, _ = get_conjugated_okuri_with_mecab(
                 word=word_without_furigana,
@@ -311,12 +319,14 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"word_with_readings_split: {word_with_readings_split}")
         # Get the last kanji character and its furigana, while removing it from the split word
         last_kanji = ""
+        repeater = ""
         last_kanji_furigana = ""
 
         def remove_from_split_word(match: re.Match) -> str:
-            nonlocal last_kanji, last_kanji_furigana
+            nonlocal last_kanji, repeater, last_kanji_furigana
             last_kanji = match.group(1) if match else ""
-            last_kanji_furigana = match.group(2) if match else ""
+            repeater = match.group(2) if match else ""
+            last_kanji_furigana = match.group(3) if match else ""
             return ""
 
         word_with_readings_split = re.sub(
@@ -336,14 +346,15 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
         if last_kanji:
-            pattern += rf"{last_kanji}\[[^\]]+\]"
-        pattern += r"([ぁ-んア-ン]*)"
+            pattern += rf"{last_kanji}{repeater}\[[^\]]+\]"
+        pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug(f"Regex pattern for matching: '{pattern}'")
 
         # Remove tags from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
             text_with_readings_split, logger=logger
         )
+        logger.debug(f"html_free_text for matching: '{html_free_text}'")
         matches = list(re.finditer(pattern, html_free_text))
         logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
@@ -353,6 +364,14 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             # Find the position of the last kanji in the matched text
             matched_text = html_free_text[m.start(0) : m.end(0)]
             maybe_okuri = m.group(1)
+            if maybe_okuri == ending_okurigana:
+                # Exact match, no inflection needed
+                logger.debug(
+                    f"Exact match found for matched text: '{matched_text}',"
+                    f" maybe_okuri: '{maybe_okuri}'"
+                )
+                result_indices.append((m.start(0), m.end(0)))
+                continue
             logger.debug(
                 f"Matched text for kana_highlight inflection check: '{matched_text}',"
                 f" maybe_okuri: '{maybe_okuri}', match: {m}"
