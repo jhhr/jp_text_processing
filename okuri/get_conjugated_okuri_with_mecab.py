@@ -186,8 +186,8 @@ def get_conjugated_okuri_with_mecab(
             # Remove the text from the rest of the okurigana
             rest_kana = rest_kana[len(token.word) :]
             logger.debug(
-                f"Added to okuri: {token.word}, headword: {token.headword}, new okuri:"
-                f" {conjugated_okuri}, rest_kana: {rest_kana}"
+                f"Added to okuri: {token.word}, headword: {token.headword}, POS:"
+                f" {token.part_of_speech}, new okuri: {conjugated_okuri}, rest_kana: {rest_kana}"
             )
             if was_suru_verb:
                 is_suru_verb = True
@@ -244,7 +244,7 @@ def main():
     test("為", "さ", "れるだろう", ("れる", "だろう", False))
     test("知", "し", "ってるでしょう", ("ってる", "でしょう", False))
     test("為", "し", "なかった", ("なかった", "", False))
-    test("挫", "くじ", "けられないで", ("けられない", "で", False))
+    test("挫", "くじ", "けられないで", ("けられないで", "", False))
     test("挫", "くじ", "けさせてやる", ("けさせて", "やる", False))
     test("何気", "なにげ", "にと", ("に", "と", False))
     test("為", "す", "るしかない", ("る", "しかない", False))
@@ -285,6 +285,7 @@ def main():
     test("送", "おく", "ってた", ("ってた", "", False))
     test("聴牌", "テンパ", "ります", ("ります", "", False))
     test("聴牌", "テンパ", "ってた", ("ってた", "", False))
+    test("", "はにか", "んだ", ("んだ", "", False))
     print("\033[92mTests passed\033[0m")
 
 

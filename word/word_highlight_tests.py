@@ -491,6 +491,15 @@ def main():
         ),
     )
     test(
+        test_name="Kana only - tags in text, inflectable word /3",
+        word="はにかむ",
+        text="「<k> 彼[あ]の</k>はにかんだ 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に 残[のこ]る」",
+        expected=(
+            "「<k> 彼[あ]の</k><b>はにかんだ</b> 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に"
+            " 残[のこ]る」"
+        ),
+    )
+    test(
         test_name="Shouldn't crash with mixture of furigana and non-furigana in word",
         word="総[そう]勃ち",
         text="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",

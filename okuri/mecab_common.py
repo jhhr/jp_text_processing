@@ -89,7 +89,14 @@ def verb_conjugation_conditions(
         or (
             # -ない, -なく
             token.part_of_speech == PartOfSpeech.bound_auxiliary
-            and token.headword == "ない"
+            and token.headword in ["ない", "ぬ"]
+        )
+        or (
+            # だ but not だろう or だね
+            token.part_of_speech == PartOfSpeech.bound_auxiliary
+            # だろう has word="だろ" and headword="だ", so using word="だ" excludes it
+            and (token.word == "だ" and token.headword == "だ")
+            and (not next_token or next_token.headword != "ね")  # exclude だね
         )
         or (
             # -て, -で following ない
