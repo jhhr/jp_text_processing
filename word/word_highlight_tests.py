@@ -453,7 +453,45 @@ def main():
         expected="このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
     )
     test(
-        test_name="Kana only - tags in text, inflectable word /1",
+        test_name="Kana only - kanji only & tags in text, inflectable word /1",
+        word="めげる",
+        text=(
+            "<div>「でも魔王城の辺りって<k>滅茶苦茶</k>"
+            "寒いんだよね。行きたくないなぁ…。"
+            "」</div>「もうめげ始めている…」<br>"
+        ),
+        expected=(
+            "<div>「でも魔王城の辺りって<k>滅茶苦茶</k>"
+            "寒いんだよね。行きたくないなぁ…。"
+            "」</div>「もう<b>めげ</b>始めている…」<br>"
+        ),
+    )
+    test(
+        test_name="Kana only - kanji only & tags in text, inflectable word /2",
+        word="ほめる",
+        text=(
+            "《咄嗟の障壁<k>巧い</k>ね》<br><div>《おほめの<k>"
+            "御</k>言葉<k>有難う</k><k>御座います</k>》</div>"
+        ),
+        expected=(
+            "《咄嗟の障壁<k>巧い</k>ね》<br><div>《お<b>ほめ</b>の<k>"
+            "御</k>言葉<k>有難う</k><k>御座います</k>》</div>"
+        ),
+    )
+    test(
+        test_name="Kana only - kanji only & tags in text, inflectable word /3",
+        word="まもる",
+        text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々をまもりましょう",
+        expected="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>まもりましょう</b>",
+    )
+    test(
+        test_name="Kana only - kanji only & tags in text, inflectable word /4",
+        word="はにかむ",
+        text="「<k>彼の</k>はにかんだ笑顔が<k>如何</k>にも頭に残る」",
+        expected="「<k>彼の</k><b>はにかんだ</b>笑顔が<k>如何</k>にも頭に残る」",
+    )
+    test(
+        test_name="Kana only - kanji only & tags in text, inflectable word /1",
         word="めげる",
         text=(
             "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
@@ -467,7 +505,7 @@ def main():
         ),
     )
     test(
-        test_name="Kana only - tags in text, inflectable word /2",
+        test_name="Kana only - furigana & tags in text, inflectable word /2",
         word="ほめる",
         text=(
             "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《おほめの<k>"
@@ -479,7 +517,7 @@ def main():
         ),
     )
     test(
-        test_name="Kana only - tags in text, inflectable word /3",
+        test_name="Kana only - furigana & tags in text, inflectable word /3",
         word="まもる",
         text=(
             "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
@@ -491,7 +529,7 @@ def main():
         ),
     )
     test(
-        test_name="Kana only - tags in text, inflectable word /3",
+        test_name="Kana only - furigana & tags in text, inflectable word /4",
         word="はにかむ",
         text="「<k> 彼[あ]の</k>はにかんだ 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に 残[のこ]る」",
         expected=(

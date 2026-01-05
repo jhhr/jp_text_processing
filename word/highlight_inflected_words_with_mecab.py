@@ -40,6 +40,11 @@ try:
     from use_text_part_storage import use_text_part_storage
 except ImportError:
     from .use_text_part_storage import use_text_part_storage
+
+try:
+    from use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
+except ImportError:
+    from .use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
 try:
     from okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 except ImportError:
@@ -106,15 +111,15 @@ def highlight_inflected_words_with_mecab(
     )
 
     # Clean html tags from the text temporarily
-    html_free_text, increment_tag_indexes, restore_tags, tag_indexes = use_text_part_storage(
-        space_free_text, logger=logger
+    html_and_space_free_text, increment_tag_indexes, restore_tags, _ = (
+        use_tag_cleaning_with_b_insertion(space_free_text, logger=logger)
     )
 
-    def increment_indexes(start: int, offset: int, end: Optional[int] = None) -> None:
-        increment_space_indexes(start, offset, end)
-        increment_tag_indexes(start, offset, end)
+    def increment_indexes_for_b(start: int, end: Optional[int] = None) -> None:
+        increment_for_b_tag_insertion(increment_space_indexes, start, end)
+        increment_tag_indexes(start, end)
 
-    all_tokens: list[MecabParsedToken] = list(mecab.translate(html_free_text))
+    all_tokens: list[MecabParsedToken] = list(mecab.translate(html_and_space_free_text))
     result = ""
 
     found_word = False
@@ -122,7 +127,6 @@ def highlight_inflected_words_with_mecab(
     text_char_idx = 0
     open_bold_idx = -1
     for token in all_tokens:
-        logger.debug(f"\33[90mtag_indexes: {tag_indexes}\033[0m")
         logger.debug(f"token.word: '{token.word}', cur result: \33[32m'{result}'\033[0m")
         if found_word:
             add_to_conjugated_okuri, _ = get_all_conjugation_conditions(
@@ -137,8 +141,14 @@ def highlight_inflected_words_with_mecab(
             else:
                 logger.debug(f"Ending highlight for conjugated okuri: {token.word}")
                 result += "</b>" + token.word
-                increment_indexes(open_bold_idx, 7)
+                # We need to subtract the length of the opening tag because the text_char_idx
+                # is counting text including it
+                before_b_close_idx = text_char_idx - 3
                 text_char_idx += len(token.word) + 4
+                logger.debug(
+                    f"open_bold_idx: {open_bold_idx}, before_b_close_idx: {before_b_close_idx}"
+                )
+                increment_indexes_for_b(open_bold_idx, before_b_close_idx)
                 opened_bold = False
                 found_word = False
         elif (
@@ -159,8 +169,12 @@ def highlight_inflected_words_with_mecab(
             if opened_bold:
                 logger.debug("Closing previously opened bold tag")
                 result += "</b>"
+                before_b_close_idx = text_char_idx - 3
                 text_char_idx += 4
-                increment_indexes(open_bold_idx, 7)
+                logger.debug(
+                    f"open_bold_idx: {open_bold_idx}, before_b_close_idx: {before_b_close_idx}"
+                )
+                increment_indexes_for_b(open_bold_idx, before_b_close_idx)
                 opened_bold = False
 
     if opened_bold:
@@ -188,11 +202,12 @@ def highlight_inflected_words_with_mecab(
             )
     logger.debug(f"Final highlighted result before restoring tags/spaces: '{result}'")
 
-    # Restore html tags in the result string
+    # Restore removed parts in reverse order
+    # First tags
     result = restore_tags(result)
     logger.debug(f"Restored html tags result: '{result}'")
 
-    # Restore spaces in the result string
+    # Then spaces
     result = restore_spaces(result)
     logger.debug(f"Restored spaces result: '{result}'")
 

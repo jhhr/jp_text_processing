@@ -7,9 +7,9 @@ except ImportError:
         highlight_inflected_words_with_mecab,
     )
 try:
-    from use_text_part_storage import use_text_part_storage
+    from use_tag_cleaning import use_tag_cleaning_with_b_insertion
 except ImportError:
-    from .use_text_part_storage import use_text_part_storage
+    from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
 try:
     from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 except ImportError:
@@ -187,12 +187,12 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         pattern = make_word_pattern(word)
 
         # Remove tags from text temporarily
-        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text, logger=logger
         )
 
         def replace_match(match: re.Match) -> str:
-            increment_tag_indexes(match.start(0), 7, match.end(0))
+            increment_tag_indexes(match.start(0), match.end(0))
             return f"<b>{match.group(0)}</b>"
 
         result = re.sub(pattern, replace_match, html_free_text)
@@ -217,13 +217,13 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"Using pattern: {pattern}")
 
         # Remove tags from text temporarily
-        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text_with_readings_split, logger=logger
         )
         logger.debug(f"html_free_text for matching: '{html_free_text}'")
 
         def replace_match(match: re.Match) -> str:
-            increment_tag_indexes(match.start(0), 7, match.end(0))
+            increment_tag_indexes(match.start(0), match.end(0))
             return f"<b>{match.group(0)}</b>"
 
         result = re.sub(pattern, replace_match, html_free_text)
@@ -248,12 +248,12 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
     )
 
     if not furigana:
-        logger.debug("No furigana but have kanji with okuri, use mecab to find inflected forms")
+        logger.debug("No furigana but have kanji with okuri, use get_conjugated_okuri_with_mecab")
         pattern = make_word_pattern(word)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         # Remove tags from text temporarily
-        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text, logger=logger
         )
         logger.debug(f"html_free_text for matching: '{html_free_text}'")
@@ -298,8 +298,10 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
-            increment_tag_indexes(start, 7, end)
+            # Increment for tags inside (but not on exact same position) or after the opening tag
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
+            logger.debug(f"Result after {idx + 1} <b> insertions: '{result}'")
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
@@ -307,9 +309,6 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
         result = restore_tags(result)
         logger.debug(f"Restored html tags result: '{result}'")
-        # Tag fixes
-        # Closing tag right before opening <b>, should be other way round
-        result = re.sub(r"<b>(</[^>]+>)", r"\1<b>", result)
         return result
     else:
         logger.debug("Furigana present, using kana_highlight for inflection matching")
@@ -351,7 +350,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"Regex pattern for matching: '{pattern}'")
 
         # Remove tags from text temporarily
-        html_free_text, increment_tag_indexes, restore_tags, _ = use_text_part_storage(
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text_with_readings_split, logger=logger
         )
         logger.debug(f"html_free_text for matching: '{html_free_text}'")
@@ -431,7 +430,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
-            increment_tag_indexes(start, 7, end)
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
@@ -441,9 +440,6 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
         logger.debug(f"Restored html tags result: '{result}'")
-        # Tag fixes
-        # Closing tag right before opening <b>, should be other way round
-        result = re.sub(r"<b>(</[^>]+>)", r"\1<b>", result)
         # Re-merge any consecutive furigana parts that were split earlier
         result = merge_consecutive_furigana(result)
         # Remove space from beginning as it's not required
