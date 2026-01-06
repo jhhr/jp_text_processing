@@ -601,7 +601,7 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="Onyomi repeater word with no highlight",
+        test_name="Kunyomi repeater word with no highlight /1",
         kanji="",
         sentence=" 愈々[いよいよ]",
         expected_kana_only=" いよいよ",
@@ -615,7 +615,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> いよいよ[愈々]</kun>",
     )
     test(
-        test_name="Kunyomi repeater word with no highlight",
+        test_name="Kunyomi repeater word with no highlight /2",
         kanji="",
         sentence=" 努々[ゆめゆめ]",
         expected_kana_only=" ゆめゆめ",
@@ -3711,6 +3711,35 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<on>べんきょう</on>できるかい？",
         expected_furigana_with_tags_merged="<on> 勉強[べんきょう]</on>できるかい？",
         expected_furikanji_with_tags_merged="<on> べんきょう[勉強]</on>できるかい？",
+    )
+    test(
+        test_name="有難う should be all kunyomi",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="有難[ありがと]う 御座[ござ]います",
+        expected_kana_only="ありがとう ございます",
+        expected_furigana=" 有難[ありがと]う 御座[ござ]います",
+        expected_furikanji=" ありがと[有難]う ござ[御座]います",
+        expected_kana_only_with_tags_split=(
+            "<kun>あり</kun><kun>がと</kun><oku>う</oku> <on>ご</on><on>ざ</on><oku>います</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<kun> 有[あり]</kun><kun> 難[がと]</kun><oku>う</oku><on> 御[ご]</on><on>"
+            " 座[ざ]</on><oku>います</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> あり[有]</kun><kun> がと[難]</kun><oku>う</oku><on> ご[御]</on><on>"
+            " ざ[座]</on><oku>います</oku>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<kun>ありがと</kun><oku>う</oku> <on>ござ</on><oku>います</oku>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<kun> 有難[ありがと]</kun><oku>う</oku><on> 御座[ござ]</on><oku>います</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> ありがと[有難]</kun><oku>う</oku><on> ござ[御座]</on><oku>います</oku>"
+        ),
     )
 
     start_time = time.time()
