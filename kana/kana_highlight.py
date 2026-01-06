@@ -988,7 +988,7 @@ def kana_highlight(
             reconstruct_type=return_type,
             logger=logger,
         )
-        logger.debug(f"furigana_replacer - final_result: {final_result}")
+        logger.debug(f"furigana_replacer - final_result: {final_result}\n")
         return final_result
 
     # Clean any potential mixed okurigana cases, turning them normal

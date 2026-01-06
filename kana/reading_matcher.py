@@ -256,7 +256,8 @@ def match_kunyomi_to_mora(
 
     # Special handling for 為 (する verb) - add conjugated stems し and さ
     # These are conjugated forms of す.る that should match as kunyomi
-    if kanji == "為" and mora_sequence in ["し", "さ"]:
+    if kanji == "為" and mora_sequence in ["し", "さ", "せ"]:
+        logger.debug(f"match_kunyomi_to_mora - special 為 handling for: '{mora_sequence}'")
         # Treat these as stems of す.る
         match_info = ReadingMatchInfo(
             reading=mora_sequence,
@@ -271,13 +272,16 @@ def match_kunyomi_to_mora(
         if maybe_okuri:
             # If there's okurigana, check it
             res = check_okurigana_for_inflection(
-                reading_okurigana=maybe_okuri,
+                reading_okurigana="る",
                 reading="す.る",
                 maybe_okuri=maybe_okuri,
                 kanji_to_match=kanji,
+                logger=logger,
             )
+            logger.debug(f"match_kunyomi_to_mora - special 為 okurigana check result: {res}")
             match_info["okurigana"] = res.okurigana
             match_info["rest_kana"] = res.rest_kana
+        return match_info
 
     # Parse kunyomi readings
     kunyomi_readings = [r.strip() for r in kunyomi.split("、")]

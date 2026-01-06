@@ -167,6 +167,20 @@ def main():
         expected=("して", "いる", "full_okuri", "vs-i"),
     )
     test(
+        text="させられた",
+        okurigana="る",
+        kanji="為",
+        kanji_reading="す",
+        expected=("させられた", "", "full_okuri", "vs-i"),
+    )
+    test(
+        text="せずに",
+        okurigana="る",
+        kanji="為",
+        kanji_reading="す",
+        expected=("せず", "に", "full_okuri", "vs-i"),
+    )
+    test(
         text="してた",
         okurigana="する",
         kanji="動",
@@ -188,7 +202,7 @@ def main():
         okurigana="い",
         kanji="良",
         kanji_reading="よ",
-        expected=("い", "です", "full_okuri", "adj-ix"),
+        expected=("い", "です", "full_okuri", "adj-i"),
     )
     test(
         text="つ",

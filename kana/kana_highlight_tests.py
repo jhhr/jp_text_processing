@@ -3525,6 +3525,16 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="為る conjugations /4",
+        kanji="",
+        sentence="為[し]よう 為[さ]せよう 為[し]ましょう 為[せ]ずに 為[さ]せずに",
+        expected_kana_only_with_tags_split=(
+            "<kun>し</kun><oku>よう</oku> <kun>さ</kun><oku>せよう</oku>"
+            " <kun>し</kun><oku>ましょう</oku> <kun>せ</kun><oku>ず</oku>に"
+            " <kun>さ</kun><oku>せず</oku>に"
+        ),
+    )
+    test(
         test_name="correct onyomi for 不 in 不都合",
         kanji="不",
         # The shorter onyomi フ should be matched instead of フツ

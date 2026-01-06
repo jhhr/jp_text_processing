@@ -45,16 +45,18 @@ def check_okurigana_for_inflection(
     # contain other kana after the okurigana
     maybe_okuri
     logger.debug(
-        f"check okurigana 0 - reading_okurigana: {reading_okurigana}, maybe_okurigana:"
+        f"check okurigana 0 - reading_okurigana: {reading_okurigana}, maybe_okuri:"
         f" {maybe_okuri}, reading: {reading}, part_of_speech: {part_of_speech}"
     )
 
     if not maybe_okuri or not reading_okurigana:
+        logger.debug("check okurigana 0 - no okurigana or reading_okurigana")
         # If there is no okurigana or reading_okurigana, we can't check for inflections
         return OkuriResults("", "", "no_okuri")
 
     # Simple case, exact match, no need to check conjugations
     if reading_okurigana == maybe_okuri:
+        logger.debug("check okurigana 1 - exact match")
         return OkuriResults(reading_okurigana, "", "full_okuri", None)
 
     # Check what kind of inflections we should be looking for from the kunyomi okurigana
@@ -69,6 +71,7 @@ def check_okurigana_for_inflection(
             detected_part_of_speech = part_of_speech
         else:
             detected_part_of_speech = None
+        logger.debug("check okurigana 2 - stem matches okurigana exactly")
         return OkuriResults(conjugatable_stem, "", "full_okuri", detected_part_of_speech)
 
     logger.debug(
