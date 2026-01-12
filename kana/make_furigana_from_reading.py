@@ -1,9 +1,12 @@
+import re
 from .kana_highlight import kana_highlight, WithTagsDef
 
 try:
     from utils.logger import Logger
 except ImportError:
     from ..utils.logger import Logger
+
+KANJI_RE = r"[\d々\u4e00-\u9faf\u3400-\u4dbf]"
 
 
 def make_furigana_from_reading(word: str, reading: str, logger: Logger = Logger("error")) -> str:
@@ -16,6 +19,9 @@ def make_furigana_from_reading(word: str, reading: str, logger: Logger = Logger(
     Returns:
         str: The furigana string with appropriate tags.
     """
+    # If word doesn't contain kanji, return the word as is
+    if re.search(KANJI_RE, word) is None:
+        return word
     added_word_with_furigana = f"{word}[{reading}]"
     logger.debug(f"Added word with furigana: {added_word_with_furigana}")
     return kana_highlight(
