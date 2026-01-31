@@ -144,7 +144,9 @@ class OkuriResults(NamedTuple):
     part_of_speech: Optional[PartOfSpeech] = None
 
 
-ReadingType = Literal["none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change"]
+ReadingType = Literal[
+    "none", "plain", "rendaku", "small_tsu", "rendaku_small_tsu", "vowel_change", "n_change"
+]
 
 
 class ReadingMatchInfo(TypedDict):

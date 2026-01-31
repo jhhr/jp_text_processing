@@ -53,6 +53,12 @@ YOON_SMALL_MAP = {
     "よ": "ょ",
 }
 
+# Kana that can change to 'ん' if a reading ends with it
+N_CHANGE_HIRAGANA = {
+    "の",  # e.g. もの -> もん
+    "に",  # e.g. なに -> なん
+}
+
 
 def check_reading_match(
     reading: str,
@@ -68,9 +74,10 @@ def check_reading_match(
     2. Rendaku (濁点) - first kana voiced (k→g, s→z, etc.)
     3. Small tsu (促音) - last kana becomes っ for certain consonants
     4. Vowel change (拗音化) - first kana vowel change (あ→や, お→よ, う→ゆ)
-    5. Combined rendaku + small tsu
-    6. う dropped before っ okurigana
-
+    5. Yōon contraction (e.g., しよ → しょ)
+    6. Combined rendaku + small tsu
+    7. う dropped before っ okurigana
+    8. Kana that can change to 'ん' if a reading ends with it
     :param reading: The dictionary reading to check
     :param mora_string: The joined mora sequence to match against
     :param okurigana: The okurigana following this reading (for う→っ cases)
@@ -151,6 +158,12 @@ def check_reading_match(
                 u_dropped_rendaku = rendaku_reading[:-1]
                 if u_dropped_rendaku == mora_string:
                     return u_dropped_rendaku, "rendaku"
+
+    # 8. Kana that can change to 'ん' if a reading ends with it
+    if reading[-1] in N_CHANGE_HIRAGANA:
+        n_changed = f"{reading[:-1]}ん"
+        if n_changed == mora_string:
+            return n_changed, "n_change"
 
     return "", "none"
 

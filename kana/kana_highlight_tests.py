@@ -1537,7 +1537,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> はる[春]</kun><b><kun> さめ[雨]</kun></b>",
     )
     test(
-        test_name="sound change readings 4/",
+        test_name="sound change readings 5/",
         kanji="雨",
         # あめ -> あま
         sentence="雨傘[あまがさ]",
@@ -1552,7 +1552,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<b><kun> あま[雨]</kun></b><kun> がさ[傘]</kun>",
     )
     test(
-        test_name="sound change readings 5/",
+        test_name="sound change readings 6/",
         kanji="酒",
         # さけ -> さか
         sentence="居酒屋[いざかや]",
@@ -1575,7 +1575,7 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="sound change readings 6/",
+        test_name="sound change readings 7/",
         kanji="応",
         # おう -> のう
         sentence="反応[はんのう]",
@@ -1590,7 +1590,7 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> ハン[反]</on><b><on> ノウ[応]</on></b>",
     )
     test(
-        test_name="sound change readings 7/",
+        test_name="sound change readings 8/",
         kanji="皇",
         # おう -> のう
         sentence="天皇[てんのう]",
@@ -1603,6 +1603,29 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<on>テン</on><b><on>ノウ</on></b>",
         expected_furigana_with_tags_merged="<on> 天[テン]</on><b><on> 皇[ノウ]</on></b>",
         expected_furikanji_with_tags_merged="<on> テン[天]</on><b><on> ノウ[皇]</on></b>",
+    )
+    test(
+        test_name="sound change readings 9/",
+        kanji="者",
+        # もの -> もん
+        sentence="馬鹿者[ばかもん]",
+        expected_kana_only="バか<b>もん</b>",
+        expected_furigana=" 馬鹿[バか]<b> 者[もん]</b>",
+        expected_furikanji=" バか[馬鹿]<b> もん[者]</b>",
+        expected_kana_only_with_tags_split="<on>バ</on><kun>か</kun><b><kun>もん</kun></b>",
+        expected_furigana_with_tags_split=(
+            "<on> 馬[バ]</on><kun> 鹿[か]</kun><b><kun> 者[もん]</kun></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> バ[馬]</on><kun> か[鹿]</kun><b><kun> もん[者]</kun></b>"
+        ),
+        expected_kana_only_with_tags_merged="<on>バ</on><kun>か</kun><b><kun>もん</kun></b>",
+        expected_furigana_with_tags_merged=(
+            "<on> 馬[バ]</on><kun> 鹿[か]</kun><b><kun> 者[もん]</kun></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> バ[馬]</on><kun> か[鹿]</kun><b><kun> もん[者]</kun></b>"
+        ),
     )
     test(
         test_name="sound dropped readings 1/",
