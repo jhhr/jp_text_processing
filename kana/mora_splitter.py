@@ -13,6 +13,10 @@ try:
 except ImportError:
     from ..mecab_controller.kana_conv import to_hiragana, is_katakana_str
 try:
+    from kana.katakana_positions import get_katakana_positions
+except ImportError:
+    from .katakana_positions import get_katakana_positions
+try:
     from regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
 except ImportError:
     from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
@@ -23,11 +27,11 @@ class MoraSplitResult(TypedDict):
     Result of splitting furigana into mora.
 
     :param mora_list: List of individual mora strings
-    :param was_katakana: True if input was in katakana (for later conversion back)
+    :param katakana_positions: List of character indices in original furigana that were katakana
     """
 
     mora_list: list[str]
-    was_katakana: bool
+    katakana_positions: list[int]
 
 
 def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
@@ -43,13 +47,13 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
 
     :param furigana: The furigana reading (can be hiragana or katakana)
     :param kanji_count: Number of kanji in the word (used for ん merging logic)
-    :return: MoraSplitResult with mora_list and was_katakana flag
+    :return: MoraSplitResult with mora_list and katakana_positions
     """
-    # Detect if input is katakana
-    was_katakana = is_katakana_str(furigana)
+    # Track which positions were katakana in the original for later conversion back
+    katakana_positions = get_katakana_positions(furigana)
 
     # Convert to hiragana for processing
-    if was_katakana:
+    if katakana_positions:
         furigana = to_hiragana(furigana)
 
     # Extract all mora using the comprehensive regex
@@ -77,4 +81,4 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
                 mora_list[i] = before_last_char
                 mora_list.insert(i + 1, LONG_VOWEL_MAP[mora[-2]])
 
-    return MoraSplitResult(mora_list=mora_list, was_katakana=was_katakana)
+    return MoraSplitResult(mora_list=mora_list, katakana_positions=katakana_positions)

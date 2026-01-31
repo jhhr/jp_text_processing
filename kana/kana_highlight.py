@@ -12,6 +12,10 @@ try:
 except ImportError:
     from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_katakana_str, is_kana_str
 try:
+    from kana.katakana_positions import get_katakana_positions
+except ImportError:
+    from .katakana_positions import get_katakana_positions
+try:
     from utils.logger import Logger
 except ImportError:
     from ..utils.logger import Logger
@@ -241,6 +245,8 @@ def reconstruct_furigana(
     highlight_idx: Optional[int] = furi_okuri_result.get("highlight_segment_index")
     okurigana: str = furi_okuri_result.get("okurigana", "")
     rest_kana: str = furi_okuri_result.get("rest_kana", "")
+    original_furigana: str = furi_okuri_result.get("original_furigana", "")
+    katakana_positions: list[int] = furi_okuri_result.get("katakana_positions", [])
 
     if okurigana and with_tags_def.with_tags:
         okurigana = f"<oku>{okurigana}</oku>"
@@ -250,6 +256,20 @@ def reconstruct_furigana(
         if not with_tags_def.with_tags:
             segment_word = "".join([entry["kanji"] for entry in segment if entry["kanji"]])
             segment_furi = "".join([entry["furigana"] for entry in segment])
+
+            # Apply katakana conversion if needed
+            if segment_furi and original_furigana and katakana_positions:
+                original_hiragana = to_hiragana(original_furigana)
+                # Find where this furigana appears in the original hiragana
+                furi_pos = original_hiragana.find(segment_furi)
+                if furi_pos != -1:
+                    # Convert characters that were katakana in the original
+                    furi_chars = list(segment_furi)
+                    for i in range(len(furi_chars)):
+                        if (furi_pos + i) in katakana_positions:
+                            furi_chars[i] = to_katakana(furi_chars[i])
+                    segment_furi = "".join(furi_chars)
+
             if reconstruct_type == "kana_only":
                 return segment_furi
             # Sanity check, can't make furigana/furikanji without the word (kanji)
@@ -268,6 +288,8 @@ def reconstruct_furigana(
             merge_flag,
             with_tags_def.with_tags,
             apply_highlight=False,
+            original_furigana=original_furigana,
+            katakana_positions=katakana_positions,
             logger=logger,
         )
 
@@ -540,7 +562,8 @@ def reconstruct_from_alignment(
     with_tags_def: WithTagsDef,
     okurigana: str,
     rest_kana: str,
-    was_katakana: bool,
+    katakana_positions: list[int],
+    original_furigana: str,
     reconstruct_type: FuriReconstruct,
     logger: Logger = Logger("error"),
 ) -> str:
@@ -557,7 +580,8 @@ def reconstruct_from_alignment(
     :param with_tags_def: Tag configuration (with_tags, merge_consecutive, onyomi_to_katakana)
     :param okurigana: The okurigana portion (from alignment or jukujikun extraction)
     :param rest_kana: The remaining kana after okurigana
-    :param was_katakana: Whether original furigana was in katakana
+    :param katakana_positions: List of indices in original furigana that were katakana
+    :param original_furigana: The original furigana before hiragana conversion
     :param logger: Logger for debugging
     :return: FinalResult with complete furigana and word parts
     """
@@ -635,11 +659,6 @@ def reconstruct_from_alignment(
             "is_noun_suru_verb": is_noun_suru_verb,
         })
     logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
-
-    # Uniform script conversion when original furigana was katakana
-    if was_katakana:
-        for entry in entries:
-            entry["furigana"] = to_katakana(entry["furigana"])
 
     # Determine highlight span (include repeater following the target kanji)
     highlight_start = kanji_to_highlight_pos
@@ -737,7 +756,8 @@ def reconstruct_from_alignment(
         "highlight_match_type": highlight_match_type,
         "okurigana": okurigana,
         "rest_kana": rest_kana,
-        "was_katakana": was_katakana,
+        "katakana_positions": katakana_positions,
+        "original_furigana": original_furigana,
     }
     logger.debug(f"reconstruct_from_alignment - final_result: {final_result}")
 
@@ -749,10 +769,12 @@ def reconstruct_from_alignment(
     )
 
 
-def whole_word_mora_split(word: str, furigana: str) -> tuple[list[list[str]], bool]:
-    """Simple mora split for whole-word case - either the whole furigana or split in half"""
-    was_katakana = is_katakana_str(furigana)
-    if was_katakana:
+def whole_word_mora_split(word: str, furigana: str) -> tuple[list[list[str]], list[int]]:
+    """Simple mora split for whole-word case - either the whole furigana or split in half
+    Returns: (possible_splits, katakana_positions)
+    """
+    katakana_positions = get_katakana_positions(furigana)
+    if katakana_positions:
         furigana = to_hiragana(furigana)
     if len(word) == 2 and word[1] == "々":
         midpoint = max(1, len(furigana) // 2)
@@ -760,8 +782,8 @@ def whole_word_mora_split(word: str, furigana: str) -> tuple[list[list[str]], bo
         second = furigana[midpoint:]
         # Since find_first_complete_alignment expects list of lists, simply return all the chars
         # as separate strings, we don't care about mora here
-        return [[list(first), list(second)]], was_katakana
-    return [[list(furigana)]], was_katakana
+        return [[list(first), list(second)]], katakana_positions
+    return [[list(furigana)]], katakana_positions
 
 
 def kana_highlight(
@@ -902,7 +924,8 @@ def kana_highlight(
                 with_tags_def=with_tags_def,
                 okurigana=use_okurigana,
                 rest_kana=use_rest_kana,
-                was_katakana=False,
+                katakana_positions=[],
+                original_furigana=full_furigana,
                 reconstruct_type=return_type,
                 logger=logger,
             )
@@ -912,15 +935,15 @@ def kana_highlight(
         # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七)
         alignment_word = replace_numeric_substrings(full_word)
         alignment = None
-        was_katakana = False
+        katakana_positions = []
 
         if is_whole_word_case:
-            possible_whole_word_splits, was_katakana = whole_word_mora_split(
+            possible_whole_word_splits, katakana_positions = whole_word_mora_split(
                 full_word, full_furigana
             )
             logger.debug(
                 "furigana_replacer - whole_word_case possible_splits:"
-                f" {possible_whole_word_splits}, was_katakana: {was_katakana}"
+                f" {possible_whole_word_splits}, katakana_positions: {katakana_positions}"
             )
             alignment = find_first_complete_alignment(
                 word=alignment_word,
@@ -931,7 +954,7 @@ def kana_highlight(
             )
         else:
             mora_result = split_to_mora_list(full_furigana, len(full_word))
-            was_katakana = mora_result["was_katakana"]
+            katakana_positions = mora_result["katakana_positions"]
             logger.debug(f"furigana_replacer - partial_word_case mora_result: {mora_result}")
             alignment = find_first_complete_alignment(
                 word=alignment_word,
@@ -984,7 +1007,8 @@ def kana_highlight(
             with_tags_def=with_tags_def,
             okurigana=final_okurigana,
             rest_kana=final_rest_kana,
-            was_katakana=was_katakana,
+            katakana_positions=katakana_positions,
+            original_furigana=full_furigana,
             reconstruct_type=return_type,
             logger=logger,
         )

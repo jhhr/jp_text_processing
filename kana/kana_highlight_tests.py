@@ -2571,6 +2571,43 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> モノガタリ[物語]</kun>",
     )
     test(
+        test_name="Preserve mixed katakana in furigana /1",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="馬鹿者[バカもの]",
+        expected_kana_only="バカもの",
+        expected_furigana=" 馬鹿者[バカもの]",
+        expected_furikanji=" バカもの[馬鹿者]",
+        expected_kana_only_with_tags_split="<on>バ</on><kun>カ</kun><kun>もの</kun>",
+        expected_furigana_with_tags_split="<on> 馬[バ]</on><kun> 鹿[カ]</kun><kun> 者[もの]</kun>",
+        expected_furikanji_with_tags_split="<on> バ[馬]</on><kun> カ[鹿]</kun><kun> もの[者]</kun>",
+        expected_kana_only_with_tags_merged="<on>バ</on><kun>カもの</kun>",
+        expected_furigana_with_tags_merged="<on> 馬[バ]</on><kun> 鹿者[カもの]</kun>",
+        expected_furikanji_with_tags_merged="<on> バ[馬]</on><kun> カもの[鹿者]</kun>",
+    )
+    test(
+        test_name="Preserve mixed katakana in furigana /2",
+        kanji="",
+        onyomi_to_katakana=False,
+        # An entirely unlikely random mix of katakana and hiragana
+        # The jukujikun 大和 should be split into やま and と when tags are split
+        # たましい is a kunyomi reading for 魂
+        sentence="大和魂[やマとダまシい]",
+        expected_kana_only="やマとダまシい",
+        expected_furigana=" 大和魂[やマとダまシい]",
+        expected_furikanji=" やマとダまシい[大和魂]",
+        expected_kana_only_with_tags_split="<juk>やマ</juk><juk>と</juk><kun>ダまシい</kun>",
+        expected_furigana_with_tags_split=(
+            "<juk> 大[やマ]</juk><juk> 和[と]</juk><kun> 魂[ダまシい]</kun>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<juk> やマ[大]</juk><juk> と[和]</juk><kun> ダまシい[魂]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>やマと</juk><kun>ダまシい</kun>",
+        expected_furigana_with_tags_merged="<juk> 大和[やマと]</juk><kun> 魂[ダまシい]</kun>",
+        expected_furikanji_with_tags_merged="<juk> やマと[大和]</juk><kun> ダまシい[魂]</kun>",
+    )
+    test(
         test_name="Should be able to get okurigana of kunyomi reading 1/",
         kanji="置",
         sentence=" 風上[かざかみ]にも 置[お]けない",

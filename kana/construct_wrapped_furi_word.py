@@ -3,6 +3,11 @@ import sys
 from typing import NamedTuple, Tuple, Union, Optional, Literal
 
 try:
+    from mecab_controller.kana_conv import to_katakana, to_hiragana
+except ImportError:
+    from ..mecab_controller.kana_conv import to_katakana, to_hiragana
+
+try:
     from all_types.main_types import WrapMatchEntry
 except ImportError:
     from ..all_types.main_types import WrapMatchEntry
@@ -203,11 +208,29 @@ def construct_wrapped_furi_word(
     merge_consecutive: bool = True,
     with_tags: bool = True,
     apply_highlight: bool = True,
+    original_furigana: str = "",
+    katakana_positions: list[int] | None = None,
     logger=Logger("error"),
 ) -> str:
     """
     Construct the word with furigana wrapped in the appropriate tags.
+
+    :param kanji_tags: List of wrap match entries to process
+    :param return_type: Type of output (furigana, furikanji, kana_only)
+    :param merge_consecutive: Whether to merge consecutive tags
+    :param with_tags: Whether to include XML tags
+    :param apply_highlight: Whether to apply highlighting
+    :param original_furigana: The original furigana before hiragana conversion
+    :param katakana_positions: List of indices in original_furigana that were katakana
+    :param logger: Logger instance
+    :return: The constructed furigana string
     """
+    if katakana_positions is None:
+        katakana_positions = []
+
+    # Convert original furigana to hiragana for matching
+    original_hiragana = to_hiragana(original_furigana) if original_furigana else ""
+
     logger.debug(f"kanji_tags: {kanji_tags}")
     wrapped_furi_word = ""
     index = 0
@@ -327,6 +350,19 @@ def construct_wrapped_furi_word(
         highlight = cur_tag_res["highlight"]
         kana = cur_tag_res["furigana"]
         is_num = cur_tag_res["is_num"]
+
+        # Convert kana back to katakana if it matches a katakana position in original furigana
+        if kana and original_hiragana and katakana_positions:
+            # Find where this kana appears in the original hiragana furigana
+            kana_pos = original_hiragana.find(kana)
+            if kana_pos != -1:
+                # Check if any position in this kana segment was katakana in the original
+                kana_chars = list(kana)
+                for i in range(len(kana_chars)):
+                    if (kana_pos + i) in katakana_positions:
+                        kana_chars[i] = to_katakana(kana_chars[i])
+                kana = "".join(kana_chars)
+
         logger.debug(
             f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}, is_num: {is_num},"
         )

@@ -72,6 +72,8 @@ class FinalResult(TypedDict):
     :param okurigana
     :param rest_kana
     :param was_katakana: Whether the original furigana was in katakana
+    :param katakana_positions: List of character indices in original furigana that were katakana
+    :param original_furigana: The original furigana before hiragana conversion
     """
 
     segments: list[list[WrapMatchEntry]]
@@ -82,6 +84,8 @@ class FinalResult(TypedDict):
     okurigana: str
     rest_kana: str
     was_katakana: bool
+    katakana_positions: list[int]
+    original_furigana: str
 
 
 PartOfSpeech = Literal[
