@@ -3,7 +3,7 @@ try:
 except ImportError:
     from ..mecab_controller.kana_conv import to_katakana
 
-RENDAKU_CONVERSION_DICT_HIRAGANA = {
+RENDAKU_CONVERSION_DICT_HIRAGANA: dict[str, list[str]] = {
     "か": ["が"],
     "き": ["ぎ"],
     "く": ["ぐ"],
@@ -27,7 +27,7 @@ RENDAKU_CONVERSION_DICT_HIRAGANA = {
     "う": ["ぬ"],
 }
 # Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
-RENDAKU_CONVERSION_DICT_KATAKANA = {
+RENDAKU_CONVERSION_DICT_KATAKANA: dict[str, list[str]] = {
     to_katakana(k): [to_katakana(v) for v in vs]
     for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items()
 }

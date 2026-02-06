@@ -5,7 +5,7 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 
 try:
     from all_types.main_types import ReadingMatchInfo, ReadingType
@@ -65,7 +65,7 @@ def check_reading_match(
     mora_string: str,
     okurigana: str = "",
     logger: Logger = Logger("error"),
-) -> Tuple[str, ReadingType]:
+) -> tuple[str, ReadingType]:
     """
     Core function to check if a reading matches a mora string, trying various phonetic changes.
 
@@ -410,7 +410,7 @@ def match_reading_to_mora(
     maybe_okuri: str,
     is_last_kanji: bool,
     logger: Logger = Logger("error"),
-) -> Tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
+) -> tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
     """
     Try to match any reading (onyomi or kunyomi) to a mora sequence.
 

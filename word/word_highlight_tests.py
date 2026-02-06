@@ -141,6 +141,12 @@ def main():
         expected="彼女[かのじょ]への 伝言[でんごん]を 言[こと]<b> 付[づ]けた</b>の。",
     )
     test(
+        test_name="Furigana - inflected verb occurring in noun form and verb form in text",
+        word="引[ひ]く",
+        text="<k> 此[こ]の</k> 漢字[かんじ]を 字引[じびき]で 引[ひ]いてみて。",
+        expected="<k> 此[こ]の</k> 漢字[かんじ]を 字[じ]<b> 引[びき]</b>で<b> 引[ひ]いて</b>みて。",
+    )
+    test(
         test_name="Furigana - verb inflection ている /1",
         word="食[た]べる",
         text="私は 食[た]べている",
@@ -339,6 +345,14 @@ def main():
         word="苛めめる",
         text="苛めなくていれないのか、お 前は？",
         expected="<b>苛めなくて</b>いれないのか、お 前は？",
+    )
+    test(
+        test_name=(
+            "No furigana with kanji - inflected verb occurring in noun form and verb form in text"
+        ),
+        word="引く",
+        text="<k>此の</k>漢字を字引で引いてみて。",
+        expected="<k>此の</k>漢字を字<b>引</b>で<b>引いて</b>みて。",
     )
     test(
         test_name="No furigana with kanji - adjective inflection /1",

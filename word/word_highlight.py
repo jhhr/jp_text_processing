@@ -1,6 +1,15 @@
 import re
 
 try:
+    from kana.reading_matcher import check_reading_match
+except ImportError:
+    from ..kana.reading_matcher import check_reading_match
+try:
+    from all_types.main_types import OkuriResults
+except ImportError:
+    from ..all_types.main_types import OkuriResults
+
+try:
     from highlight_inflected_words_with_mecab import highlight_inflected_words_with_mecab
 except ImportError:
     from .highlight_inflected_words_with_mecab import (
@@ -50,7 +59,7 @@ def replace_hiragana_in_pattern(text: str) -> str:
 
 def make_word_pattern(word: str) -> str:
     # Remove first space
-    word = re.sub(r"^ ", r"", word)
+    word = re.sub(r"^ ", "", word)
     # Escape the word for regex special characters
     escaped_word = re.escape(word)
     escaped_word = replace_hiragana_in_pattern(escaped_word)
@@ -326,6 +335,10 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             last_kanji = match.group(1) if match else ""
             repeater = match.group(2) if match else ""
             last_kanji_furigana = match.group(3) if match else ""
+            logger.debug(
+                f"Found last kanji in split word: '{last_kanji}', repeater: '{repeater}',"
+                f" last_kanji_furigana: '{last_kanji_furigana}'"
+            )
             return ""
 
         word_with_readings_split = re.sub(
@@ -345,15 +358,15 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
         if last_kanji:
-            pattern += rf"{last_kanji}{repeater}\[[^\]]+\]"
-        pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
+            pattern += rf"{last_kanji}{repeater}\[(?P<furigana>[^\]]+)\]"
+        pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug(f"Regex pattern for matching: '{pattern}'")
 
         # Remove tags from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text_with_readings_split, logger=logger
         )
-        logger.debug(f"html_free_text for matching: '{html_free_text}'")
+        logger.debug(f"html_free_text for matching: '{html_free_text}', pattern: '{pattern}'")
         matches = list(re.finditer(pattern, html_free_text))
         logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
@@ -362,7 +375,8 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
             matched_text = html_free_text[m.start(0) : m.end(0)]
-            maybe_okuri = m.group(1)
+            furigana = m.group("furigana")
+            maybe_okuri = m.group("maybe_okuri")
             if maybe_okuri == ending_okurigana:
                 # Exact match, no inflection needed
                 logger.debug(
@@ -381,13 +395,31 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 f"Checking inflected forms for last kanji with mecab, last_kanji: '{last_kanji}',"
                 f" last_kanji_furigana: '{last_kanji_furigana}'"
             )
-            kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
-                word=last_kanji,
-                reading=last_kanji_furigana,
-                maybe_okuri=to_hiragana(maybe_okuri),
-                okuri_prefix="word",
-                logger=logger,
-            )
+
+            if last_kanji and furigana:
+                # furigana should match the last_kanji_furigana, with all variations considered
+                _, reading_match_type = check_reading_match(
+                    reading=last_kanji_furigana,
+                    mora_string=furigana,
+                    okurigana=maybe_okuri,
+                    logger=logger,
+                )
+                if reading_match_type == "none":
+                    logger.debug(
+                        f"Furigana '{furigana}' does not match last kanji furigana"
+                        f" '{last_kanji_furigana}', so no okuri match"
+                    )
+                    kanji_okuri_result = OkuriResults(
+                        result="no_okuri", okurigana="", rest_kana="", part_of_speech=""
+                    )
+                else:
+                    kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
+                        word=last_kanji,
+                        reading=last_kanji_furigana,
+                        maybe_okuri=to_hiragana(maybe_okuri),
+                        okuri_prefix="word",
+                        logger=logger,
+                    )
             if kanji_okuri_result.result != "no_okuri":
                 okuri_result = kanji_okuri_result
                 logger.debug(
