@@ -2403,6 +2403,32 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name=(
+            "Should be able to get okurigana for 美味しい jukujikun reading - no highlight /1"
+        ),
+        kanji="",
+        sentence="美味[おい]しい",
+        expected_kana_only_with_tags_split="<juk>お</juk><juk>い</juk><oku>しい</oku>",
+        expected_furigana_with_tags_split="<juk> 美[お]</juk><juk> 味[い]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_split="<juk> お[美]</juk><juk> い[味]</juk><oku>しい</oku>",
+        expected_kana_only_with_tags_merged="<juk>おい</juk><oku>しい</oku>",
+        expected_furigana_with_tags_merged="<juk> 美味[おい]</juk><oku>しい</oku>",
+        expected_furikanji_with_tags_merged="<juk> おい[美味]</juk><oku>しい</oku>",
+    )
+    test(
+        test_name=(
+            "Should be able to get okurigana for 美味しい jukujikun reading - no highlight /2"
+        ),
+        kanji="",
+        sentence="美味[おい]しさがいい",
+        expected_kana_only_with_tags_split="<juk>お</juk><juk>い</juk><oku>しさ</oku>がいい",
+        expected_furigana_with_tags_split="<juk> 美[お]</juk><juk> 味[い]</juk><oku>しさ</oku>がいい",
+        expected_furikanji_with_tags_split="<juk> お[美]</juk><juk> い[味]</juk><oku>しさ</oku>がいい",
+        expected_kana_only_with_tags_merged="<juk>おい</juk><oku>しさ</oku>がいい",
+        expected_furigana_with_tags_merged="<juk> 美味[おい]</juk><oku>しさ</oku>がいい",
+        expected_furikanji_with_tags_merged="<juk> おい[美味]</juk><oku>しさ</oku>がいい",
+    )
+    test(
         test_name="Match 釣瓶落とし jukujikun reading - with highlight",
         kanji="釣",
         sentence="釣瓶落[つるべお]とし",
@@ -2451,7 +2477,7 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="correct juk for 菠薐草",
+        test_name="Should handle 菠薐草 correctly as jukujikun",
         kanji="",
         onyomi_to_katakana=False,
         # 菠 has onyomi reading ほ which should not match in this case

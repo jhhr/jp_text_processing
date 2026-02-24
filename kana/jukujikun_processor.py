@@ -247,6 +247,7 @@ def process_jukujikun_positions(
             f" {last_kanji}, juku_reading: {juku_reading}, remaining_kana: {remaining_kana}"
         )
         # Either the full word or the last kanji may produce okurigana correctly, check both
+        # and take the one that produces the longest okurigana match
         kanji_okuri_result, kanji_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
             word=last_kanji,
             reading=juku_reading,
@@ -254,17 +255,22 @@ def process_jukujikun_positions(
             okuri_prefix="reading",
             logger=logger,
         )
-        if kanji_okuri_result.okurigana:
+        word_okuri_result, word_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
+            word=word,
+            reading=furigana,
+            maybe_okuri=remaining_kana,
+            okuri_prefix="reading",
+            logger=logger,
+        )
+        if word_okuri_result.okurigana and len(word_okuri_result.okurigana) > len(
+            kanji_okuri_result.okurigana
+        ):
+            okuri_result = word_okuri_result
+            is_noun_suru_verb = word_is_noun_suru_verb
+        elif kanji_okuri_result.okurigana:
             okuri_result = kanji_okuri_result
             is_noun_suru_verb = kanji_is_noun_suru_verb
         else:
-            word_okuri_result, word_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
-                word=word,
-                reading=furigana,
-                maybe_okuri=remaining_kana,
-                okuri_prefix="reading",
-                logger=logger,
-            )
             okuri_result = word_okuri_result
             is_noun_suru_verb = word_is_noun_suru_verb
         juku_entry["is_noun_suru_verb"] = is_noun_suru_verb
