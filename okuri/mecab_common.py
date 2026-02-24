@@ -155,7 +155,10 @@ def get_all_conjugation_conditions(
         # handle suru verbs
         if (
             (token.part_of_speech == PartOfSpeech.verb and token.headword == "する")
-            or (token.part_of_speech == PartOfSpeech.bound_auxiliary and token.headword != "だ")
+            or (
+                token.part_of_speech == PartOfSpeech.bound_auxiliary
+                and token.headword not in ["だ", "です"]
+            )
             or verb_conjugation_conditions(token, all_tokens)
             or (token.part_of_speech == PartOfSpeech.particle and token.word == "って")
         ):

@@ -2364,6 +2364,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<b><kun> はし[端]</kun></b><kun> ょ[折]</kun><oku>る</oku>",
     )
     test(
+        test_name="Should not include です in okurigana",
+        kanji="爺",
+        sentence="好々爺[こうこうや]です",
+        expected_kana_only="コウコウ<b>ヤ</b>です",
+        expected_furigana=" 好々[コウコウ]<b> 爺[ヤ]</b>です",
+        expected_furikanji=" コウコウ[好々]<b> ヤ[爺]</b>です",
+        expected_kana_only_with_tags_split="<on>コウコウ</on><b><on>ヤ</on></b>です",
+        expected_furigana_with_tags_split="<on> 好々[コウコウ]</on><b><on> 爺[ヤ]</on></b>です",
+        expected_furikanji_with_tags_split="<on> コウコウ[好々]</on><b><on> ヤ[爺]</on></b>です",
+        expected_kana_only_with_tags_merged="<on>コウコウ</on><b><on>ヤ</on></b>です",
+        expected_furigana_with_tags_merged="<on> 好々[コウコウ]</on><b><on> 爺[ヤ]</on></b>です",
+        expected_furikanji_with_tags_merged="<on> コウコウ[好々]</on><b><on> ヤ[爺]</on></b>です",
+    )
+    test(
         test_name="Should be able to get dictionary form okurigana of jukujikun reading",
         kanji="逆",
         # No kunyomi to match, the okurigana would need to be analyzed to get the dictionary form
