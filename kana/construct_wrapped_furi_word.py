@@ -153,7 +153,21 @@ def match_tags_with_kanji(word: str, furigana: str, logger=Logger("error")) -> l
                 # Only merge with the next tag when it matches the same tag type; otherwise keep
                 # separate so adjacent repeater groups with different readings don't collapse.
                 next_tag = tag_order[tag_index + 1] if tag_index + 1 < len(tag_order) else None
-                if next_tag and next_tag.tag == tag:
+                if next_tag is None:
+                    # Single tag can span repeated-kanji words (e.g., 悠々[ゆうゆう]).
+                    # Keep both kanji under the current tag and consume only this tag.
+                    kanji_tags.append(
+                        WrapMatchEntry(
+                            kanji=cur_kanji + next_kanji,
+                            tag=tag,
+                            highlight=bool(highlight),
+                            furigana=kana,
+                            is_num=False,
+                        )
+                    )
+                    kanji_index += 2
+                    tag_index += 1
+                elif next_tag.tag == tag:
                     combined_kana = kana + next_tag.contents
                     kanji_tags.append(
                         WrapMatchEntry(
