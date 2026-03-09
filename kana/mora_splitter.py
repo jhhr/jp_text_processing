@@ -9,9 +9,9 @@ the mora count exceeds the kanji count.
 from typing import TypedDict
 
 try:
-    from mecab_controller.kana_conv import to_hiragana, is_katakana_str
+    from mecab_controller.kana_conv import to_hiragana
 except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana, is_katakana_str
+    from ..mecab_controller.kana_conv import to_hiragana
 try:
     from kana.katakana_positions import get_katakana_positions
 except ImportError:
@@ -28,10 +28,26 @@ class MoraSplitResult(TypedDict):
 
     :param mora_list: List of individual mora strings
     :param katakana_positions: List of character indices in original furigana that were katakana
+    :param long_vowel_positions: List of character indices in original furigana that were long
+        vowel marks (ー)
     """
 
     mora_list: list[str]
     katakana_positions: list[int]
+    long_vowel_positions: list[int]
+
+
+def normalize_long_vowel_marks(furigana: str) -> tuple[str, list[int]]:
+    """
+    Return furigana unchanged and capture long vowel mark (ー) indices.
+
+    Matching behavior for ー is handled in reading comparison logic; this function only tracks
+    original positions for reconstruction when marks are preserved.
+    """
+    if "ー" not in furigana:
+        return furigana, []
+
+    return furigana, [i for i, char in enumerate(furigana) if char == "ー"]
 
 
 def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
@@ -47,7 +63,7 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
 
     :param furigana: The furigana reading (can be hiragana or katakana)
     :param kanji_count: Number of kanji in the word (used for ん merging logic)
-    :return: MoraSplitResult with mora_list and katakana_positions
+    :return: MoraSplitResult with mora_list, katakana_positions, and long_vowel_positions
     """
     # Track which positions were katakana in the original for later conversion back
     katakana_positions = get_katakana_positions(furigana)
@@ -55,6 +71,9 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
     # Convert to hiragana for processing
     if katakana_positions:
         furigana = to_hiragana(furigana)
+
+    # Track long-vowel positions for later reconstruction.
+    _, long_vowel_positions = normalize_long_vowel_marks(furigana)
 
     # Extract all mora using the comprehensive regex
     mora_list = ALL_MORA_REC.findall(furigana)
@@ -71,8 +90,10 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
         mora_list = new_list
 
     # If the furigana contained long vowels represented by ー, and we didn't get enough mora,
-    # convert the ー into the previous vowel and splice it in as its own mora
+    # convert the ー into the previous vowel and splice it in as its own mora. In this branch,
+    # restoration to ー should not be applied because the reading is being redistributed.
     if "ー" in furigana and len(mora_list) < kanji_count:
+        long_vowel_positions = []
         mora_list = mora_list.copy()
         for i, mora in enumerate(mora_list):
             if len(mora) >= 2 and mora[-1] == "ー" and mora[-2] in LONG_VOWEL_MAP:
@@ -81,4 +102,8 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
                 mora_list[i] = before_last_char
                 mora_list.insert(i + 1, LONG_VOWEL_MAP[mora[-2]])
 
-    return MoraSplitResult(mora_list=mora_list, katakana_positions=katakana_positions)
+    return MoraSplitResult(
+        mora_list=mora_list,
+        katakana_positions=katakana_positions,
+        long_vowel_positions=long_vowel_positions,
+    )

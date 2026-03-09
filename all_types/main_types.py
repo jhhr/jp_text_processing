@@ -73,6 +73,7 @@ class FinalResult(TypedDict):
     :param rest_kana
     :param was_katakana: Whether the original furigana was in katakana
     :param katakana_positions: List of character indices in original furigana that were katakana
+    :param long_vowel_positions: List of character indices in original furigana that were ー
     :param original_furigana: The original furigana before hiragana conversion
     """
 
@@ -85,6 +86,7 @@ class FinalResult(TypedDict):
     rest_kana: str
     was_katakana: bool
     katakana_positions: list[int]
+    long_vowel_positions: list[int]
     original_furigana: str
 
 

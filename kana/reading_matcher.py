@@ -86,8 +86,14 @@ def check_reading_match(
     if not reading:
         return "", "none"
 
+    # Normalize long vowel marks in the observed mora for matching (e.g. コー -> コウ).
+    normalized_mora = mora_string.replace("ー", "う")
+
+    def matches(candidate: str) -> bool:
+        return candidate == mora_string or candidate == normalized_mora
+
     # 1. Plain match
-    if reading == mora_string:
+    if matches(reading):
         return reading, "plain"
 
     # 2. Rendaku - first kana voiced
@@ -97,7 +103,7 @@ def check_reading_match(
             rendaku_readings.append(f"{kana}{reading[1:]}")
 
     for rendaku_reading in rendaku_readings:
-        if rendaku_reading == mora_string:
+        if matches(rendaku_reading):
             return rendaku_reading, "rendaku"
 
     # 3. Small tsu - last kana becomes っ
@@ -107,7 +113,7 @@ def check_reading_match(
             small_tsu_readings.append(f"{reading[:-1]}っ")
 
     for small_tsu_reading in small_tsu_readings:
-        if small_tsu_reading == mora_string:
+        if matches(small_tsu_reading):
             return small_tsu_reading, "small_tsu"
 
     # 4. Vowel change
@@ -117,14 +123,14 @@ def check_reading_match(
             vowel_change_readings.append(f"{kana}{reading[1:]}")
 
     for vowel_change_reading in vowel_change_readings:
-        if vowel_change_reading == mora_string:
+        if matches(vowel_change_reading):
             return vowel_change_reading, "vowel_change"
 
     # 5. Yōon contraction: reading like しよ → しょ, きや → きゃ, etc.
     # Check direct contraction
     if len(reading) >= 2 and reading[1] in YOON_SMALL_MAP:
         yoon_contracted = f"{reading[0]}{YOON_SMALL_MAP[reading[1]]}{reading[2:]}"
-        if yoon_contracted == mora_string:
+        if matches(yoon_contracted):
             return yoon_contracted, "vowel_change"
 
     # Also try yōon contraction on rendaku variants of the first kana
@@ -133,7 +139,7 @@ def check_reading_match(
             yoon_rendaku = (
                 f"{rendaku_reading[0]}{YOON_SMALL_MAP[rendaku_reading[1]]}{rendaku_reading[2:]}"
             )
-            if yoon_rendaku == mora_string:
+            if matches(yoon_rendaku):
                 return yoon_rendaku, "vowel_change"
 
     # 6. Combined rendaku + small tsu
@@ -144,25 +150,25 @@ def check_reading_match(
                 rendaku_small_tsu_readings.append(f"{rendaku_reading[:-1]}っ")
 
     for combined_reading in rendaku_small_tsu_readings:
-        if combined_reading == mora_string:
+        if matches(combined_reading):
             return combined_reading, "rendaku_small_tsu"
 
     # 7. う dropped before っ okurigana (e.g., 言う[いう]って → い + って)
     if okurigana and okurigana[0] == "っ" and reading[-1] == "う":
         u_dropped = reading[:-1]
-        if u_dropped == mora_string:
+        if matches(u_dropped):
             return u_dropped, "small_tsu"
         # Also try with rendaku
         for rendaku_reading in rendaku_readings:
             if rendaku_reading[-1] == "う":
                 u_dropped_rendaku = rendaku_reading[:-1]
-                if u_dropped_rendaku == mora_string:
+                if matches(u_dropped_rendaku):
                     return u_dropped_rendaku, "rendaku"
 
     # 8. Kana that can change to 'ん' if a reading ends with it
     if reading[-1] in N_CHANGE_HIRAGANA:
         n_changed = f"{reading[:-1]}ん"
-        if n_changed == mora_string:
+        if matches(n_changed):
             return n_changed, "n_change"
 
     return "", "none"

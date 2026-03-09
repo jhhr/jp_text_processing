@@ -2526,6 +2526,78 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<k><juk> ほうれん[菠薐]</juk></k><on> そう[草]</on>",
     )
     test(
+        test_name=(
+            "Should convert long vowel mark ー to vowel kana in any readings, katakana furigana"
+        ),
+        kanji="",
+        onyomi_to_katakana=False,
+        # reading in katakana, with ー replacing ウ in the コウ onyomi for 高
+        # the reading should be matched correctly but also preserved
+        sentence=" 最高[サイコー]",
+        expected_kana_only=" サイコー",
+        expected_furigana=" 最高[サイコー]",
+        expected_furikanji=" サイコー[最高]",
+        expected_kana_only_with_tags_split=" <on>サイ</on><on>コー</on>",
+        expected_furigana_with_tags_split="<on> 最[サイ]</on><on> 高[コー]</on>",
+        expected_furikanji_with_tags_split="<on> サイ[最]</on><on> コー[高]</on>",
+        expected_kana_only_with_tags_merged=" <on>サイコー</on>",
+        expected_furigana_with_tags_merged="<on> 最高[サイコー]</on>",
+        expected_furikanji_with_tags_merged="<on> サイコー[最高]</on>",
+    )
+    test(
+        test_name=(
+            "Should convert long vowel mark ー to vowel kana in any readings, hiragana furigana"
+        ),
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence=" 最高[さいこー]",
+        expected_kana_only=" さいこー",
+        expected_furigana=" 最高[さいこー]",
+        expected_furikanji=" さいこー[最高]",
+        expected_kana_only_with_tags_split=" <on>さい</on><on>こー</on>",
+        expected_furigana_with_tags_split="<on> 最[さい]</on><on> 高[こー]</on>",
+        expected_furikanji_with_tags_split="<on> さい[最]</on><on> こー[高]</on>",
+        expected_kana_only_with_tags_merged=" <on>さいこー</on>",
+        expected_furigana_with_tags_merged="<on> 最高[さいこー]</on>",
+        expected_furikanji_with_tags_merged="<on> さいこー[最高]</on>",
+    )
+    test(
+        test_name=(
+            "Should convert long vowel mark ー to vowel kana in any readings, katakana furigana -"
+            " with highlight"
+        ),
+        kanji="高",
+        onyomi_to_katakana=False,
+        sentence=" 最高[サイコー]",
+        expected_kana_only=" サイ<b>コー</b>",
+        expected_furigana=" 最[サイ]<b> 高[コー]</b>",
+        expected_furikanji=" サイ[最]<b> コー[高]</b>",
+        expected_kana_only_with_tags_split=" <on>サイ</on><b><on>コー</on></b>",
+        expected_furigana_with_tags_split="<on> 最[サイ]</on><b><on> 高[コー]</on></b>",
+        expected_furikanji_with_tags_split="<on> サイ[最]</on><b><on> コー[高]</on></b>",
+        expected_kana_only_with_tags_merged=" <on>サイ</on><b><on>コー</on></b>",
+        expected_furigana_with_tags_merged="<on> 最[サイ]</on><b><on> 高[コー]</on></b>",
+        expected_furikanji_with_tags_merged="<on> サイ[最]</on><b><on> コー[高]</on></b>",
+    )
+    test(
+        test_name=(
+            "Should convert long vowel mark ー to vowel kana in any readings, hiragana furigana -"
+            " with highlight"
+        ),
+        kanji="高",
+        onyomi_to_katakana=False,
+        sentence=" 最高[さいこー]",
+        expected_kana_only=" さい<b>こー</b>",
+        expected_furigana=" 最[さい]<b> 高[こー]</b>",
+        expected_furikanji=" さい[最]<b> こー[高]</b>",
+        expected_kana_only_with_tags_split=" <on>さい</on><b><on>こー</on></b>",
+        expected_furigana_with_tags_split="<on> 最[さい]</on><b><on> 高[こー]</on></b>",
+        expected_furikanji_with_tags_split="<on> さい[最]</on><b><on> こー[高]</on></b>",
+        expected_kana_only_with_tags_merged=" <on>さい</on><b><on>こー</on></b>",
+        expected_furigana_with_tags_merged="<on> 最[さい]</on><b><on> 高[こー]</on></b>",
+        expected_furikanji_with_tags_merged="<on> さい[最]</on><b><on> こー[高]</on></b>",
+    )
+    test(
         test_name="jukujikun test with ー long vowel mark",
         kanji="",
         sentence="炒麺[ちゃーめん]",

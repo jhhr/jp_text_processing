@@ -224,6 +224,8 @@ def construct_wrapped_furi_word(
     apply_highlight: bool = True,
     original_furigana: str = "",
     katakana_positions: list[int] | None = None,
+    long_vowel_positions: list[int] | None = None,
+    original_start_index: int = 0,
     logger=Logger("error"),
 ) -> str:
     """
@@ -236,11 +238,17 @@ def construct_wrapped_furi_word(
     :param apply_highlight: Whether to apply highlighting
     :param original_furigana: The original furigana before hiragana conversion
     :param katakana_positions: List of indices in original_furigana that were katakana
+    :param long_vowel_positions: List of indices in original_furigana that were long vowel marks
+        (ー)
+    :param original_start_index: Offset into original_furigana for the first character of this
+        segment, used when reconstructing per-segment output
     :param logger: Logger instance
     :return: The constructed furigana string
     """
     if katakana_positions is None:
         katakana_positions = []
+    if long_vowel_positions is None:
+        long_vowel_positions = []
 
     # Convert original furigana to hiragana for matching
     original_hiragana = to_hiragana(original_furigana) if original_furigana else ""
@@ -248,6 +256,7 @@ def construct_wrapped_furi_word(
     logger.debug(f"kanji_tags: {kanji_tags}")
     wrapped_furi_word = ""
     index = 0
+    original_cursor = original_start_index
     while index < len(kanji_tags):
         cur_tag_res = kanji_tags[index]
         logger.debug(f"cur_tag_res: {cur_tag_res} in index: {index}")
@@ -365,17 +374,21 @@ def construct_wrapped_furi_word(
         kana = cur_tag_res["furigana"]
         is_num = cur_tag_res["is_num"]
 
-        # Convert kana back to katakana if it matches a katakana position in original furigana
-        if kana and original_hiragana and katakana_positions:
-            # Find where this kana appears in the original hiragana furigana
-            kana_pos = original_hiragana.find(kana)
-            if kana_pos != -1:
-                # Check if any position in this kana segment was katakana in the original
-                kana_chars = list(kana)
-                for i in range(len(kana_chars)):
-                    if (kana_pos + i) in katakana_positions:
-                        kana_chars[i] = to_katakana(kana_chars[i])
-                kana = "".join(kana_chars)
+        # Convert kana back to long-vowel marks / katakana based on original character positions.
+        if kana and original_hiragana and (katakana_positions or long_vowel_positions):
+            kana_chars = list(kana)
+            for i in range(len(kana_chars)):
+                original_pos = original_cursor + i
+                if original_pos in long_vowel_positions:
+                    kana_chars[i] = "ー"
+                if (
+                    original_pos in katakana_positions
+                    and original_pos < len(original_hiragana)
+                    and original_hiragana[original_pos] != "ー"
+                ):
+                    kana_chars[i] = to_katakana(kana_chars[i])
+            kana = "".join(kana_chars)
+        original_cursor += len(kana)
 
         logger.debug(
             f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}, is_num: {is_num},"
