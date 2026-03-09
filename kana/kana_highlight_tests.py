@@ -2604,6 +2604,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> はつ[初]</kun><b><kun> もうで[詣]</kun></b>",
     )
     test(
+        test_name="Should match noun form okuri for 刳い",
+        kanji="刳",
+        sentence="刳[えぐ]み",
+        expected_kana_only="<b>えぐみ</b>",
+        expected_furigana="<b> 刳[えぐ]み</b>",
+        expected_furikanji="<b> えぐ[刳]み</b>",
+        expected_kana_only_with_tags_split="<b><kun>えぐ</kun><oku>み</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 刳[えぐ]</kun><oku>み</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> えぐ[刳]</kun><oku>み</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>えぐ</kun><oku>み</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 刳[えぐ]</kun><oku>み</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> えぐ[刳]</kun><oku>み</oku></b>",
+    )
+    test(
         test_name="Should be able match kunyomi reading with partial okurigana match /1",
         kanji="脹",
         # The reading ふくら is part of the kunyomi ふく.らむ but isn't noun-form (ふくらみ) nor

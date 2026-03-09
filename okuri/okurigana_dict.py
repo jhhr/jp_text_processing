@@ -266,6 +266,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (1, "くなかったら"),
     (1, "かったり"),
     (1, "さ"),  # Added for noun conjugation of adjectives, e.g. 高さ
+    (1, "み"),  # Added for adjective nominalization, e.g. 苦み/えぐみ
     (1, ""),  # Added for e.g. 恥ずかし気な where the い is dropped
     (2, "だ"),
     (7, "い"),
