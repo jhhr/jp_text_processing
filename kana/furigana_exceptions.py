@@ -109,6 +109,15 @@ FURIGANA_EXCEPTION_ALIGNMENTS: Dict[str, List[ExceptionAlignmentEntry]] = {
         {"type": "onyomi", "mora": "ちょう"},
         {"type": "onyomi", "mora": "ちょ"},
     ],
+    # こ in 恰好/格好[かっこ] should be considered an onyomi of 好
+    "格好_かっこ": [
+        {"type": "onyomi", "mora": "かっ"},
+        {"type": "onyomi", "mora": "こ"},
+    ],
+    "恰好_かっこ": [
+        {"type": "onyomi", "mora": "かっ"},
+        {"type": "onyomi", "mora": "こ"},
+    ],
 }
 
 
