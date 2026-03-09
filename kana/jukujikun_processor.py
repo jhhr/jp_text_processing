@@ -34,6 +34,39 @@ except ImportError:
     from ..utils.logger import Logger
 
 
+def should_reject_lexicalized_na_suffix(
+    word: str,
+    alignment: MoraAlignment,
+    remaining_kana: str,
+    selected_okuri: str,
+    selected_rest: str,
+    last_juku_reading: str,
+    kanji_okuri: str,
+    word_okuri: str,
+) -> bool:
+    """
+    Reject false-positive plain "ない" okurigana detection in partial jukujikun compounds.
+
+    Cases like 不甲斐[ふがい]ない are lexicalized i-adjectives where the trailing ない is
+    part of the word, not inflectional okurigana for the last jukujikun kanji.
+    """
+    if not (selected_okuri == "ない" and selected_rest == "" and remaining_kana == "ない"):
+        return False
+    if not (kanji_okuri == "ない" and word_okuri == "ない"):
+        return False
+    if len(word) < 2:
+        return False
+    # Only apply this safeguard when the alignment is mixed (some matched readings + jukujikun),
+    # which is where this false positive appears.
+    has_non_juku_match = any(match is not None for match in alignment["kanji_matches"][:-1])
+    if not has_non_juku_match:
+        return False
+    # Last jukujikun readings ending in い are especially prone to "Xない" lexicalized parsing.
+    if not last_juku_reading.endswith("い"):
+        return False
+    return True
+
+
 def split_mora_for_jukujikun(
     mora_list: list[str], kanji: list[str], logger: Logger = Logger("error")
 ) -> list[str]:
@@ -276,6 +309,24 @@ def process_jukujikun_positions(
             okuri_result = word_okuri_result
             is_noun_suru_verb = word_is_noun_suru_verb
         juku_entry["is_noun_suru_verb"] = is_noun_suru_verb
+
+        if should_reject_lexicalized_na_suffix(
+            word=word,
+            alignment=alignment,
+            remaining_kana=remaining_kana,
+            selected_okuri=okuri_result.okurigana,
+            selected_rest=okuri_result.rest_kana,
+            last_juku_reading=juku_reading,
+            kanji_okuri=kanji_okuri_result.okurigana,
+            word_okuri=word_okuri_result.okurigana,
+        ):
+            logger.debug(
+                "process_jukujikun_positions - rejecting lexicalized plain ない suffix as"
+                f" okurigana for word: {word}, reading: {furigana}, remaining_kana:"
+                f" {remaining_kana}, juku_reading: {juku_reading}"
+            )
+            okuri_result = okuri_result._replace(okurigana="", rest_kana=remaining_kana)
+
         logger.debug(
             f"process_jukujikun_positions - okuri_result: {okuri_result}, remaining_kana:"
             f" {remaining_kana}, juku_reading: {juku_reading}, last_kanji: {last_kanji}"

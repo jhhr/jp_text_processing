@@ -2417,6 +2417,21 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="Should not consider ない as okurigana in 不甲斐ない jukujikun reading",
+        kanji="",
+        onyomi_to_katakana=False,
+        sentence="不甲斐[ふがい]ない",
+        expected_kana_only="ふがいない",
+        expected_furigana=" 不甲斐[ふがい]ない",
+        expected_furikanji=" ふがい[不甲斐]ない",
+        expected_kana_only_with_tags_split="<on>ふ</on><juk>が</juk><juk>い</juk>ない",
+        expected_furigana_with_tags_split="<on> 不[ふ]</on><juk> 甲[が]</juk><juk> 斐[い]</juk>ない",
+        expected_furikanji_with_tags_split="<on> ふ[不]</on><juk> が[甲]</juk><juk> い[斐]</juk>ない",
+        expected_kana_only_with_tags_merged="<on>ふ</on><juk>がい</juk>ない",
+        expected_furigana_with_tags_merged="<on> 不[ふ]</on><juk> 甲斐[がい]</juk>ない",
+        expected_furikanji_with_tags_merged="<on> ふ[不]</on><juk> がい[甲斐]</juk>ない",
+    )
+    test(
         test_name=(
             "Should be able to get okurigana for 美味しい jukujikun reading - no highlight /1"
         ),
