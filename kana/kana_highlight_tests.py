@@ -2567,6 +2567,29 @@ Return type: {return_type}
         expected_kana_only="はつ<b>もうで</b>",
         expected_kana_only_with_tags_split="<kun>はつ</kun><b><kun>もうで</kun></b>",
         expected_kana_only_with_tags_merged="<kun>はつ</kun><b><kun>もうで</kun></b>",
+        expected_furigana=" 初[はつ]<b> 詣[もうで]</b>",
+        expected_furigana_with_tags_split="<kun> 初[はつ]</kun><b><kun> 詣[もうで]</kun></b>",
+        expected_furigana_with_tags_merged="<kun> 初[はつ]</kun><b><kun> 詣[もうで]</kun></b>",
+        expected_furikanji=" はつ[初]<b> もうで[詣]</b>",
+        expected_furikanji_with_tags_split="<kun> はつ[初]</kun><b><kun> もうで[詣]</kun></b>",
+        expected_furikanji_with_tags_merged="<kun> はつ[初]</kun><b><kun> もうで[詣]</kun></b>",
+    )
+    test(
+        test_name="Should be able match kunyomi reading with partial okurigana match /1",
+        kanji="脹",
+        # The reading ふくら is part of the kunyomi ふく.らむ but isn't noun-form (ふくらみ) nor
+        # just the stem (ふく) but should be matched as kunyomi nonetheless as it is effectively
+        # a portion of the base form reading
+        sentence="脹脛[ふくらはぎ]",
+        expected_kana_only="<b>ふくら</b>はぎ",
+        expected_kana_only_with_tags_split="<b><kun>ふくら</kun></b><kun>はぎ</kun>",
+        expected_kana_only_with_tags_merged="<b><kun>ふくら</kun></b><kun>はぎ</kun>",
+        expected_furigana="<b> 脹[ふくら]</b> 脛[はぎ]",
+        expected_furigana_with_tags_split="<b><kun> 脹[ふくら]</kun></b><kun> 脛[はぎ]</kun>",
+        expected_furigana_with_tags_merged="<b><kun> 脹[ふくら]</kun></b><kun> 脛[はぎ]</kun>",
+        expected_furikanji="<b> ふくら[脹]</b> はぎ[脛]",
+        expected_furikanji_with_tags_split="<b><kun> ふくら[脹]</kun></b><kun> はぎ[脛]</kun>",
+        expected_furikanji_with_tags_merged="<b><kun> ふくら[脹]</kun></b><kun> はぎ[脛]</kun>",
     )
     test(
         test_name="Should be able match noun form okuriganaless kunyomi reading 4/",

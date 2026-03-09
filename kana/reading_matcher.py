@@ -338,6 +338,17 @@ def match_kunyomi_to_mora(
                 if noun_form_reading != full_reading:
                     readings_to_try.append((noun_form_reading, "plain", kunyomi_reading))
 
+            # Also try partial okurigana forms (stem + okuri prefix), e.g.:
+            # ふく.らむ -> ふくら
+            # This handles compounds where the matched mora includes part of the
+            # dictionary-form okurigana but is not the full reading nor noun form.
+            if len(dict_form_okuri) > 1:
+                for suffix_drop_count in range(1, len(dict_form_okuri)):
+                    partial_okuri = dict_form_okuri[:-suffix_drop_count]
+                    partial_reading = f"{stem}{partial_okuri}"
+                    if partial_reading and partial_reading not in [r[0] for r in readings_to_try]:
+                        readings_to_try.append((partial_reading, "plain", kunyomi_reading))
+
         # 3. Try full reading if not already tried (e.g., "ひく" from "ひ.く")
         if full_reading != stem and full_reading not in [r[0] for r in readings_to_try]:
             readings_to_try.append((full_reading, "plain", kunyomi_reading))
