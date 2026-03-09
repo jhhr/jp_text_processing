@@ -246,6 +246,7 @@ def match_kunyomi_to_mora(
     kanji_data: dict,
     maybe_okuri: str,
     is_last_kanji: bool,
+    repeater_mora_sequence: Optional[str] = None,
     logger: Logger = Logger("error"),
 ) -> Optional[ReadingMatchInfo]:
     """
@@ -259,6 +260,8 @@ def match_kunyomi_to_mora(
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param maybe_okuri: The kana following the word (used for last kanji okurigana extraction)
     :param is_last_kanji: Whether this is the last kanji in the word
+    :param repeater_mora_sequence: Optional combined mora sequence for a kanji followed by a
+        repeater (々 or duplicated kanji).
     :return: ReadingMatchInfo if match found, None otherwise
     """
 
@@ -364,9 +367,32 @@ def match_kunyomi_to_mora(
                 maybe_okuri if is_last_kanji else "",
             )
 
+            matched_from_repeater = False
+            if (
+                not matched_reading
+                and repeater_mora_sequence
+                and repeater_mora_sequence != mora_sequence
+            ):
+                repeater_matched_reading, repeater_reading_variant = check_reading_match(
+                    reading_to_match,
+                    repeater_mora_sequence,
+                    maybe_okuri if is_last_kanji else "",
+                )
+                if repeater_matched_reading:
+                    # Repeater words like 各々[おのおの] may only have the doubled kunyomi
+                    # in kanji data. Treat this as a match for the current kanji and let
+                    # the repeater branch in alignment duplicate it for the next position.
+                    matched_reading = reading_to_match
+                    reading_variant = (
+                        repeater_reading_variant
+                        if repeater_reading_variant != "none"
+                        else base_variant
+                    )
+                    matched_from_repeater = True
+
             if matched_reading:
                 candidate = ReadingMatchInfo(
-                    reading=matched_reading,
+                    reading=(mora_sequence if matched_from_repeater else matched_reading),
                     dict_form=original_reading,
                     match_type="kunyomi",
                     reading_variant=reading_variant if reading_variant != "none" else base_variant,
@@ -423,6 +449,7 @@ def match_reading_to_mora(
     kanji_data: dict,
     maybe_okuri: str,
     is_last_kanji: bool,
+    repeater_mora_sequence: Optional[str] = None,
     logger: Logger = Logger("error"),
 ) -> tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
     """
@@ -439,12 +466,20 @@ def match_reading_to_mora(
     :param kanji_data: Dictionary containing onyomi/kunyomi data for this kanji
     :param maybe_okuri: The okurigana following the word (used for last kanji okurigana extraction)
     :param is_last_kanji: Whether this is the last kanji in the word
+    :param repeater_mora_sequence: Optional combined mora for kanji+repeater words. Passed through
+        to kunyomi matching to support doubled-form readings while preserving per-kanji alignment.
     :return: Tuple of (kunyomi_match, onyomi_match), either can be None
     """
     if maybe_okuri:
         # When okurigana is present, check both
         kunyomi_match = match_kunyomi_to_mora(
-            kanji, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji,
+            mora_sequence,
+            kanji_data,
+            maybe_okuri,
+            is_last_kanji,
+            repeater_mora_sequence,
+            logger,
         )
         onyomi_match = match_onyomi_to_mora(
             kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
@@ -459,7 +494,13 @@ def match_reading_to_mora(
             return (None, onyomi_match)
 
         kunyomi_match = match_kunyomi_to_mora(
-            kanji, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji,
+            mora_sequence,
+            kanji_data,
+            maybe_okuri,
+            is_last_kanji,
+            repeater_mora_sequence,
+            logger,
         )
         if kunyomi_match:
             return (kunyomi_match, None)

@@ -685,6 +685,34 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<b><kun> かくかく[斯々]</kun></b><kun> しかじか[然々]</kun>",
     )
     test(
+        test_name="Rendaku test 1/",
+        kanji="婦",
+        sentence="新婦[しんぷ]",
+        expected_kana_only="シン<b>プ</b>",
+        expected_furigana=" 新[シン]<b> 婦[プ]</b>",
+        expected_furikanji=" シン[新]<b> プ[婦]</b>",
+        expected_kana_only_with_tags_split="<on>シン</on><b><on>プ</on></b>",
+        expected_furigana_with_tags_split="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
+        expected_furikanji_with_tags_split="<on> シン[新]</on><b><on> プ[婦]</on></b>",
+        expected_kana_only_with_tags_merged="<on>シン</on><b><on>プ</on></b>",
+        expected_furigana_with_tags_merged="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
+        expected_furikanji_with_tags_merged="<on> シン[新]</on><b><on> プ[婦]</on></b>",
+    )
+    test(
+        test_name="Matches repeater word with kunyomi matching the whole word",
+        kanji="各",
+        sentence="各々[おのおの]",
+        expected_kana_only="<b>おのおの</b>",
+        expected_furigana="<b> 各々[おのおの]</b>",
+        expected_furikanji="<b> おのおの[各々]</b>",
+        expected_kana_only_with_tags_split="<b><kun>おのおの</kun></b>",
+        expected_furigana_with_tags_split="<b><kun> 各々[おのおの]</kun></b>",
+        expected_furikanji_with_tags_split="<b><kun> おのおの[各々]</kun></b>",
+        expected_kana_only_with_tags_merged="<b><kun>おのおの</kun></b>",
+        expected_furigana_with_tags_merged="<b><kun> 各々[おのおの]</kun></b>",
+        expected_furikanji_with_tags_merged="<b><kun> おのおの[各々]</kun></b>",
+    )
+    test(
         test_name="Matches word that uses the repeater 々 with rendaku 1/",
         kanji="国",
         sentence="国々[くにぐに]の 関係[かんけい]が 深い[ふかい]。",
@@ -754,20 +782,6 @@ Return type: {return_type}
         expected_kana_only_with_tags_merged="<b><on>ウンヌン</on></b>",
         expected_furigana_with_tags_merged="<b><on> 云々[ウンヌン]</on></b>",
         expected_furikanji_with_tags_merged="<b><on> ウンヌン[云々]</on></b>",
-    )
-    test(
-        test_name="Rendaku test 1/",
-        kanji="婦",
-        sentence="新婦[しんぷ]",
-        expected_kana_only="シン<b>プ</b>",
-        expected_furigana=" 新[シン]<b> 婦[プ]</b>",
-        expected_furikanji=" シン[新]<b> プ[婦]</b>",
-        expected_kana_only_with_tags_split="<on>シン</on><b><on>プ</on></b>",
-        expected_furigana_with_tags_split="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
-        expected_furikanji_with_tags_split="<on> シン[新]</on><b><on> プ[婦]</on></b>",
-        expected_kana_only_with_tags_merged="<on>シン</on><b><on>プ</on></b>",
-        expected_furigana_with_tags_merged="<on> 新[シン]</on><b><on> 婦[プ]</on></b>",
-        expected_furikanji_with_tags_merged="<on> シン[新]</on><b><on> プ[婦]</on></b>",
     )
     test(
         test_name="Matches repeater in the middle of the word from left edge",
