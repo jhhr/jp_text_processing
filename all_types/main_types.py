@@ -138,7 +138,14 @@ PARTS_OF_SPEECH: list[PartOfSpeech] = [
     "vs-i",
 ]
 
-OkuriType = Literal["full_okuri", "partial_okuri", "empty_okuri", "no_okuri", "detected_okuri"]
+OkuriType = Literal[
+    "full_okuri",
+    "partial_okuri",
+    "empty_okuri",
+    "no_okuri",
+    "detected_okuri",
+    "rejected_lexical_suffix",
+]
 
 
 class OkuriResults(NamedTuple):

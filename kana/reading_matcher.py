@@ -219,12 +219,16 @@ def match_onyomi_to_mora(
                 reading=furigana,
                 maybe_okuri=maybe_okuri,
                 okuri_prefix="word",
+                strict_inflection=True,
                 logger=logger,
+            )
+            lexical_suffix_without_inflection = (
+                okuri_result.result == "rejected_lexical_suffix" and not is_noun_suru_verb
             )
             return ReadingMatchInfo(
                 reading=matched_reading,
                 dict_form=onyomi_reading,  # Store original reading
-                match_type="onyomi",
+                match_type=("kunyomi" if lexical_suffix_without_inflection else "onyomi"),
                 reading_variant=reading_variant,
                 matched_mora=mora_sequence,
                 kanji=kanji,
@@ -247,7 +251,6 @@ def match_kunyomi_to_mora(
     """
     Try to match kunyomi readings to a mora sequence.
 
-    For kunyomi, extracts the stem (portion before ".") and matches it.
     Also tries noun form variants (e.g., ひ.く → ひき) for compounds.
     The dict_form field preserves the original reading with okurigana marker.
 

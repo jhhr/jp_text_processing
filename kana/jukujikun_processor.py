@@ -253,6 +253,7 @@ def process_jukujikun_positions(
             reading=juku_reading,
             maybe_okuri=remaining_kana,
             okuri_prefix="reading",
+            strict_inflection=True,
             logger=logger,
         )
         word_okuri_result, word_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
@@ -260,6 +261,7 @@ def process_jukujikun_positions(
             reading=furigana,
             maybe_okuri=remaining_kana,
             okuri_prefix="reading",
+            strict_inflection=True,
             logger=logger,
         )
         if word_okuri_result.okurigana and len(word_okuri_result.okurigana) > len(

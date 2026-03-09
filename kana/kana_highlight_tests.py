@@ -3070,6 +3070,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> モクロ[目論]</on><oku>む</oku>",
     )
     test(
+        test_name="Should not match okurigana in 餡こ",
+        kanji="",
+        sentence="餡[あん]こ",
+        expected_kana_only="あんこ",
+        expected_furigana=" 餡[あん]こ",
+        expected_furikanji=" あん[餡]こ",
+        expected_kana_only_with_tags_split="<kun>あん</kun>こ",
+        expected_furigana_with_tags_split="<kun> 餡[あん]</kun>こ",
+        expected_furikanji_with_tags_split="<kun> あん[餡]</kun>こ",
+        expected_kana_only_with_tags_merged="<kun>あん</kun>こ",
+        expected_furigana_with_tags_merged="<kun> 餡[あん]</kun>こ",
+        expected_furikanji_with_tags_merged="<kun> あん[餡]</kun>こ",
+    )
+    test(
         test_name="Adjective okurigana test 1/",
         kanji="悲",
         sentence="彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",

@@ -42,6 +42,7 @@ def get_conjugated_okuri_with_mecab(
     reading: str,
     maybe_okuri: str,
     okuri_prefix: OkuriPrefix = "word",
+    strict_inflection: bool = False,
     logger: Logger = Logger("error"),
 ) -> tuple[OkuriResults, bool]:
     """
@@ -49,13 +50,15 @@ def get_conjugated_okuri_with_mecab(
     :param word: The kanji or word
     :param maybe_okuri: The okurigana to check
     :param reading: The reading of the kanji or word occurring before the okurigana
+    :param okuri_prefix: Whether the maybe_okuri is attached to the "word" (kanji) or "reading" (kana) portion
+    :param strict_inflection: Whether to enforce strict inflection rules
     :param logger: Logger instance for debugging
     :return: A tuple of the okurigana that is part of the conjugation for threading
             and the rest of the okurigana, along with a boolean indicating if it is a suru verb
     """
     logger.debug(
         f"get_conjugated_okuri - maybe_okuri: {maybe_okuri}, word: {word}, reading:"
-        f" {reading}, okuri_prefix: {okuri_prefix}"
+        f" {reading}, okuri_prefix: {okuri_prefix}, strict_inflection: {strict_inflection}"
     )
     if not maybe_okuri:
         logger.debug("get_conjugated_okuri - No okurigana provided, no processing needed.")
@@ -139,6 +142,7 @@ def get_conjugated_okuri_with_mecab(
                     reading,
                     maybe_okuri,
                     okuri_prefix="reading",
+                    strict_inflection=strict_inflection,
                     logger=logger,
                 )
             else:
@@ -174,6 +178,7 @@ def get_conjugated_okuri_with_mecab(
         f" {first_token.word}, PartOfSpeech: {first_token.part_of_speech}"
     )
     rest_tokens = tokens[1:]
+    added_conjugation_token = False
     for token in rest_tokens:
         add_to_conjugated_okuri, was_suru_verb = get_all_conjugation_conditions(
             token,
@@ -182,6 +187,7 @@ def get_conjugated_okuri_with_mecab(
             logger,
         )
         if add_to_conjugated_okuri:
+            added_conjugation_token = True
             conjugated_okuri += token.word
             # Remove the text from the rest of the okurigana
             rest_kana = rest_kana[len(token.word) :]
@@ -198,6 +204,24 @@ def get_conjugated_okuri_with_mecab(
                 f" {token.part_of_speech},"
             )
             break
+
+    # In strict mode, avoid treating lexical noun/adverb suffixes as okurigana when there is
+    # no actual conjugation evidence (e.g., 餡こ should not tag こ as <oku>). Keep suru-verb
+    # chains and other token-based conjugations intact.
+    if (
+        strict_inflection
+        and word_type in ["noun", "adverb"]
+        and conjugated_okuri
+        and not added_conjugation_token
+        and not is_suru_verb
+    ):
+        logger.debug(
+            "get_conjugated_okuri - strict_inflection: rejecting noun/adverb lexical suffix as"
+            f" okuri, conjugated_okuri: {conjugated_okuri}, maybe_okuri: {maybe_okuri},"
+            f" token: {first_token.word}"
+        )
+        return OkuriResults("", maybe_okuri, "rejected_lexical_suffix", None), is_suru_verb
+
     return OkuriResults(conjugated_okuri, rest_kana, "detected_okuri", None), is_suru_verb
 
 
