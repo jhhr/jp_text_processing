@@ -303,6 +303,24 @@ def main():
         ),
     )
     test(
+        test_name="Furigana - combination of furigana word and katakana word",
+        word="十徳[じゅっとく]ナイフ",
+        text=(
+            "<k> 止[や]めた</k> 方[ほう]が<k> 良[い]い</k>、 貴方[あなた]の 持[も]っている"
+            " 十徳[じゅっとく]ナイフじゃ 私[わたし]には 勝[か]てない"
+        ),
+        expected=(
+            "<k> 止[や]めた</k> 方[ほう]が<k> 良[い]い</k>、 貴方[あなた]の 持[も]っている"
+            "<b> 十徳[じゅっとく]ナイフ</b>じゃ 私[わたし]には 勝[か]てない"
+        ),
+    )
+    test(
+        test_name="Furigana - combination of furigana word with okurigana and katakana word",
+        word="彫[ほ]りナイフ",
+        text="塑像[そぞう]を 彫[ほ]りナイフで 彫[ほ]るのは 安[やす]いね。",
+        expected="塑像[そぞう]を<b> 彫[ほ]りナイフ</b>で 彫[ほ]るのは 安[やす]いね。",
+    )
+    test(
         test_name="Furigana is colloquial /1",
         # Needs some kind of exception handling, can only work when furigana are used
         word="無[ない]",

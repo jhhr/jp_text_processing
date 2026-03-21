@@ -175,6 +175,19 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         # Otherwise, use MeCab to find inflected forms
         return highlight_inflected_words_with_mecab(text, word, logger=logger)
 
+    # Strip trailing katakana suffix after furigana (with optional hiragana okuri)
+    # before to_hiragana so it is not mistaken for inflectable okurigana.
+    katakana_suffix_after_furi_match = re.search(r"(\[[^\]]*?\])([ぁ-ん]*)([ァ-ン]+)$", word)
+    katakana_fixed_suffix = (
+        katakana_suffix_after_furi_match.group(3) if katakana_suffix_after_furi_match else ""
+    )
+    if katakana_fixed_suffix:
+        word = word[: -len(katakana_fixed_suffix)]
+        logger.debug(
+            f"Detected fixed katakana suffix: '{katakana_fixed_suffix}',"
+            f" word without suffix: '{word}'"
+        )
+
     # Convert word to hiragana for matching with other methods
     word = to_hiragana(word)
 
@@ -223,6 +236,13 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"text_with_readings_split: {text_with_readings_split}")
 
         pattern = make_word_pattern(word_with_readings_split)
+        if katakana_fixed_suffix:
+            # Append the fixed katakana suffix to the pattern, matching both katakana and hiragana.
+            katakana_suffix_pattern = replace_hiragana_in_pattern(
+                to_hiragana(katakana_fixed_suffix)
+            )
+            pattern += katakana_suffix_pattern
+            logger.debug(f"Appended fixed katakana suffix pattern: '{katakana_suffix_pattern}'")
         logger.debug(f"Using pattern: {pattern}")
 
         # Remove tags from text temporarily
@@ -459,6 +479,20 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
+        # Extend each end index to include the fixed katakana suffix when present in the text
+        if katakana_fixed_suffix:
+            katakana_suffix_re = replace_hiragana_in_pattern(to_hiragana(katakana_fixed_suffix))
+            suffix_len = len(katakana_fixed_suffix)
+            logger.debug(
+                f"Extending result_indices end by fixed katakana suffix '{katakana_fixed_suffix}'"
+            )
+            # Only keep matches where the suffix is present immediately after the okuri end;
+            # filter out incidental matches that lack the suffix (e.g. 彫[ほ]る without ナイフ).
+            result_indices = [
+                (start, end + suffix_len)
+                for start, end in result_indices
+                if re.match(katakana_suffix_re, html_free_text[end:])
+            ]
         result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
