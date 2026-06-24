@@ -1,12 +1,13 @@
 import re
 
-# Regex matching any kanji characters
-# Include the kanji repeater punctuation as something that will be cleaned off
-# Also include numbers as they are sometimes used in furigana
-KANJI_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)"
+# Regex matching any kanji characters or other characters to be treated as kanji, including
+# - the counter characters ヶ and ヵ which are just small katakana
+# - the kanji repeater punctuation as something that will be cleaned off
+# - numbers as they are sometimes used in furigana instead of their kanji counterparts
+KANJI_RE = r"([\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]+)"
 KANJI_REC = re.compile(KANJI_RE)
 # Same as above but allows for being empty
-KANJI_RE_OPT = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]*)"
+KANJI_RE_OPT = r"([\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]*)"
 
 # Matching any furigana with match groups
 FURIGANA_RE = r" ?([^ >]+?)\[(.+?)\]"
@@ -24,7 +25,7 @@ KANJI_AND_REPEATER_RE = r"([\u4e00-\u9faf\u3400-\u4dbf]々)"
 KANJI_AND_REPEATER_REC = re.compile(KANJI_AND_REPEATER_RE)
 
 # Regex matching any kanji and furigana + hiragana after the furigana
-KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[(.*?)\]([ぁ-ん]*)"
+KANJI_AND_FURIGANA_AND_OKURIGANA_RE = r"([\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]+)\[(.*?)\]([ぁ-ん]*)"
 KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGANA_RE)
 
 HIRAGANA_RE = "([ぁ-ん])"

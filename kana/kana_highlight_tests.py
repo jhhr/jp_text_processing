@@ -4003,6 +4003,97 @@ Return type: {return_type}
             "<kun> ありがと[有難]</kun><oku>う</oku><on> ござ[御座]</on><oku>います</oku>"
         ),
     )
+    test(
+        test_name="small ヶ should be processed as kanji - no highlight",
+        kanji="",
+        sentence="僧ヶ岳[そうがだけ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="そうがだけ",
+        expected_furigana=" 僧ヶ岳[そうがだけ]",
+        expected_furikanji=" そうがだけ[僧ヶ岳]",
+        expected_kana_only_with_tags_split="<on>そう</on><on>が</on><kun>だけ</kun>",
+        expected_furigana_with_tags_split="<on> 僧[そう]</on><on> ヶ[が]</on><kun> 岳[だけ]</kun>",
+        expected_furikanji_with_tags_split="<on> そう[僧]</on><on> が[ヶ]</on><kun> だけ[岳]</kun>",
+        expected_kana_only_with_tags_merged="<on>そうが</on><kun>だけ</kun>",
+        expected_furigana_with_tags_merged="<on> 僧ヶ[そうが]</on><kun> 岳[だけ]</kun>",
+        expected_furikanji_with_tags_merged="<on> そうが[僧ヶ]</on><kun> だけ[岳]</kun>",
+    )
+    test(
+        test_name="small ケ should be processed as kanji - with highlight",
+        kanji="駒",
+        sentence="駒ヶ岳[こまがだけ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="<b>こま</b>がだけ",
+        expected_furigana="<b> 駒[こま]</b> ヶ岳[がだけ]",
+        expected_furikanji="<b> こま[駒]</b> がだけ[ヶ岳]",
+        expected_kana_only_with_tags_split="<b><kun>こま</kun></b><on>が</on><kun>だけ</kun>",
+        expected_furigana_with_tags_split=(
+            "<b><kun> 駒[こま]</kun></b><on> ヶ[が]</on><kun> 岳[だけ]</kun>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><kun> こま[駒]</kun></b><on> が[ヶ]</on><kun> だけ[岳]</kun>"
+        ),
+        expected_kana_only_with_tags_merged="<b><kun>こま</kun></b><on>が</on><kun>だけ</kun>",
+        expected_furigana_with_tags_merged=(
+            "<b><kun> 駒[こま]</kun></b><on> ヶ[が]</on><kun> 岳[だけ]</kun>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><kun> こま[駒]</kun></b><on> が[ヶ]</on><kun> だけ[岳]</kun>"
+        ),
+    )
+    test(
+        test_name="small ケ should be processed as kanji - with number and no highlight",
+        kanji="",
+        sentence="１ヶ所[いっかしょ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="いっかしょ",
+        expected_furigana=" １ヶ所[いっかしょ]",
+        expected_furikanji=" いっかしょ[１ヶ所]",
+        expected_kana_only_with_tags_split="<on>いっ</on><on>か</on><on>しょ</on>",
+        expected_furigana_with_tags_split="<on> １[いっ]</on><on> ヶ[か]</on><on> 所[しょ]</on>",
+        expected_furikanji_with_tags_split="<on> いっ[１]</on><on> か[ヶ]</on><on> しょ[所]</on>",
+        expected_kana_only_with_tags_merged="<on>いっかしょ</on>",
+        expected_furigana_with_tags_merged="<on> １ヶ所[いっかしょ]</on>",
+        expected_furikanji_with_tags_merged="<on> いっかしょ[１ヶ所]</on>",
+    )
+    test(
+        test_name="small ケ should be processed as kanji - with number and highlight",
+        kanji="一",
+        sentence="１ヶ所[いっかしょ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="<b>いっ</b>かしょ",
+        expected_furigana="<b> １[いっ]</b> ヶ所[かしょ]",
+        expected_furikanji="<b> いっ[１]</b> かしょ[ヶ所]",
+        expected_kana_only_with_tags_split="<b><on>いっ</on></b><on>か</on><on>しょ</on>",
+        expected_furigana_with_tags_split="<b><on> １[いっ]</on></b><on> ヶ[か]</on><on> 所[しょ]</on>",
+        expected_furikanji_with_tags_split="<b><on> いっ[１]</on></b><on> か[ヶ]</on><on> しょ[所]</on>",
+        expected_kana_only_with_tags_merged="<b><on>いっ</on></b><on>かしょ</on>",
+        expected_furigana_with_tags_merged="<b><on> １[いっ]</on></b><on> ヶ所[かしょ]</on>",
+        expected_furikanji_with_tags_merged="<b><on> いっ[１]</on></b><on> かしょ[ヶ所]</on>",
+    )
+    test(
+        test_name="small カ should be processed as kanji - with highlight",
+        kanji="月",
+        sentence="三ヵ月[みっかげつ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="みっか<b>げつ</b>",
+        expected_furigana=" 三ヵ[みっか]<b> 月[げつ]</b>",
+        expected_furikanji=" みっか[三ヵ]<b> げつ[月]</b>",
+        expected_kana_only_with_tags_split="<kun>みっ</kun><on>か</on><b><on>げつ</on></b>",
+        expected_furigana_with_tags_split=(
+            "<kun> 三[みっ]</kun><on> ヵ[か]</on><b><on> 月[げつ]</on></b>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> みっ[三]</kun><on> か[ヵ]</on><b><on> げつ[月]</on></b>"
+        ),
+        expected_kana_only_with_tags_merged="<kun>みっ</kun><on>か</on><b><on>げつ</on></b>",
+        expected_furigana_with_tags_merged=(
+            "<kun> 三[みっ]</kun><on> ヵ[か]</on><b><on> 月[げつ]</on></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> みっ[三]</kun><on> か[ヵ]</on><b><on> げつ[月]</on></b>"
+        ),
+    )
 
     start_time = time.time()
     total_test_count = len(test_list)
