@@ -628,8 +628,9 @@ def reconstruct_from_alignment(
             surface_slices.extend(list(word[pos:]))
         if len(surface_slices) != len(word_for_alignment):
             surface_slices = list(word_for_alignment)
+    highlight_lookup_word = compress_numeric_runs(word)
     kanji_to_highlight_pos = (
-        word_for_alignment.find(kanji_to_highlight) if kanji_to_highlight else -1
+        highlight_lookup_word.find(kanji_to_highlight) if kanji_to_highlight else -1
     )
 
     entries: list[WrapMatchEntry] = []
