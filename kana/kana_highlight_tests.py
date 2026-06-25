@@ -4019,6 +4019,21 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> そうが[僧ヶ]</on><kun> だけ[岳]</kun>",
     )
     test(
+        test_name="small ヶ should be processed as kanji - no highlight, start of word",
+        kanji="",
+        sentence="ヶ月[かげつ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="かげつ",
+        expected_furigana=" ヶ月[かげつ]",
+        expected_furikanji=" かげつ[ヶ月]",
+        expected_kana_only_with_tags_split="<on>か</on><on>げつ</on>",
+        expected_furigana_with_tags_split="<on> ヶ[か]</on><on> 月[げつ]</on>",
+        expected_furikanji_with_tags_split="<on> か[ヶ]</on><on> げつ[月]</on>",
+        expected_kana_only_with_tags_merged="<on>かげつ</on>",
+        expected_furigana_with_tags_merged="<on> ヶ月[かげつ]</on>",
+        expected_furikanji_with_tags_merged="<on> かげつ[ヶ月]</on>",
+    )
+    test(
         test_name="small ケ should be processed as kanji - with highlight",
         kanji="駒",
         sentence="駒ヶ岳[こまがだけ]",

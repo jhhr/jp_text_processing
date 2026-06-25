@@ -37,13 +37,13 @@ except ImportError:
     from ..utils.logger import Logger
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
-    r"([\d々\u4e00-\u9faf\u3400-\u4dbf]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
+    r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbf])(々?)(?:\[([^\]]*?)\])?$"
+LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbfヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
-    r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[([^\]]*?)\])(?:"
-    r" ([\d々\u4e00-\u9faf\u3400-\u4dbf]+)\[([^\]]*?)\])"
+    r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])(?:"
+    r" ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])"
 )
 
 
@@ -64,6 +64,11 @@ def make_word_pattern(word: str) -> str:
     escaped_word = re.escape(word)
     escaped_word = replace_hiragana_in_pattern(escaped_word)
     return rf"\s?{escaped_word}"
+
+
+def preserve_small_counter_kana(text: str) -> str:
+    # Keep Japanese counter kana in katakana form after to_hiragana conversion.
+    return text.replace("ゕ", "ヵ").replace("ゖ", "ヶ")
 
 
 def split_furi_text_into_individual_kanji_furigana(furi_text: str) -> str:
@@ -188,8 +193,9 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             f" word without suffix: '{word}'"
         )
 
-    # Convert word to hiragana for matching with other methods
-    word = to_hiragana(word)
+    # Convert word to hiragana for matching with other methods while preserving
+    # small counter kana (e.g. ヶ/ヵ), which are meaningful inside kanji words.
+    word = preserve_small_counter_kana(to_hiragana(word))
 
     # We have some kanji in the word to match
     # First, remove kana from the end of the word, to see if there is any okurigana

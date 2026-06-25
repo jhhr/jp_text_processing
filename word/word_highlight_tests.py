@@ -329,6 +329,36 @@ def main():
         ignore_fail=True,
     )
     test(
+        test_name="Furigana word containing ヶ in middle 1/",
+        word="幡ヶ谷[はたがや]",
+        text="幡ヶ谷[はたがや]で 待[ま]ち 合[あ]わせ",
+        expected="<b>幡ヶ谷[はたがや]</b>で 待[ま]ち 合[あ]わせ",
+    )
+    test(
+        test_name="Furigana word containing ヶ in middle 2/",
+        word="一ヶ月[いっかげつ]",
+        text="一ヶ月[いっかげつ]で 仕上[しあ]げる",
+        expected="<b>一ヶ月[いっかげつ]</b>で 仕上[しあ]げる",
+    )
+    test(
+        test_name="Furigana word containing ヶ in start 1/",
+        word="ヶ月[かげつ]",
+        text="一ヶ月[いっかげつ]で 仕上[しあ]げる",
+        expected="一[いっ]<b> ヶ月[かげつ]</b>で 仕上[しあ]げる",
+    )
+    test(
+        test_name="Furigana word containing ヵ in middle 1/",
+        word="一ヵ月[いっかげつ]",
+        text="一ヵ月[いっかげつ]で 仕上[しあ]げる",
+        expected="<b>一ヵ月[いっかげつ]</b>で 仕上[しあ]げる",
+    )
+    test(
+        test_name="Furigana word containing ヵ in start 1/",
+        word="ヵ月[かげつ]",
+        text="一ヵ月[いっかげつ]で 仕上[しあ]げる",
+        expected="一[いっ]<b> ヵ月[かげつ]</b>で 仕上[しあ]げる",
+    )
+    test(
         test_name="No furigana with kanji - single-kanji noun multiple occurrences",
         word="家",
         text="家で居る、家出はしない",
@@ -439,6 +469,24 @@ def main():
         word="護る",
         text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を護りましょう",
         expected="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>護りましょう</b>",
+    )
+    test(
+        test_name="No furigana with kanji - word containing ヶ 1/",
+        word="幡ヶ谷",
+        text="幡ヶ谷で待ち合わせ",
+        expected="<b>幡ヶ谷</b>で待ち合わせ",
+    )
+    test(
+        test_name="No furigana with kanji - word containing ヶ 2/",
+        word="一ヶ月",
+        text="一ヶ月で仕上げる",
+        expected="<b>一ヶ月</b>で仕上げる",
+    )
+    test(
+        test_name="No furigana with kanji - word containing ヵ 1/",
+        word="一ヵ月",
+        text="一ヵ月で仕上げる",
+        expected="<b>一ヵ月</b>で仕上げる",
     )
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     test(
