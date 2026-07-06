@@ -20,6 +20,10 @@ try:
 except ImportError:
     from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
 try:
+    from use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
+except ImportError:
+    from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
+try:
     from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 except ImportError:
     from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
@@ -218,13 +222,29 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text, logger=logger
         )
+        logger.debug(f"html_free_text for matching: '{html_free_text}'")
+
+        (
+            splitter_free_text,
+            increment_splitter_indexes,
+            restore_splitters,
+            _,
+            split_free_to_original_index,
+        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text, logger=logger)
 
         def replace_match(match: re.Match) -> str:
-            increment_tag_indexes(match.start(0), match.end(0))
+            split_start = match.start(0)
+            split_end = match.end(0)
+            increment_tag_indexes(
+                split_free_to_original_index(split_start),
+                split_free_to_original_index(split_end),
+            )
+            increment_splitter_indexes(split_start, split_end)
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, html_free_text)
+        result = re.sub(pattern, replace_match, splitter_free_text)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        result = restore_splitters(result)
         result = restore_tags(result)
         return result
     elif not ending_okurigana and furigana:
@@ -257,12 +277,33 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         )
         logger.debug(f"html_free_text for matching: '{html_free_text}'")
 
+        (
+            splitter_free_text,
+            increment_splitter_indexes,
+            restore_splitters,
+            _,
+            split_free_to_original_index,
+        ) = use_splitter_dot_cleaning_with_b_insertion(
+            html_free_text,
+            splitter_regex=r"・",
+            logger=logger,
+        )
+        logger.debug(f"splitter_free_text for matching: '{splitter_free_text}'")
+
         def replace_match(match: re.Match) -> str:
-            increment_tag_indexes(match.start(0), match.end(0))
+            split_start = match.start(0)
+            split_end = match.end(0)
+            increment_tag_indexes(
+                split_free_to_original_index(split_start),
+                split_free_to_original_index(split_end),
+            )
+            increment_splitter_indexes(split_start, split_end)
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, html_free_text)
+        result = re.sub(pattern, replace_match, splitter_free_text)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+
+        result = restore_splitters(result)
 
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
@@ -292,7 +333,20 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             text, logger=logger
         )
         logger.debug(f"html_free_text for matching: '{html_free_text}'")
-        matches = re.finditer(pattern, html_free_text)
+
+        (
+            splitter_free_text,
+            increment_splitter_indexes,
+            restore_splitters,
+            _,
+            split_free_to_original_index,
+        ) = use_splitter_dot_cleaning_with_b_insertion(
+            html_free_text,
+            splitter_regex=r"・",
+            logger=logger,
+        )
+        logger.debug(f"splitter_free_text for matching: '{splitter_free_text}'")
+        matches = re.finditer(pattern, splitter_free_text)
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             maybe_okuri = m.group(1)
@@ -329,12 +383,16 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
-        result = html_free_text
+        result = splitter_free_text
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
             # Increment for tags inside (but not on exact same position) or after the opening tag
-            increment_tag_indexes(start, end)
+            increment_tag_indexes(
+                split_free_to_original_index(start),
+                split_free_to_original_index(end),
+            )
+            increment_splitter_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             logger.debug(f"Result after {idx + 1} <b> insertions: '{result}'")
             # Adjust subsequent indices due to added tag lengths
@@ -342,6 +400,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        result = restore_splitters(result)
         result = restore_tags(result)
         logger.debug(f"Restored html tags result: '{result}'")
         return result
@@ -392,15 +451,25 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
             text_with_readings_split, logger=logger
         )
-        logger.debug(f"html_free_text for matching: '{html_free_text}', pattern: '{pattern}'")
-        matches = list(re.finditer(pattern, html_free_text))
+
+        (
+            splitter_free_text,
+            increment_splitter_indexes,
+            restore_splitters,
+            _,
+            split_free_to_original_index,
+        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text, logger=logger)
+        logger.debug(
+            f"splitter_free_text for matching: '{splitter_free_text}', pattern: '{pattern}'"
+        )
+        matches = list(re.finditer(pattern, splitter_free_text))
         logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
-            matched_text = html_free_text[m.start(0) : m.end(0)]
+            matched_text = splitter_free_text[m.start(0) : m.end(0)]
             furigana = m.group("furigana")
             maybe_okuri = m.group("maybe_okuri")
             if maybe_okuri == ending_okurigana:
@@ -497,18 +566,23 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             result_indices = [
                 (start, end + suffix_len)
                 for start, end in result_indices
-                if re.match(katakana_suffix_re, html_free_text[end:])
+                if re.match(katakana_suffix_re, splitter_free_text[end:])
             ]
-        result = html_free_text
+        result = splitter_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
-            increment_tag_indexes(start, end)
+            increment_tag_indexes(
+                split_free_to_original_index(start),
+                split_free_to_original_index(end),
+            )
+            increment_splitter_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
+        result = restore_splitters(result)
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
         logger.debug(f"Restored html tags result: '{result}'")

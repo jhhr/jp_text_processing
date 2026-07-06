@@ -359,6 +359,12 @@ def main():
         expected="一[いっ]<b> ヵ月[かげつ]</b>で 仕上[しあ]げる",
     )
     test(
+        test_name="Furigana word split by ・ in text",
+        word="報連相[ほうれんそう]",
+        text="私[わたし]への 報[ほう]・ 連[れん]・ 相[そう]を 行[おこな]っていただきます",
+        expected="私[わたし]への<b> 報[ほう]・ 連[れん]・ 相[そう]</b>を 行[おこな]っていただきます",
+    )
+    test(
         test_name="No furigana with kanji - single-kanji noun multiple occurrences",
         word="家",
         text="家で居る、家出はしない",
@@ -487,6 +493,13 @@ def main():
         word="一ヵ月",
         text="一ヵ月で仕上げる",
         expected="<b>一ヵ月</b>で仕上げる",
+    )
+
+    test(
+        test_name="No furigana with kanji - word split by ・ in text",
+        word="報連相",
+        text="私への 報・ 連・ 相を 行っていただきます",
+        expected="私への<b> 報・ 連・ 相</b>を 行っていただきます",
     )
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     test(
