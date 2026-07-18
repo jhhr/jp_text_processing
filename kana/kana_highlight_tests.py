@@ -3156,6 +3156,62 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="Verb たい inflection 1/",
+        kanji="見",
+        sentence="見[み]たい",
+        expected_kana_only="<b>みたい</b>",
+        expected_furigana="<b> 見[み]たい</b>",
+        expected_furikanji="<b> み[見]たい</b>",
+        expected_kana_only_with_tags_split="<b><kun>み</kun><oku>たい</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 見[み]</kun><oku>たい</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> み[見]</kun><oku>たい</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>み</kun><oku>たい</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 見[み]</kun><oku>たい</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> み[見]</kun><oku>たい</oku></b>",
+    )
+    test(
+        test_name="Verb たい inflection 2/",
+        kanji="",
+        sentence="試[ため]したい",
+        expected_kana_only="ためしたい",
+        expected_furigana=" 試[ため]したい",
+        expected_furikanji=" ため[試]したい",
+        expected_kana_only_with_tags_split="<kun>ため</kun><oku>したい</oku>",
+        expected_furigana_with_tags_split="<kun> 試[ため]</kun><oku>したい</oku>",
+        expected_furikanji_with_tags_split="<kun> ため[試]</kun><oku>したい</oku>",
+        expected_kana_only_with_tags_merged="<kun>ため</kun><oku>したい</oku>",
+        expected_furigana_with_tags_merged="<kun> 試[ため]</kun><oku>したい</oku>",
+        expected_furikanji_with_tags_merged="<kun> ため[試]</kun><oku>したい</oku>",
+    )
+    test(
+        test_name="Verb たい inflection 3/",
+        kanji="泳",
+        sentence="泳[およ]がれたいかな",
+        expected_kana_only="<b>およがれたい</b>かな",
+        expected_furigana="<b> 泳[およ]がれたい</b>かな",
+        expected_furikanji="<b> およ[泳]がれたい</b>かな",
+        expected_kana_only_with_tags_split="<b><kun>およ</kun><oku>がれたい</oku></b>かな",
+        expected_furigana_with_tags_split="<b><kun> 泳[およ]</kun><oku>がれたい</oku></b>かな",
+        expected_furikanji_with_tags_split="<b><kun> およ[泳]</kun><oku>がれたい</oku></b>かな",
+        expected_kana_only_with_tags_merged="<b><kun>およ</kun><oku>がれたい</oku></b>かな",
+        expected_furigana_with_tags_merged="<b><kun> 泳[およ]</kun><oku>がれたい</oku></b>かな",
+        expected_furikanji_with_tags_merged="<b><kun> およ[泳]</kun><oku>がれたい</oku></b>かな",
+    )
+    test(
+        test_name="Verb たい inflection 4/",
+        kanji="飲",
+        sentence="飲[の]みたい",
+        expected_kana_only="<b>のみたい</b>",
+        expected_furigana="<b> 飲[の]みたい</b>",
+        expected_furikanji="<b> の[飲]みたい</b>",
+        expected_kana_only_with_tags_split="<b><kun>の</kun><oku>みたい</oku></b>",
+        expected_furigana_with_tags_split="<b><kun> 飲[の]</kun><oku>みたい</oku></b>",
+        expected_furikanji_with_tags_split="<b><kun> の[飲]</kun><oku>みたい</oku></b>",
+        expected_kana_only_with_tags_merged="<b><kun>の</kun><oku>みたい</oku></b>",
+        expected_furigana_with_tags_merged="<b><kun> 飲[の]</kun><oku>みたい</oku></b>",
+        expected_furikanji_with_tags_merged="<b><kun> の[飲]</kun><oku>みたい</oku></b>",
+    )
+    test(
         test_name="Onyomi multi-kanji verb okurigana - with highlight",
         kanji="論",
         # 論 uses the onyomi ろ in 目論む and is an unusual of a godan mu verb

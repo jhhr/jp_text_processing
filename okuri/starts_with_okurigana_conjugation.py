@@ -218,6 +218,13 @@ def main():
         kanji_reading="き",
         expected=("いて", "たか", "full_okuri", "v5k"),
     )
+    test(
+        text="たい",
+        okurigana="る",
+        kanji="見",
+        kanji_reading="み",
+        expected=("たい", "", "full_okuri", "v1"),
+    )
     # empty okuri tests
     test(
         # 恥[は]ずかしげな is an i-adjective, not na-adjective!
