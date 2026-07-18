@@ -321,6 +321,12 @@ def main():
         expected="塑像[そぞう]を<b> 彫[ほ]りナイフ</b>で 彫[ほ]るのは 安[やす]いね。",
     )
     test(
+        test_name="Furigana - verb in noun form in text",
+        word="及[およ]ぶ",
+        text="及[およ]び 腰[ごし]",
+        expected="<b>及[およ]び</b> 腰[ごし]",
+    )
+    test(
         test_name="Furigana is colloquial /1",
         # Needs some kind of exception handling, can only work when furigana are used
         word="無[ない]",
@@ -471,6 +477,12 @@ def main():
         ),
     )
     test(
+        test_name="No furigana with kanji - verb in noun form in text",
+        word="及ぶ",
+        text="及び腰",
+        expected="<b>及び</b>腰",
+    )
+    test(
         test_name="No furigana with kanji - tags in text, inflected verb /3",
         word="護る",
         text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を護りましょう",
@@ -494,7 +506,6 @@ def main():
         text="一ヵ月で仕上げる",
         expected="<b>一ヵ月</b>で仕上げる",
     )
-
     test(
         test_name="No furigana with kanji - word split by ・ in text",
         word="報連相",
