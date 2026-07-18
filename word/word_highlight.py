@@ -49,6 +49,7 @@ CONSECUTIVE_FURI_WORD_RE = (
     r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])(?:"
     r" ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])"
 )
+FURIGANA_TOKEN_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\]"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:
@@ -68,6 +69,50 @@ def make_word_pattern(word: str) -> str:
     escaped_word = re.escape(word)
     escaped_word = replace_hiragana_in_pattern(escaped_word)
     return rf"\s?{escaped_word}"
+
+
+def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
+    """Create a regex pattern that captures furigana sections for variant checking.
+
+    The generated pattern keeps kanji and separators strict, but allows the furigana
+    inside brackets to vary. Captured furigana values can then be validated via
+    check_reading_match (rendaku/small-tsu/vowel-change, etc.).
+    """
+    word = re.sub(r"^ ", "", word)
+    expected_readings: list[str] = []
+    pattern_parts: list[str] = [r"\s?"]
+    cursor = 0
+    for idx, match in enumerate(re.finditer(FURIGANA_TOKEN_RE, word)):
+        literal_prefix = word[cursor : match.start()]
+        if literal_prefix:
+            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+        kanji = match.group(1)
+        expected_readings.append(to_hiragana(match.group(2)))
+        pattern_parts.append(rf"{re.escape(kanji)}\[(?P<furi_{idx}>[^\]]+)\]")
+        cursor = match.end()
+    literal_suffix = word[cursor:]
+    if literal_suffix:
+        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+    return "".join(pattern_parts), expected_readings
+
+
+def furigana_captures_match_readings(
+    match: re.Match,
+    expected_readings: list[str],
+    logger: Logger,
+) -> bool:
+    """Validate captured furigana readings against expected readings with variants."""
+    for idx, expected in enumerate(expected_readings):
+        observed = to_hiragana(match.group(f"furi_{idx}"))
+        _, reading_match_type = check_reading_match(
+            reading=expected,
+            mora_string=observed,
+            okurigana="",
+            logger=logger,
+        )
+        if reading_match_type == "none":
+            return False
+    return True
 
 
 def preserve_small_counter_kana(text: str) -> str:
@@ -261,7 +306,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug(f"text_with_readings_split: {text_with_readings_split}")
 
-        pattern = make_word_pattern(word_with_readings_split)
+        pattern, expected_readings = make_furigana_agnostic_pattern(word_with_readings_split)
         if katakana_fixed_suffix:
             # Append the fixed katakana suffix to the pattern, matching both katakana and hiragana.
             katakana_suffix_pattern = replace_hiragana_in_pattern(
@@ -291,14 +336,38 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"splitter_free_text for matching: '{splitter_free_text}'")
 
         def replace_match(match: re.Match) -> str:
+            has_variant = False
+            for idx, expected in enumerate(expected_readings):
+                observed = to_hiragana(match.group(f"furi_{idx}"))
+                _, reading_match_type = check_reading_match(
+                    reading=expected,
+                    mora_string=observed,
+                    okurigana="",
+                    logger=logger,
+                )
+                if reading_match_type == "none":
+                    return match.group(0)
+                if reading_match_type != "plain":
+                    has_variant = True
+
+            match_text = match.group(0)
             split_start = match.start(0)
             split_end = match.end(0)
+            leading_ws = ""
+            if has_variant and split_start > 0 and match_text[:1].isspace():
+                leading_ws = match_text[0]
+                match_text = match_text[1:]
+                split_start += 1
+
+            if not match_text:
+                return match.group(0)
+
             increment_tag_indexes(
                 split_free_to_original_index(split_start),
                 split_free_to_original_index(split_end),
             )
             increment_splitter_indexes(split_start, split_end)
-            return f"<b>{match.group(0)}</b>"
+            return f"{leading_ws}<b>{match_text}</b>"
 
         result = re.sub(pattern, replace_match, splitter_free_text)
         logger.debug(f"Intermediate result with <b> tags: '{result}'")
@@ -438,7 +507,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug(f"text_with_readings_split: {text_with_readings_split}")
         # Find all occurrences of the word_with_readings_split in the text_with_readings_split
-        pattern = make_word_pattern(word_with_readings_split)
+        pattern, prefix_expected_readings = make_furigana_agnostic_pattern(word_with_readings_split)
         # Replace the furigana part for the last kanji in the regex pattern so that all
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
@@ -466,13 +535,30 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         logger.debug(f"Found {len(matches)} matches")
         result_indices: list[tuple[int, int]] = []
         for m in matches:
+            if not furigana_captures_match_readings(m, prefix_expected_readings, logger):
+                logger.debug("Skipping match; prefix furigana does not match expected readings")
+                continue
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
             matched_text = splitter_free_text[m.start(0) : m.end(0)]
             furigana = m.group("furigana")
             maybe_okuri = m.group("maybe_okuri")
+            reading_match_type = "plain"
+            if last_kanji and furigana:
+                _, reading_match_type = check_reading_match(
+                    reading=last_kanji_furigana,
+                    mora_string=to_hiragana(furigana),
+                    okurigana=to_hiragana(maybe_okuri),
+                    logger=logger,
+                )
             if maybe_okuri == ending_okurigana:
+                if reading_match_type == "none":
+                    logger.debug(
+                        f"Skipping exact okuri match; furigana '{furigana}' does not match"
+                        f" last kanji reading '{last_kanji_furigana}'"
+                    )
+                    continue
                 # Exact match, no inflection needed
                 logger.debug(
                     f"Exact match found for matched text: '{matched_text}',"
@@ -491,23 +577,14 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 f" last_kanji_furigana: '{last_kanji_furigana}'"
             )
 
+            kanji_okuri_result = OkuriResults(
+                result="no_okuri",
+                okurigana="",
+                rest_kana="",
+                part_of_speech="",
+            )
             if last_kanji and furigana:
-                # furigana should match the last_kanji_furigana, with all variations considered
-                _, reading_match_type = check_reading_match(
-                    reading=last_kanji_furigana,
-                    mora_string=furigana,
-                    okurigana=maybe_okuri,
-                    logger=logger,
-                )
-                if reading_match_type == "none":
-                    logger.debug(
-                        f"Furigana '{furigana}' does not match last kanji furigana"
-                        f" '{last_kanji_furigana}', so no okuri match"
-                    )
-                    kanji_okuri_result = OkuriResults(
-                        result="no_okuri", okurigana="", rest_kana="", part_of_speech=""
-                    )
-                else:
+                if reading_match_type != "none":
                     kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
                         word=last_kanji,
                         reading=last_kanji_furigana,

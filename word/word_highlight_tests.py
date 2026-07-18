@@ -321,6 +321,18 @@ def main():
         expected="塑像[そぞう]を<b> 彫[ほ]りナイフ</b>で 彫[ほ]るのは 安[やす]いね。",
     )
     test(
+        test_name="Furigana - noun in rendaku form in text",
+        word="腰[こし]",
+        text="及[およ]び 腰[ごし]",
+        expected="及[およ]び <b>腰[ごし]</b>",
+    )
+    test(
+        test_name="Furigana - multi-kanji noun with rendaku reading change",
+        word="手紙[てかみ]",
+        text="手紙[てがみ]を 書[か]いた",
+        expected="<b>手紙[てがみ]</b>を 書[か]いた",
+    )
+    test(
         test_name="Furigana - verb in noun form in text",
         word="及[およ]ぶ",
         text="及[およ]び 腰[ごし]",
