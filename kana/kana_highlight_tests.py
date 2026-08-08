@@ -3482,6 +3482,34 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<b><kun> よ[良]</kun><oku>かろう</oku></b>",
     )
     test(
+        test_name="adjective okurigana test 8/",
+        kanji="",
+        sentence="馴染[なじ]む",
+        expected_kana_only="なじむ",
+        expected_furigana=" 馴染[なじ]む",
+        expected_furikanji=" なじ[馴染]む",
+        expected_kana_only_with_tags_split="<kun>な</kun><kun>じ</kun><oku>む</oku>",
+        expected_furigana_with_tags_split="<kun> 馴[な]</kun><kun> 染[じ]</kun><oku>む</oku>",
+        expected_furikanji_with_tags_split="<kun> な[馴]</kun><kun> じ[染]</kun><oku>む</oku>",
+        expected_kana_only_with_tags_merged="<kun>なじ</kun><oku>む</oku>",
+        expected_furigana_with_tags_merged="<kun> 馴染[なじ]</kun><oku>む</oku>",
+        expected_furikanji_with_tags_merged="<kun> なじ[馴染]</kun><oku>む</oku>",
+    )
+    test(
+        test_name="adjective okurigana test 9/",
+        kanji="染",
+        sentence="馴染[なじ]む",
+        expected_kana_only="な<b>じむ</b>",
+        expected_furigana=" 馴[な]<b> 染[じ]む</b>",
+        expected_furikanji=" な[馴]<b> じ[染]む</b>",
+        expected_kana_only_with_tags_split="<kun>な</kun><b><kun>じ</kun><oku>む</oku></b>",
+        expected_furigana_with_tags_split="<kun> 馴[な]</kun><b><kun> 染[じ]</kun><oku>む</oku></b>",
+        expected_furikanji_with_tags_split="<kun> な[馴]</kun><b><kun> じ[染]</kun><oku>む</oku></b>",
+        expected_kana_only_with_tags_merged="<kun>な</kun><b><kun>じ</kun><oku>む</oku></b>",
+        expected_furigana_with_tags_merged="<kun> 馴[な]</kun><b><kun> 染[じ]</kun><oku>む</oku></b>",
+        expected_furikanji_with_tags_merged="<kun> な[馴]</kun><b><kun> じ[染]</kun><oku>む</oku></b>",
+    )
+    test(
         test_name="numbers of people /1",
         kanji="一",
         sentence="一人[ひとり]",
