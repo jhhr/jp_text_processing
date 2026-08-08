@@ -2526,6 +2526,50 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<k><juk> ほうれん[菠薐]</juk></k><on> そう[草]</on>",
     )
     test(
+        test_name="Should not consider だ as okuri after onyomi noun - with highlight",
+        kanji="稚",
+        sentence="少[すこ]し 幼稚[ようち]だ",
+        expected_kana_only="すこし ヨウ<b>チ</b>だ",
+        expected_furigana=" 少[すこ]し 幼[ヨウ]<b> 稚[チ]</b>だ",
+        expected_furikanji=" すこ[少]し ヨウ[幼]<b> チ[稚]</b>だ",
+        expected_kana_only_with_tags_split=(
+            "<kun>すこ</kun><oku>し</oku> <on>ヨウ</on><b><on>チ</on></b>だ"
+        ),
+        expected_furigana_with_tags_split=(
+            "<kun> 少[すこ]</kun><oku>し</oku><on> 幼[ヨウ]</on><b><on> 稚[チ]</on></b>だ"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> すこ[少]</kun><oku>し</oku><on> ヨウ[幼]</on><b><on> チ[稚]</on></b>だ"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<kun>すこ</kun><oku>し</oku> <on>ヨウ</on><b><on>チ</on></b>だ"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<kun> 少[すこ]</kun><oku>し</oku><on> 幼[ヨウ]</on><b><on> 稚[チ]</on></b>だ"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<kun> すこ[少]</kun><oku>し</oku><on> ヨウ[幼]</on><b><on> チ[稚]</on></b>だ"
+        ),
+    )
+    test(
+        test_name="Should not consider だ as okuri after onyomi noun - no highlight",
+        kanji="",
+        sentence="少[すこ]し 幼稚[ようち]だ",
+        expected_kana_only="すこし ヨウチだ",
+        expected_furigana=" 少[すこ]し 幼稚[ヨウチ]だ",
+        expected_furikanji=" すこ[少]し ヨウチ[幼稚]だ",
+        expected_kana_only_with_tags_split="<kun>すこ</kun><oku>し</oku> <on>ヨウ</on><on>チ</on>だ",
+        expected_furigana_with_tags_split=(
+            "<kun> 少[すこ]</kun><oku>し</oku><on> 幼[ヨウ]</on><on> 稚[チ]</on>だ"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<kun> すこ[少]</kun><oku>し</oku><on> ヨウ[幼]</on><on> チ[稚]</on>だ"
+        ),
+        expected_kana_only_with_tags_merged="<kun>すこ</kun><oku>し</oku> <on>ヨウチ</on>だ",
+        expected_furigana_with_tags_merged="<kun> 少[すこ]</kun><oku>し</oku><on> 幼稚[ヨウチ]</on>だ",
+        expected_furikanji_with_tags_merged="<kun> すこ[少]</kun><oku>し</oku><on> ヨウチ[幼稚]</on>だ",
+    )
+    test(
         test_name=(
             "Should convert long vowel mark ー to vowel kana in any readings, katakana furigana"
         ),

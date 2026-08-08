@@ -152,14 +152,17 @@ def get_all_conjugation_conditions(
         if token.word == "な":
             add_to_conjugated_okuri = True
     elif word_type == "adverb" or word_type == "noun":
-        # handle suru verbs
+        # handle suru verbs; copula だ/です is never okurigana for nouns/adverbs
         if (
             (token.part_of_speech == PartOfSpeech.verb and token.headword == "する")
             or (
                 token.part_of_speech == PartOfSpeech.bound_auxiliary
                 and token.headword not in ["だ", "です"]
             )
-            or verb_conjugation_conditions(token, all_tokens)
+            or (
+                token.headword not in ["だ", "です"]
+                and verb_conjugation_conditions(token, all_tokens)
+            )
             or (token.part_of_speech == PartOfSpeech.particle and token.word == "って")
         ):
             add_to_conjugated_okuri = True
