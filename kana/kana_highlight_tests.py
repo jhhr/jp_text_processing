@@ -3510,6 +3510,32 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> な[馴]</kun><b><kun> じ[染]</kun><oku>む</oku></b>",
     )
     test(
+        test_name="adjective okurigana test 10/",
+        kanji="暖",
+        sentence="暖[あたた]かい、温[あたた]かく",
+        expected_kana_only="<b>あたたかい</b>、あたたかく",
+        expected_furigana="<b> 暖[あたた]かい</b>、 温[あたた]かく",
+        expected_furikanji="<b> あたた[暖]かい</b>、 あたた[温]かく",
+        expected_kana_only_with_tags_split=(
+            "<b><kun>あたた</kun><oku>かい</oku></b>、<kun>あたた</kun><oku>かく</oku>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<b><kun> 暖[あたた]</kun><oku>かい</oku></b>、<kun> 温[あたた]</kun><oku>かく</oku>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><kun> あたた[暖]</kun><oku>かい</oku></b>、<kun> あたた[温]</kun><oku>かく</oku>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<b><kun>あたた</kun><oku>かい</oku></b>、<kun>あたた</kun><oku>かく</oku>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<b><kun> 暖[あたた]</kun><oku>かい</oku></b>、<kun> 温[あたた]</kun><oku>かく</oku>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><kun> あたた[暖]</kun><oku>かい</oku></b>、<kun> あたた[温]</kun><oku>かく</oku>"
+        ),
+    )
+    test(
         test_name="numbers of people /1",
         kanji="一",
         sentence="一人[ひとり]",

@@ -314,7 +314,8 @@ def match_kunyomi_to_mora(
     # When okurigana is present, prefer readings whose okurigana marker best matches the remaining
     # kana. Collect candidates and pick best.
     best_candidate: Optional[ReadingMatchInfo] = None
-    best_candidate_score: int = -1
+    # Higher is better: (result quality, matched okuri length, shorter rest kana)
+    best_candidate_score: tuple[int, int, int] = (-1, -1, -1)
 
     for kunyomi_reading in kunyomi_readings:
         # Remove parentheses content
@@ -429,11 +430,17 @@ def match_kunyomi_to_mora(
                             f"match_kunyomi_to_mora - scoring candidate: {candidate}, "
                             f"okurigana match result: {res}"
                         )
-                        # Score by length of matched okuri (prefer full matches)
-                        score = len(res.okurigana)
-                        if res.result == "full_okuri":
-                            # Perfect match, return immediately
-                            return candidate
+                        result_priority = {
+                            "no_okuri": 0,
+                            "empty_okuri": 1,
+                            "partial_okuri": 2,
+                            "full_okuri": 3,
+                        }
+                        score = (
+                            result_priority.get(res.result, 0),
+                            len(res.okurigana),
+                            -len(res.rest_kana),
+                        )
                         if score > best_candidate_score:
                             best_candidate = candidate
                             best_candidate_score = score
@@ -442,7 +449,7 @@ def match_kunyomi_to_mora(
                 # If not scoring or no okurigana marker, fall back to first matched candidate
                 if best_candidate is None:
                     best_candidate = candidate
-                    best_candidate_score = max(best_candidate_score, 0)
+                    best_candidate_score = max(best_candidate_score, (0, 0, 0))
 
     return best_candidate
 
