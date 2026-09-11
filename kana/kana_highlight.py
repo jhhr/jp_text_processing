@@ -35,6 +35,7 @@ except ImportError:
     )
 try:
     from regex.kanji_furi import (
+        KANJI_RE,
         DOUBLE_KANJI_REC,
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
@@ -42,6 +43,7 @@ try:
     )
 except ImportError:
     from ..regex.kanji_furi import (
+        KANJI_RE,
         DOUBLE_KANJI_REC,
         KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
         FURIGANA_REC,
@@ -147,25 +149,37 @@ def kunyomi_replacer(match, wrap_readings_with_tags=True):
     return f"{match.group(1)}<b>{kunyomi_kana}</b>{match.group(3)}"
 
 
+# Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
+# before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
+KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[(.+?)\]")
+
+
 def kana_filter(text):
     """
     Implementation of the basic Anki kana filter
     This is needed to clean up the text in cases where we know there's no matches to the kanji
     This works differently as it directly matches kanji characters instead of [^ >] as in the Anki
     built-in version. For whatever reason a python version using that doesn't work as expected.
+    With [^ >], Anki's version turns これは漢字[かんじ] into かんじ, while this gives これはかんじ.
+    Kanji without furigana, [sound:...] tags and HTML are left as they are.
     :param text: The text to clean
     :return: The cleaned text
     """
 
     def bracket_replace(match):
-        if match.group(1).startswith("sound:"):
+        if match.group(2).startswith("sound:"):
             # [sound:...] should not be replaced
             return match.group(0)
-        # Return the furigana inside the brackets
-        return match.group(1)
+        # Return the furigana inside the brackets, dropping the kanji and the leading space
+        return match.group(2)
 
-    # First remove all brackets and then remove all kanji
-    # Assuming every kanji had furigana, we'll be left with the correct kana
+    # First turn mixed okurigana furigana like 消え去[きえさ]る into 消[き]え去[さ]る, so that
+    # every kanji is directly followed by its own furigana, then replace each kanji[furigana]
+    # with the furigana
+    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(
+        okurigana_mix_cleaning_replacer, text.replace("&nbsp;", " ")
+    )
+    return KANA_FILTER_REC.sub(bracket_replace, clean_text)
 
 
 def furigana_reverser(text):
