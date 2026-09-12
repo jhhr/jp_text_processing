@@ -48,6 +48,74 @@ def increment_for_b_tag_insertion(
     increment_tag_indexes(b_close_index + 3, 4)
 
 
+TAG_RE = re.compile(r"<(/?)([a-zA-Z][^\s/>]*)[^>]*>")
+EMPTY_PAIR = r"<([a-zA-Z][^\s/>]*)[^>]*></\1>"
+# Tags that never enclose anything, so they can't be crossed by a <b> span
+UNPAIRED_TAGS = {"br", "hr", "img", "wbr", "b"}
+
+
+def crossed_tags(text: str, b_open: int, b_close: int) -> tuple[list[str], list[str]]:
+    """
+    Find the tags that a <b>...</b> span crosses instead of enclosing.
+
+    Args:
+        text: The text containing the b tags.
+        b_open: Index of the opening <b>.
+        b_close: Index of the closing </b>.
+    Returns:
+        A tuple of:
+            - the tags opened inside the span and closed after it, outermost first
+            - the tags opened before the span and closed inside it, innermost first
+    """
+    opened: list[str] = []
+    closed_from_before: list[str] = []
+    for m in TAG_RE.finditer(text, b_open + len("<b>"), b_close):
+        tag = m.group(2)
+        if tag in UNPAIRED_TAGS:
+            continue
+        if not m.group(1):
+            opened.append(tag)
+        elif opened and opened[-1] == tag:
+            opened.pop()
+        else:
+            closed_from_before.append(tag)
+    return opened, closed_from_before
+
+
+def balance_b_tags(text: str) -> str:
+    """
+    Close and reopen the tags that a <b>...</b> crosses, which the reorderings in
+    apply_tag_fixes can only do when the tag sits right next to a b tag:
+    '<b><k>A</k>を<k>B</b>C</k>' becomes '<b><k>A</k>を<k>B</k></b><k>C</k>'.
+
+    Args:
+        text: The text after restoring tags.
+    Returns:
+        The text with every b span enclosing whole tags.
+    """
+    result = ""
+    rest = text
+    while True:
+        b_open = rest.find("<b>")
+        b_close = rest.find("</b>", b_open + 3) if b_open != -1 else -1
+        if b_close == -1:
+            return result + rest
+        opened, closed_from_before = crossed_tags(rest, b_open, b_close)
+        result += (
+            rest[:b_open]
+            # Tags the span started inside of are closed before it and reopened within it
+            + "".join(f"</{tag}>" for tag in closed_from_before)
+            + "<b>"
+            + "".join(f"<{tag}>" for tag in reversed(closed_from_before))
+            + rest[b_open + 3 : b_close]
+            # Tags the span opened are closed within it and reopened after it
+            + "".join(f"</{tag}>" for tag in reversed(opened))
+            + "</b>"
+            + "".join(f"<{tag}>" for tag in opened)
+        )
+        rest = rest[b_close + 4 :]
+
+
 def apply_tag_fixes(restored_text: str) -> str:
     """
     Apply fixes for issues that are hard to otherwise handle with changing how to increment
@@ -63,6 +131,13 @@ def apply_tag_fixes(restored_text: str) -> str:
     result = re.sub(r"(<([^>]+)>)(<b>)([^<]*</\2>)", r"\3\1\4", result)
     # An opening tag before closing </b>, but it's closing tag is after the </b>
     result = re.sub(r"(<([^>]+)>[^<]*)(</b>)(<\/\2>)", r"\1\4\3", result)
+    # Any remaining tag the b span crosses instead of enclosing
+    result = balance_b_tags(result)
+    # The reopened tags can end up empty, e.g. when the reordering above already handled them
+    result = re.sub(rf"{EMPTY_PAIR}(?=<b>)", "", result)
+    result = re.sub(rf"(?<=<b>){EMPTY_PAIR}", "", result)
+    result = re.sub(rf"{EMPTY_PAIR}(?=</b>)", "", result)
+    result = re.sub(rf"(?<=</b>){EMPTY_PAIR}", "", result)
     return result
 
 
@@ -108,15 +183,38 @@ def use_tag_cleaning_with_b_insertion(
     return cleaned_text, custom_incrementer, custom_restorer, indexes
 
 
+TEST_CASES = [
+    # An opening tag right before <b>, closed within the b span
+    (
+        "<k><b> 何[なん]</k>でも<k> 無[な]い</b></k>",
+        "<b><k> 何[なん]</k>でも<k> 無[な]い</k></b>",
+    ),
+    # A tag opened within the b span and closed after it, with text in between
+    (
+        "<k> 其[そ]れ</k>には<b><k> 優劣[ゆうれつ]</k>を<k> 付[つ]け</b> 難[がた]い</k>。",
+        "<k> 其[そ]れ</k>には<b><k> 優劣[ゆうれつ]</k>を<k> 付[つ]け</k></b><k> 難[がた]い</k>。",
+    ),
+    # A tag opened before <b> and closed within it, with text in between
+    (
+        "<k> 何[なん]<b>でも</k> 無[な]い</b>",
+        "<k> 何[なん]</k><b><k>でも</k> 無[な]い</b>",
+    ),
+    # Whole tags within the b span, and b spans within a tag, are left alone
+    ("<k> 何[なん]<b>でも</b> 無[な]い</k>", "<k> 何[なん]<b>でも</b> 無[な]い</k>"),
+    ("<b><k> 何[なん]</k>でも</b>", "<b><k> 何[なん]</k>でも</b>"),
+]
+
+
 def run_tests():
-    unfixed_text = "<k><b> 何[なん]</k>でも<k> 無[な]い</b></k>"
-    fixed_text = apply_tag_fixes(unfixed_text)
-    try:
-        assert fixed_text == "<b><k> 何[なん]</k>でも<k> 無[な]い</k></b>"
-    except AssertionError:
-        print("Test failed for apply_tag_fixes")
-        print(f"\033[93mExpected: '{fixed_text}'\033[0m")
-        print(f"\033[92mGot:      '{unfixed_text}'\033[0m")
+    failed = False
+    for unfixed_text, expected in TEST_CASES:
+        fixed_text = apply_tag_fixes(unfixed_text)
+        if fixed_text != expected:
+            failed = True
+            print(f"Test failed for apply_tag_fixes on '{unfixed_text}'")
+            print(f"\033[93mExpected: '{expected}'\033[0m")
+            print(f"\033[92mGot:      '{fixed_text}'\033[0m")
+    if failed:
         sys.exit(1)
     print("\n\033[92mTests passed\033[0m")
 
