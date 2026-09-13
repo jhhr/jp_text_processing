@@ -1481,6 +1481,20 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<b><kun> ほう[放]</kun><oku>ったら</oku></b>かす",
     )
     test(
+        test_name="okurigana of godan verb from a noun 裏目る",
+        kanji="目",
+        sentence="完全[かんぜん]に 裏目[うらめ]ったな",
+        expected_kana_only="カンゼンに うら<b>めった</b>な",
+        expected_furigana_with_tags_split=(
+            "<on> 完[カン]</on><on> 全[ゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
+            "<oku>った</oku></b>な"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 完全[カンゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
+            "<oku>った</oku></b>な"
+        ),
+    )
+    test(
         test_name="reading mixup /1",
         kanji="口",
         ignore_fail=True,
