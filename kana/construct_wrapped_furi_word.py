@@ -149,7 +149,7 @@ def match_tags_with_kanji(word: str, furigana: str, logger=Logger("error")) -> l
                                     )
                                 )
                             tag_index += 1
-            elif next_kanji and (next_kanji == cur_kanji or next_kanji == "々"):
+            elif next_kanji == "々":
                 # Only merge with the next tag when it matches the same tag type; otherwise keep
                 # separate so adjacent repeater groups with different readings don't collapse.
                 next_tag = tag_order[tag_index + 1] if tag_index + 1 < len(tag_order) else None
@@ -266,7 +266,7 @@ def construct_wrapped_furi_word(
             do_merge = False
             logger.debug(f"next_tag_res: {next_tag_res}")
             if (
-                (next_tag_res["kanji"] == cur_tag_res["kanji"] or next_tag_res["kanji"] == "々")
+                next_tag_res["kanji"] == "々"
                 and next_tag_res["tag"] == cur_tag_res["tag"]
                 and next_tag_res["highlight"] == cur_tag_res["highlight"]
                 # Avoid auto-merging repeated numeric digits when split output is requested.

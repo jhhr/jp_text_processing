@@ -661,8 +661,11 @@ def reconstruct_from_alignment(
             tag = part["tag"]
             is_num = part["is_num"]
             is_noun_suru_verb = part.get("is_noun_suru_verb", False)
-        elif alignment["kanji_matches"][i]:
-            match_info = alignment["kanji_matches"][i]
+        elif match_info := alignment["kanji_matches"][i]:
+            # The alignment is what decides a doubled kanji is really the repeater, so where it
+            # says 々, 々 is what gets written - even if the word came in spelled out.
+            if match_info.get("kanji") == "々":
+                surface_kanji = "々"
             is_noun_suru_verb = match_info.get("is_noun_suru_verb", False)
             reading = match_info["matched_mora"]
             highlight_match_type = match_info["match_type"]
@@ -812,7 +815,7 @@ def whole_word_mora_split(word: str, furigana: str) -> tuple[list[list[str]], li
     if katakana_positions:
         furigana = to_hiragana(furigana)
     furigana, long_vowel_positions = normalize_long_vowel_marks(furigana)
-    if len(word) == 2 and word[1] == "々":
+    if len(word) == 2 and word[1] in ("々", word[0]):
         midpoint = max(1, len(furigana) // 2)
         first = furigana[:midpoint]
         second = furigana[midpoint:]
@@ -909,9 +912,12 @@ def kana_highlight(
                     return f"<err> {full_furigana}[{full_word}]</err>{maybe_okuri}"
                 return f" {full_furigana}[{full_word}]{maybe_okuri}"
 
-        # Replace doubled kanji with the repeater character
-        full_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
-        logger.debug(f"furigana_replacer - word after double kanji: {full_word}")
+        # A doubled kanji is only sometimes the repeater 々 written out: 清清[すがすが] is, while
+        # the 物物 of 生物物理学[せいぶつぶつりがく] is two words meeting. We can't tell from the
+        # spelling alone, so the repeater form is only a *lookup* key here; whether the word is
+        # rewritten to use 々 is decided later, by whether the reading says it repeats.
+        repeater_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
+        logger.debug(f"furigana_replacer - repeater lookup form: {repeater_word}")
 
         if full_furigana.startswith("sound:"):
             # This was something like 漢字[sound:...], we shouldn't modify the text in the brackets
@@ -924,21 +930,24 @@ def kana_highlight(
             or f"{kanji_to_highlight}々" == full_word
             or kanji_to_highlight * 2 == full_word
         )
-        word_is_repeated_kanji = len(full_word) == 2 and full_word[1] == "々"
+        word_is_repeated_kanji = len(repeater_word) == 2 and repeater_word[1] == "々"
         is_whole_word_case = highlight_kanji_is_whole_word or word_is_repeated_kanji
 
         def replace_numeric_substrings(text: str) -> str:
             return re.sub(r"[0-9０-９]+", lambda m: number_to_kanji(m.group(0)), text)
 
-        # Step 1: Check exception dictionary first
+        # Step 1: Check exception dictionary first. Exceptions are keyed in the 々 spelling, so a
+        # word written with the kanji doubled is looked up in that form - and a hit is proof that
+        # the doubling really is a repeater, so the word takes that spelling from here on.
         exception_alignment = check_exception(
-            word=full_word,
+            word=repeater_word,
             furigana=full_furigana,
             logger=logger,
         )
         logger.debug(f"furigana_replacer - exception_alignment: {exception_alignment}")
         if exception_alignment is not None:
             logger.debug(f"furigana_replacer - using exception alignment: {exception_alignment}")
+            full_word = repeater_word
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 furigana=full_furigana,

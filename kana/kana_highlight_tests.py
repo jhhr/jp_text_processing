@@ -971,6 +971,66 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> たけだけ[猛々]</kun><oku>しい</oku>",
     )
     test(
+        # 生物 + 物理学, so the doubled 物 is two words meeting, not a repeater: it must stay
+        # spelled out and keep a tag each, unlike the 猛猛 above where the reading rendakus
+        test_name="Keeps a kanji doubled across a word boundary spelled out",
+        kanji="",
+        sentence="生物物理学[せいぶつぶつりがく]",
+        expected_kana_only="セイブツブツリガク",
+        expected_furigana=" 生物物理学[セイブツブツリガク]",
+        expected_furikanji=" セイブツブツリガク[生物物理学]",
+        expected_kana_only_with_tags_split=(
+            "<on>セイ</on><on>ブツ</on><on>ブツ</on><on>リ</on><on>ガク</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 生[セイ]</on><on> 物[ブツ]</on><on> 物[ブツ]</on><on> 理[リ]</on><on>"
+            " 学[ガク]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> セイ[生]</on><on> ブツ[物]</on><on> ブツ[物]</on><on> リ[理]</on><on>"
+            " ガク[学]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>セイブツブツリガク</on>",
+        expected_furigana_with_tags_merged="<on> 生物物理学[セイブツブツリガク]</on>",
+        expected_furikanji_with_tags_merged="<on> セイブツブツリガク[生物物理学]</on>",
+    )
+    test(
+        # 中国 + 国民: the same kanji doubled across the seam, but reading ごく then こく. A
+        # repeater would have to copy the first reading, which would misread the second 国.
+        test_name="Reads each side of a doubled kanji at a word boundary on its own",
+        kanji="",
+        sentence="中国国民[ちゅうごくこくみん]",
+        expected_kana_only="チュウゴクコクミン",
+        expected_furigana=" 中国国民[チュウゴクコクミン]",
+        expected_furikanji=" チュウゴクコクミン[中国国民]",
+        expected_kana_only_with_tags_split="<on>チュウ</on><on>ゴク</on><on>コク</on><on>ミン</on>",
+        expected_furigana_with_tags_split=(
+            "<on> 中[チュウ]</on><on> 国[ゴク]</on><on> 国[コク]</on><on> 民[ミン]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> チュウ[中]</on><on> ゴク[国]</on><on> コク[国]</on><on> ミン[民]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>チュウゴクコクミン</on>",
+        expected_furigana_with_tags_merged="<on> 中国国民[チュウゴクコクミン]</on>",
+        expected_furikanji_with_tags_merged="<on> チュウゴクコクミン[中国国民]</on>",
+    )
+    test(
+        # A repeater word written out, but with the reading simply repeating: nothing here says
+        # repeater rather than word boundary, so the spelling the note used is what we keep
+        test_name="Leaves a doubled kanji whose reading merely repeats as written",
+        kanji="",
+        sentence="我我[われわれ]",
+        expected_kana_only="われわれ",
+        expected_furigana=" 我我[われわれ]",
+        expected_furikanji=" われわれ[我我]",
+        expected_kana_only_with_tags_split="<kun>われ</kun><kun>われ</kun>",
+        expected_furigana_with_tags_split="<kun> 我[われ]</kun><kun> 我[われ]</kun>",
+        expected_furikanji_with_tags_split="<kun> われ[我]</kun><kun> われ[我]</kun>",
+        expected_kana_only_with_tags_merged="<kun>われわれ</kun>",
+        expected_furigana_with_tags_merged="<kun> 我我[われわれ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> われわれ[我我]</kun>",
+    )
+    test(
         test_name="Handles repeater with non repeating furigana 1/",
         kanji="",
         # An edge case: the furigana does not repeat completely, for example 蝶々 can sometimes
