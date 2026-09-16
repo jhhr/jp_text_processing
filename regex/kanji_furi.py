@@ -4,10 +4,11 @@ import re
 # - the counter characters ヶ and ヵ which are just small katakana
 # - the kanji repeater punctuation as something that will be cleaned off
 # - numbers as they are sometimes used in furigana instead of their kanji counterparts
-KANJI_RE = r"([\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]+)"
+KANJI_CHAR_RE = r"[\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]"
+KANJI_RE = rf"({KANJI_CHAR_RE}+)"
 KANJI_REC = re.compile(KANJI_RE)
 # Same as above but allows for being empty
-KANJI_RE_OPT = r"([\d々ヶヵ\u4e00-\u9faf\u3400-\u4dbf]*)"
+KANJI_RE_OPT = rf"({KANJI_CHAR_RE}*)"
 
 # Matching any furigana with match groups
 FURIGANA_RE = r" ?([^ >]+?)\[(.+?)\]"

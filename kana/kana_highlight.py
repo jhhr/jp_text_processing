@@ -25,12 +25,16 @@ except ImportError:
     from ..kanji.number_to_kanji import number_to_kanji
 try:
     from okuri.okurigana_mix_cleaning_replacer import (
+        LEADING_KANA_CLEANING_REC,
         OKURIGANA_MIX_CLEANING_REC,
+        leading_kana_cleaning_replacer,
         okurigana_mix_cleaning_replacer,
     )
 except ImportError:
     from ..okuri.okurigana_mix_cleaning_replacer import (
+        LEADING_KANA_CLEANING_REC,
         OKURIGANA_MIX_CLEANING_REC,
+        leading_kana_cleaning_replacer,
         okurigana_mix_cleaning_replacer,
     )
 try:
@@ -1052,8 +1056,10 @@ def kana_highlight(
         logger.debug(f"furigana_replacer - final_result: {final_result}\n")
         return final_result
 
+    # Give back the kana a word opens with, so the kanji is left holding only its own reading
+    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, text)
     # Clean any potential mixed okurigana cases, turning them normal
-    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, text)
+    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
     logger.debug(f"processed_text: {processed_text}")
     # Clean any double spaces that might have been created by the furigana reconstruction
