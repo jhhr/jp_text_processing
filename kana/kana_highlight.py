@@ -260,7 +260,7 @@ def reconstruct_furigana(
         f" {with_tags_def.merge_consecutive}"
     )
     segments: list[list[WrapMatchEntry]] = furi_okuri_result.get("segments", [])
-    highlight_idx: Optional[int] = furi_okuri_result.get("highlight_segment_index")
+    highlight_indices: list[int] = furi_okuri_result.get("highlight_segment_indices", [])
     okurigana: str = furi_okuri_result.get("okurigana", "")
     rest_kana: str = furi_okuri_result.get("rest_kana", "")
     original_furigana: str = furi_okuri_result.get("original_furigana", "")
@@ -330,13 +330,23 @@ def reconstruct_furigana(
         rendered = render_segment(segment, merge_override=merge_all)
         rendered_segments.append(rendered)
 
-    highlight_segment = None
-    if highlight_idx is not None and 0 <= highlight_idx < len(rendered_segments):
-        highlight_segment = rendered_segments[highlight_idx]
-        logger.debug(
-            f"reconstruct_furigana - highlight segment in index {highlight_idx}:"
-            f" {highlight_segment}"
-        )
+    highlight_indices = [i for i in highlight_indices if 0 <= i < len(rendered_segments)]
+    # The okurigana belongs to the last segment, so wrapping that one has to wait until we know
+    # whether the okurigana goes inside the <b> or after it
+    last_is_highlighted = bool(highlight_indices) and highlight_indices[-1] == (
+        len(rendered_segments) - 1
+    )
+
+    def wrap_highlighted_segments(skip_last: bool = False) -> None:
+        for i in highlight_indices:
+            if skip_last and i == len(rendered_segments) - 1:
+                continue
+            rendered_segments[i] = f"<b>{rendered_segments[i]}</b>"
+
+    logger.debug(
+        f"reconstruct_furigana - highlight segments at indices {highlight_indices},"
+        f" last_is_highlighted: {last_is_highlighted}"
+    )
     logger.debug(
         "reconstruct_furigana - rendered segments before okurigana/rest kana handling:"
         f" {rendered_segments}, okurigana: {okurigana}, rest_kana: {rest_kana}"
@@ -353,26 +363,25 @@ def reconstruct_furigana(
             f" highlight: {okuri_out_of_highlight}"
         )
         # Append okurigana to the last segment if it exists, also handling highlight
-        last_rendered_segment = rendered_segments[-1]
-        if last_rendered_segment != highlight_segment:
+        if not last_is_highlighted:
             # No highlight in last segment, just add okurigana
             rendered_segments[-1] = f"{rendered_segments[-1]}{okurigana}"
-            # Handle highlight segment if it exists
-            if highlight_segment is not None:
-                rendered_segments[highlight_idx] = f"<b>{highlight_segment}</b>"
+            wrap_highlighted_segments()
             logger.debug(
                 "reconstruct_furigana - no highlight in last segment, appended okurigana:"
                 f" {rendered_segments[-1]}"
             )
         elif not okuri_out_of_highlight:
             # Highlight segment is last and okurigana should be inside it
+            wrap_highlighted_segments(skip_last=True)
             rendered_segments[-1] = f"<b>{rendered_segments[-1]}{okurigana}</b>"
             logger.debug(
                 "reconstruct_furigana - highlight in last segment, included okurigana:"
                 f" {rendered_segments[-1]}"
             )
-        elif okuri_out_of_highlight:
+        else:
             # Highlight segment is last but okurigana should be outside it
+            wrap_highlighted_segments(skip_last=True)
             rendered_segments[-1] = f"<b>{rendered_segments[-1]}</b>{okurigana}"
             logger.debug(
                 "reconstruct_furigana - highlight in last segment, okurigana outside highlight:"
@@ -383,8 +392,7 @@ def reconstruct_furigana(
         rendered_segments.append(okurigana)
     else:
         logger.debug("reconstruct_furigana - no okurigana to handle, adding highlight if needed")
-        if highlight_segment is not None:
-            rendered_segments[highlight_idx] = f"<b>{highlight_segment}</b>"
+        wrap_highlighted_segments()
 
     result = "".join(rendered_segments)
 
@@ -697,18 +705,21 @@ def reconstruct_from_alignment(
         })
     logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
 
-    # Determine highlight span (include repeater following the target kanji)
-    highlight_start = kanji_to_highlight_pos
-    highlight_end = (
-        kanji_to_highlight_pos + 1 if kanji_to_highlight_pos >= 0 else kanji_to_highlight_pos
-    )
-    if kanji_to_highlight_pos >= 0 and kanji_to_highlight_pos + 1 < len(word_for_alignment):
-        if word_for_alignment[kanji_to_highlight_pos + 1] == "々":
-            highlight_end = kanji_to_highlight_pos + 2
+    # Mark every position the kanji occupies, not just the first: the point is to show the kanji
+    # wherever it turns up, and a word can use it more than once - 生物物理学 is 生物 + 物理学 and
+    # both its 物 are the kanji being studied. A 々 stands in for the kanji before it, so it is
+    # highlighted along with it.
+    highlight_positions: list[int] = []
+    if kanji_to_highlight:
+        for idx, kanji in enumerate(highlight_lookup_word):
+            if kanji != kanji_to_highlight:
+                continue
+            highlight_positions.append(idx)
+            if idx + 1 < len(word_for_alignment) and word_for_alignment[idx + 1] == "々":
+                highlight_positions.append(idx + 1)
 
-    # Mark highlighted entries
-    if highlight_start >= 0:
-        for idx in range(highlight_start, min(highlight_end, len(entries))):
+    for idx in highlight_positions:
+        if idx < len(entries):
             entries[idx]["highlight"] = True
 
     # Merge consecutive numeric entries so they behave like a single logical block when their
@@ -752,28 +763,21 @@ def reconstruct_from_alignment(
 
         entries = merged_entries
 
-    # Split entries into segments: before highlight, highlight, after highlight
+    # Split entries into segments, each a run of entries that are all highlighted or all not, so
+    # that a kanji occurring twice with something between (国民国家) gets a <b> around each run
+    # rather than one around everything from the first to the last.
     segments: list[list[WrapMatchEntry]] = []
-    highlight_segment_index: Optional[int] = None
+    highlight_segment_indices: list[int] = []
 
-    first_highlight_idx = next((i for i, e in enumerate(entries) if e["highlight"]), None)
-    last_highlight_idx = None
-    if first_highlight_idx is not None:
-        for i in range(len(entries) - 1, -1, -1):
-            if entries[i]["highlight"]:
-                last_highlight_idx = i
-                break
-
-    if first_highlight_idx is None:
+    for entry in entries:
+        if segments and segments[-1][-1]["highlight"] == entry["highlight"]:
+            segments[-1].append(entry)
+            continue
+        segments.append([entry])
+        if entry["highlight"]:
+            highlight_segment_indices.append(len(segments) - 1)
+    if not segments:
         segments = [entries]
-    else:
-        end_idx = (last_highlight_idx or first_highlight_idx) + 1
-        if first_highlight_idx > 0:
-            segments.append(entries[:first_highlight_idx])
-        segments.append(entries[first_highlight_idx:end_idx])
-        highlight_segment_index = len(segments) - 1
-        if end_idx < len(entries):
-            segments.append(entries[end_idx:])
 
     logger.debug(
         "reconstruct_from_alignment - match type from highlighted kanji at position"
@@ -788,7 +792,7 @@ def reconstruct_from_alignment(
 
     final_result: FinalResult = {
         "segments": segments,
-        "highlight_segment_index": highlight_segment_index,
+        "highlight_segment_indices": highlight_segment_indices,
         "word": word,
         "highlight_match_type": highlight_match_type,
         "okurigana": okurigana,

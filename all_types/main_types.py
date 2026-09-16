@@ -64,8 +64,8 @@ class YomiMatchResult(TypedDict):
 class FinalResult(TypedDict):
     """
     TypedDict for the final result of the onyomi or kunyomi match check
-    :param segments: Sequence of wrap entries split into portions (before, highlight, after)
-    :param highlight_segment_index: Index of the highlighted segment in `segments` or None
+    :param segments: Sequence of wrap entries split into runs that are all highlighted or all not
+    :param highlight_segment_indices: Indices of the highlighted segments in `segments`, in order
     :param word: The full word being reconstructed (used for spacing/okuri decisions)
     :param edge: Legacy edge position of the highlight for okuri tagging
     :param highlight_match_type: The match type that was highlighted
@@ -78,7 +78,7 @@ class FinalResult(TypedDict):
     """
 
     segments: list[list[WrapMatchEntry]]
-    highlight_segment_index: Optional[int]
+    highlight_segment_indices: list[int]
     word: str
     edge: Edge
     match_type: MatchType

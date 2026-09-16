@@ -995,6 +995,62 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<on> セイブツブツリガク[生物物理学]</on>",
     )
     test(
+        # Both 物 are the kanji being studied, so both get highlighted, even though they belong
+        # to different words. Being adjacent, they highlight as one run under a single <b>.
+        test_name="Highlights both halves of a kanji doubled across a word boundary",
+        kanji="物",
+        sentence="生物物理学[せいぶつぶつりがく]",
+        expected_kana_only="セイ<b>ブツブツ</b>リガク",
+        expected_furigana=" 生[セイ]<b> 物物[ブツブツ]</b> 理学[リガク]",
+        expected_furikanji=" セイ[生]<b> ブツブツ[物物]</b> リガク[理学]",
+        expected_kana_only_with_tags_split=(
+            "<on>セイ</on><b><on>ブツ</on><on>ブツ</on></b><on>リ</on><on>ガク</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 生[セイ]</on><b><on> 物[ブツ]</on><on> 物[ブツ]</on></b><on> 理[リ]</on><on>"
+            " 学[ガク]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> セイ[生]</on><b><on> ブツ[物]</on><on> ブツ[物]</on></b><on> リ[理]</on><on>"
+            " ガク[学]</on>"
+        ),
+        expected_kana_only_with_tags_merged="<on>セイ</on><b><on>ブツブツ</on></b><on>リガク</on>",
+        expected_furigana_with_tags_merged=(
+            "<on> 生[セイ]</on><b><on> 物物[ブツブツ]</on></b><on> 理学[リガク]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> セイ[生]</on><b><on> ブツブツ[物物]</on></b><on> リガク[理学]</on>"
+        ),
+    )
+    test(
+        # The same rule with the occurrences apart rather than adjacent: each gets its own <b>,
+        # and the 民 between them stays outside both
+        test_name="Highlights every occurrence of a kanji used twice in one word",
+        kanji="国",
+        sentence="国民国家[こくみんこっか]",
+        expected_kana_only="<b>コク</b>ミン<b>コッ</b>カ",
+        expected_furigana="<b> 国[コク]</b> 民[ミン]<b> 国[コッ]</b> 家[カ]",
+        expected_furikanji="<b> コク[国]</b> ミン[民]<b> コッ[国]</b> カ[家]",
+        expected_kana_only_with_tags_split=(
+            "<b><on>コク</on></b><on>ミン</on><b><on>コッ</on></b><on>カ</on>"
+        ),
+        expected_furigana_with_tags_split=(
+            "<b><on> 国[コク]</on></b><on> 民[ミン]</on><b><on> 国[コッ]</on></b><on> 家[カ]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> コク[国]</on></b><on> ミン[民]</on><b><on> コッ[国]</on></b><on> カ[家]</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<b><on>コク</on></b><on>ミン</on><b><on>コッ</on></b><on>カ</on>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<b><on> 国[コク]</on></b><on> 民[ミン]</on><b><on> 国[コッ]</on></b><on> 家[カ]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><on> コク[国]</on></b><on> ミン[民]</on><b><on> コッ[国]</on></b><on> カ[家]</on>"
+        ),
+    )
+    test(
         # 中国 + 国民: the same kanji doubled across the seam, but reading ごく then こく. A
         # repeater would have to copy the first reading, which would misread the second 国.
         test_name="Reads each side of a doubled kanji at a word boundary on its own",
