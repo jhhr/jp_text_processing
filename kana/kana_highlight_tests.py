@@ -232,6 +232,65 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="A multi-kanji kanji_to_highlight that is the whole word",
+        kanji="漢字",
+        sentence="漢字[かんじ]",
+        expected_furigana="<b> 漢字[カンジ]</b>",
+        expected_furikanji="<b> カンジ[漢字]</b>",
+        expected_kana_only="<b>カンジ</b>",
+        expected_furigana_with_tags_split="<b><on> 漢[カン]</on><on> 字[ジ]</on></b>",
+        expected_furigana_with_tags_merged="<b><on> 漢字[カンジ]</on></b>",
+        expected_furikanji_with_tags_split="<b><on> カン[漢]</on><on> ジ[字]</on></b>",
+        expected_furikanji_with_tags_merged="<b><on> カンジ[漢字]</on></b>",
+        expected_kana_only_with_tags_split="<b><on>カン</on><on>ジ</on></b>",
+        expected_kana_only_with_tags_merged="<b><on>カンジ</on></b>",
+    )
+    test(
+        test_name="A multi-kanji kanji_to_highlight within a longer word",
+        kanji="生物",
+        sentence="生物学[せいぶつがく]",
+        expected_furigana="<b> 生物[セイブツ]</b> 学[ガク]",
+        expected_furikanji="<b> セイブツ[生物]</b> ガク[学]",
+        expected_kana_only="<b>セイブツ</b>ガク",
+        expected_furigana_with_tags_split=(
+            "<b><on> 生[セイ]</on><on> 物[ブツ]</on></b><on> 学[ガク]</on>"
+        ),
+        expected_furigana_with_tags_merged="<b><on> 生物[セイブツ]</on></b><on> 学[ガク]</on>",
+        expected_furikanji_with_tags_split=(
+            "<b><on> セイ[生]</on><on> ブツ[物]</on></b><on> ガク[学]</on>"
+        ),
+        expected_furikanji_with_tags_merged="<b><on> セイブツ[生物]</on></b><on> ガク[学]</on>",
+        expected_kana_only_with_tags_split="<b><on>セイ</on><on>ブツ</on></b><on>ガク</on>",
+        expected_kana_only_with_tags_merged="<b><on>セイブツ</on></b><on>ガク</on>",
+    )
+    test(
+        # Only 生物 is highlighted, not the 物 that starts 物理学
+        test_name="A multi-kanji kanji_to_highlight highlights only where the whole run matches",
+        kanji="生物",
+        sentence="生物物理学[せいぶつぶつりがく]",
+        expected_furigana="<b> 生物[セイブツ]</b> 物理学[ブツリガク]",
+        expected_furikanji="<b> セイブツ[生物]</b> ブツリガク[物理学]",
+        expected_kana_only="<b>セイブツ</b>ブツリガク",
+        expected_furigana_with_tags_split=(
+            "<b><on> 生[セイ]</on><on> 物[ブツ]</on></b><on> 物[ブツ]</on><on> 理[リ]</on>"
+            "<on> 学[ガク]</on>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<b><on> 生物[セイブツ]</on></b><on> 物理学[ブツリガク]</on>"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<b><on> セイ[生]</on><on> ブツ[物]</on></b><on> ブツ[物]</on><on> リ[理]</on>"
+            "<on> ガク[学]</on>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<b><on> セイブツ[生物]</on></b><on> ブツリガク[物理学]</on>"
+        ),
+        expected_kana_only_with_tags_split=(
+            "<b><on>セイ</on><on>ブツ</on></b><on>ブツ</on><on>リ</on><on>ガク</on>"
+        ),
+        expected_kana_only_with_tags_merged="<b><on>セイブツ</on></b><on>ブツリガク</on>",
+    )
+    test(
         test_name="Should not crash with kanji that has empty onyomi or kunyomi",
         kanji="匂",
         # 匂 has no onyomi, 区 has no kunyomi

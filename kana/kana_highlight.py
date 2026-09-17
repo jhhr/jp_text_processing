@@ -742,12 +742,16 @@ def reconstruct_from_alignment(
     # highlighted along with it.
     highlight_positions: list[int] = []
     if kanji_to_highlight:
-        for idx, kanji in enumerate(highlight_lookup_word):
-            if kanji != kanji_to_highlight:
-                continue
-            highlight_positions.append(idx)
-            if idx + 1 < len(word_for_alignment) and word_for_alignment[idx + 1] == "々":
-                highlight_positions.append(idx + 1)
+        # kanji_to_highlight is usually one kanji but doesn't have to be: 生物 in 生物学 covers two
+        # positions, so search for it as a substring and mark every position it spans.
+        span = len(kanji_to_highlight)
+        start = highlight_lookup_word.find(kanji_to_highlight)
+        while start != -1:
+            end = start + span
+            highlight_positions.extend(range(start, end))
+            if end < len(word_for_alignment) and word_for_alignment[end] == "々":
+                highlight_positions.append(end)
+            start = highlight_lookup_word.find(kanji_to_highlight, end)
 
     for idx in highlight_positions:
         if idx < len(entries):
@@ -878,7 +882,8 @@ def kana_highlight(
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
     onyomi or kunyomi reading. The furigana is then highlighted with<b> tags.
     Text received could be a sentence or a single word with furigana.
-    :param kanji_to_highlight: should be a single kanji character
+    :param kanji_to_highlight: the kanji to highlight, usually a single character but any run of
+        kanji works; every occurrence of it in a word is highlighted
     :param text: The text to process
     :param return_type: string. Return either normal furigana, reversed furigana AKA furikanji or
         remove the kanji and return only the kana
@@ -992,13 +997,13 @@ def kana_highlight(
         def shift_katakana_positions(positions: list[int]) -> list[int]:
             return [pos + len(furigana_prefix) for pos in positions]
 
-        highlight_kanji_is_whole_word = kanji_to_highlight is not None and (
-            full_word == kanji_to_highlight
-            or f"{kanji_to_highlight}々" == full_word
-            or kanji_to_highlight * 2 == full_word
-        )
+        # The whole-word split hands the entire reading to one kanji, so it only fits a word that
+        # *is* one kanji, or a kanji plus its repeater, which it splits in two. Whether that kanji
+        # happens to be the one being highlighted has nothing to do with it - asking that let a
+        # multi-kanji kanji_to_highlight in here, where the split came back a slot short of the
+        # word's kanji count and the whole word fell through to jukujikun.
         word_is_repeated_kanji = len(repeater_word) == 2 and repeater_word[1] == "々"
-        is_whole_word_case = highlight_kanji_is_whole_word or word_is_repeated_kanji
+        is_whole_word_case = len(full_word) == 1 or word_is_repeated_kanji
 
         def replace_numeric_substrings(text: str) -> str:
             return re.sub(r"[0-9０-９]+", lambda m: number_to_kanji(m.group(0)), text)
