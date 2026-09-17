@@ -36,6 +36,36 @@ tool runs above used default settings.
 
 ---
 
+## Fix review (main at 61cf286, 2026-09-17)
+
+Nine commits on main address H1–H5, M1, M3 and M7. Each was checked against its original
+failing input, against the pre-fix code (c5f1edb) on the same inputs, and by the four touched
+test suites, which all pass (`kana_highlight_tests` now 2168 cases).
+
+| Finding | Commit | Verdict | Notes |
+|---|---|---|---|
+| H1 | a7afa09 | Fixed | Per-run redistribution. `kana_only` output round-trips the furigana in order on every crafted input (`山川保田[ぱぴぷほぺぽ]`, two runs, runs at both ends). |
+| H2 | 864e2fd | Fixed, with a cost | `か家族[かぞく]`, `も紅葉[もみじ]` correct; every お/ご/katakana/multi-kana prefix probed is unchanged from before. Each prefixed word now runs two extra alignments, and the spelling that is wrong always fails, so it takes the exhaustive path (M4): the 6-kanji `ご協力者募集中` went from 22 ms to 107 ms. Cheap short-circuit: when the stripped probe leaves 0 unread and `SELF_READING_PREFIX_REC` matches the prefix, skip the kept probe. |
+| H3 | 83ce57e | Fixed | Whole match returned for every return type. |
+| H4 | ec910d3 | Fixed, rule applied inconsistently | 一万, 一億, 一千万 correct. Brute force against a reference over 50 000 numbers found one systematic deviation: a 千 that heads a myriad group keeps its 一 only when nothing follows it before the unit. 1000万 → 一千万 but 1200万 → 千二百万 and 1203兆 → 千二百三兆. The commit message says a 千 topping a 万-group keeps it; the lookahead `(?!千[万億兆京])` only covers the bare case. If 一千二百万 is intended, use `(?!千[一二三四五六七八九十百]*[万億兆京])`. Either convention is acceptable Japanese, but a furigana like いっせんにひゃくまん will only align under one of them. |
+| H5 | a1648fd, 61cf286 | Fixed, one regression | はし/あめ no longer highlight, はしらないで still does, バズった and バズってる are bolded whole. **Regression:** `バズられた` (passive of an unknown verb) was fully highlighted before and is not highlighted at all now. mecab gives バズ/られ/た and `POSSIBLE_OKURIGANA_PROGRESSION_DICT` has no `is_last` on ら→れ→た for v5r or v1, so the stem is rejected. Accept the stem also when the next token passes `get_all_conjugation_conditions` (られ has headword られる and is a verb); that keeps はしが rejected. Limitation, not a regression: `バズっている` stops at って because mecab tokenizes って as one particle and the ている rule in `verb_conjugation_conditions` wants the previous token to be exactly て/で, while 食べている is bolded whole. |
+| M1 | 5ba21b1 | Fixed | Every one of the 82 `LONG_VOWEL_MAP` entries now matches its gojūon row (checked programmatically). とーきょー, せんせー, けーざい, ぎゅーにゅー, おーきい all match. |
+| M3 | 772aa85 | Fixed, two caveats | Design choice to be aware of: every `<b>` in the text is stripped, including the caller's emphasis on unrelated words (`<b>今日</b>は 食[た]べる` → `今日は …`). Bug: `</?b>` misses tags with attributes, so `<b class='x'>食[た]</b>べる` keeps the opening tag and loses the closing one, leaving unbalanced HTML. `</?b(?:\s[^>]*)?>` would cover it. |
+| M7 | 3f3d381 | Fixed | 漢字, 生物 in 生物学, 物理 in 生物物理学 highlight correctly in all return types; `人々` as `kanji_to_highlight` now highlights (it did not before). Single-kanji and repeater words are identical to before on every probe. |
+
+M2 stays latent (see below); M4, M5, M6, M8 and the Low/Design items are untouched.
+
+Noticed while verifying, pre-existing and not caused by these commits:
+
+- `highlight_inflected_words_with_mecab` loses or misplaces HTML tags that wrap the highlighted
+  word: `あ<span>食べた</span>` → `あ<b>食べた</b>` (span gone), `<span>はしって</span>` →
+  `<b><span>は</span>しって</b>`. A space inside the word breaks the same bookkeeping:
+  `食べ た` → `<b >食べた</b>`.
+- Katakana-stem verbs that mecab knows never highlight: `サボった`/サボる, `ミスった`/ミスる.
+  `base_form_word` is rebuilt with a katakana ending (サボル), which never equals mecab's headword
+  サボる, and the hiragana retry (さぼる) does not either. ググる only works because mecab does
+  not know it and the stem path takes over.
+
 ## High severity
 
 ### H1. Reading order is scrambled when a matched kanji sits between unmatched kanji
