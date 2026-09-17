@@ -899,6 +899,12 @@ def kana_highlight(
             f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
             f" {maybe_okuri}"
         )
+        # An audio tag is not furigana. Test the raw bracket content, before any cleaning can
+        # turn sound:test.mp3 into an empty string or sound:かんじ.mp3 into a reading, and hand
+        # the whole match back untouched — the same thing kana_filter does.
+        if full_furigana.startswith("sound:"):
+            logger.debug(f"furigana_replacer - sound tag, left as is: {match.group(0)}")
+            return match.group(0)
         # Clean off non-kana characters from furigana, unless it becomes empty
         cleaned_furigana = re.sub(NON_KANA_REC, "", full_furigana)
         if cleaned_furigana:
@@ -948,12 +954,6 @@ def kana_highlight(
         # rewritten to use 々 is decided later, by whether the reading says it repeats.
         repeater_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
         logger.debug(f"furigana_replacer - repeater lookup form: {repeater_word}")
-
-        if full_furigana.startswith("sound:"):
-            # This was something like 漢字[sound:...], we shouldn't modify the text in the brackets
-            # as it'd break the audio tag. But we know the text to the right is kanji
-            # (what is it doing there next to a sound tag?) so we'll just leave it out anyway
-            return full_furigana + maybe_okuri
 
         # Take the kana that carry no reading of their own out of the way, so that what is left can
         # be matched against the kanji's listed readings. They are written back in at the end from

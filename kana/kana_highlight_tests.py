@@ -361,6 +361,84 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="A [sound:...] tag in the brackets is not furigana - no highlight",
+        kanji="",
+        # The bracket content is an Anki audio tag, not a reading. Rewriting it in any way would
+        # break the audio, so the whole match is left exactly as it was in every return type.
+        sentence="漢字[sound:test.mp3]",
+        expected_kana_only="漢字[sound:test.mp3]",
+        expected_furigana="漢字[sound:test.mp3]",
+        expected_furikanji="漢字[sound:test.mp3]",
+        expected_kana_only_with_tags_split="漢字[sound:test.mp3]",
+        expected_kana_only_with_tags_merged="漢字[sound:test.mp3]",
+        expected_furigana_with_tags_split="漢字[sound:test.mp3]",
+        expected_furigana_with_tags_merged="漢字[sound:test.mp3]",
+        expected_furikanji_with_tags_split="漢字[sound:test.mp3]",
+        expected_furikanji_with_tags_merged="漢字[sound:test.mp3]",
+    )
+    test(
+        test_name="A [sound:...] tag with kana in the file name is not read as furigana",
+        # Kana in the file name must not be mistaken for a reading, and the kanji to highlight
+        # sitting in front of the tag must not get a <b> either - nothing here is touched.
+        kanji="漢",
+        sentence="漢字[sound:かんじ.mp3]",
+        expected_kana_only="漢字[sound:かんじ.mp3]",
+        expected_furigana="漢字[sound:かんじ.mp3]",
+        expected_furikanji="漢字[sound:かんじ.mp3]",
+        expected_kana_only_with_tags_split="漢字[sound:かんじ.mp3]",
+        expected_kana_only_with_tags_merged="漢字[sound:かんじ.mp3]",
+        expected_furigana_with_tags_split="漢字[sound:かんじ.mp3]",
+        expected_furigana_with_tags_merged="漢字[sound:かんじ.mp3]",
+        expected_furikanji_with_tags_split="漢字[sound:かんじ.mp3]",
+        expected_furikanji_with_tags_merged="漢字[sound:かんじ.mp3]",
+    )
+    test(
+        test_name="A [sound:...] tag mixed into a sentence leaves the real furigana working",
+        kanji="気",
+        sentence="天気[てんき]の 音[sound:おと.mp3]を 聞[き]く。",
+        expected_kana_only="テン<b>キ</b>の 音[sound:おと.mp3]を きく。",
+        expected_furigana=" 天[テン]<b> 気[キ]</b>の 音[sound:おと.mp3]を 聞[き]く。",
+        expected_furikanji=" テン[天]<b> キ[気]</b>の 音[sound:おと.mp3]を き[聞]く。",
+        expected_kana_only_with_tags_split=(
+            "<on>テン</on><b><on>キ</on></b>の 音[sound:おと.mp3]を <kun>き</kun><oku>く</oku>。"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>テン</on><b><on>キ</on></b>の 音[sound:おと.mp3]を <kun>き</kun><oku>く</oku>。"
+        ),
+        expected_furigana_with_tags_split=(
+            "<on> 天[テン]</on><b><on> 気[キ]</on></b>の 音[sound:おと.mp3]を<kun>"
+            " 聞[き]</kun><oku>く</oku>。"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 天[テン]</on><b><on> 気[キ]</on></b>の 音[sound:おと.mp3]を<kun>"
+            " 聞[き]</kun><oku>く</oku>。"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<on> テン[天]</on><b><on> キ[気]</on></b>の 音[sound:おと.mp3]を<kun>"
+            " き[聞]</kun><oku>く</oku>。"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> テン[天]</on><b><on> キ[気]</on></b>の 音[sound:おと.mp3]を<kun>"
+            " き[聞]</kun><oku>く</oku>。"
+        ),
+    )
+    test(
+        test_name="A [sound:...] tag in a mixed okurigana word is left alone with its okurigana",
+        kanji="",
+        # 消え去[...]る would normally be split into 消[き]え去[さ]る; with a sound tag there is no
+        # reading to split, so the word has to survive whole.
+        sentence="消え去[sound:test.mp3]る",
+        expected_kana_only="消え去[sound:test.mp3]る",
+        expected_furigana="消え去[sound:test.mp3]る",
+        expected_furikanji="消え去[sound:test.mp3]る",
+        expected_kana_only_with_tags_split="消え去[sound:test.mp3]る",
+        expected_kana_only_with_tags_merged="消え去[sound:test.mp3]る",
+        expected_furigana_with_tags_split="消え去[sound:test.mp3]る",
+        expected_furigana_with_tags_merged="消え去[sound:test.mp3]る",
+        expected_furikanji_with_tags_split="消え去[sound:test.mp3]る",
+        expected_furikanji_with_tags_merged="消え去[sound:test.mp3]る",
+    )
+    test(
         test_name=(
             "Should ignore non-kana characters in furigana if there are also kana - no highlight"
         ),
