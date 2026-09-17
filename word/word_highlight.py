@@ -388,7 +388,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
             logger=logger,
         )
         logger.debug(f"splitter_free_text for matching: '{splitter_free_text}'")
-        matches = re.finditer(pattern, splitter_free_text)
+        matches = list(re.finditer(pattern, splitter_free_text))
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             maybe_okuri = m.group(1)
@@ -506,7 +506,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         )
         matches = list(re.finditer(pattern, splitter_free_text))
         logger.debug(f"Found {len(matches)} matches")
-        result_indices: list[tuple[int, int]] = []
+        result_indices = []
         for m in matches:
             if not furigana_captures_match_readings(m, prefix_expected_readings, logger):
                 logger.debug("Skipping match; prefix furigana does not match expected readings")
@@ -554,7 +554,6 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
                 result="no_okuri",
                 okurigana="",
                 rest_kana="",
-                part_of_speech="",
             )
             if last_kanji and furigana:
                 if reading_match_type != "none":

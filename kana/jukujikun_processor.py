@@ -8,7 +8,7 @@ when the last kanji is jukujikun.
 
 from typing import Tuple
 
-from ..all_types.main_types import WrapMatchEntry
+from ..all_types.main_types import ReadingMatchInfo, WrapMatchEntry
 from .mora_splitter import split_to_mora_list
 from .mora_alignment import MoraAlignment
 from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
@@ -126,8 +126,7 @@ def process_jukujikun_positions(
         return jukujikun_parts, extracted_okurigana, extracted_rest_kana
 
     # Build the full furigana string from mora_split for exception substring detection
-    all_mora = [mora for sublist in alignment["mora_split"] for mora in sublist]
-    full_furigana = "".join(all_mora)
+    full_furigana = "".join(alignment["mora_split"])
     logger.debug(f"process_jukujikun_positions: full_furigana: {full_furigana}")
 
     # Priority: If the word contains a known exception substring and the furigana contains
@@ -167,16 +166,16 @@ def process_jukujikun_positions(
                 if start_search == 0 and start == 1 and not alignment["kanji_matches"][0]:
                     prefix_str = full_furigana.split(ex_furi, 1)[0]
                     if prefix_str:
-                        alignment["kanji_matches"][0] = {
-                            "reading": prefix_str,
-                            "dict_form": prefix_str,
-                            "match_type": "onyomi",
-                            "reading_variant": "plain",
-                            "matched_mora": prefix_str,
-                            "kanji": word[0],
-                            "okurigana": "",
-                            "rest_kana": "",
-                        }
+                        alignment["kanji_matches"][0] = ReadingMatchInfo(
+                            reading=prefix_str,
+                            dict_form=prefix_str,
+                            match_type="onyomi",
+                            reading_variant="plain",
+                            matched_mora=prefix_str,
+                            kanji=word[0],
+                            okurigana="",
+                            rest_kana="",
+                        )
                 start_search = start + len(ex_word)
 
     # If exception mapping did not set any juku parts, fall back to redistributing
@@ -198,7 +197,7 @@ def process_jukujikun_positions(
         for run in runs:
             # Only the mora the alignment assigned to this run's own slots. They are already in
             # order and already bounded by the neighbouring matched kanji.
-            run_mora_str = "".join("".join(mora_split[pos]) for pos in run if pos < len(mora_split))
+            run_mora_str = "".join(mora_split[pos] for pos in run if pos < len(mora_split))
             run_mora = split_to_mora_list(
                 furigana=run_mora_str,
                 kanji_count=len(run),
@@ -220,10 +219,9 @@ def process_jukujikun_positions(
                 # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
                 # 為 with readings し/さ is the irregular verb する
                 is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
-                tag = "kun" if (kanji.isdigit() or is_suru_verb) else "juk"
                 jukujikun_parts[pos] = {
                     "kanji": kanji,
-                    "tag": tag,
+                    "tag": "kun" if (kanji.isdigit() or is_suru_verb) else "juk",
                     "highlight": False,
                     "furigana": mora_portion,
                     "is_num": kanji.isdigit(),

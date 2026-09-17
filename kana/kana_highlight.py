@@ -31,6 +31,7 @@ from ..regex.kanji_furi import (
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
 from ..all_types.main_types import (
     Edge,
+    MatchType,
     WithTagsDef,
     YomiMatchResult,
     FinalResult,
@@ -637,15 +638,14 @@ def reconstruct_from_alignment(
                 surface_kanji = "々"
             is_noun_suru_verb = match_info.get("is_noun_suru_verb", False)
             reading = match_info["matched_mora"]
-            highlight_match_type = match_info["match_type"]
+            # This kanji's own match type, not the highlight's - that one is decided below
+            match_type = match_info["match_type"]
 
-            if with_tags_def.onyomi_to_katakana and highlight_match_type == "onyomi":
+            if with_tags_def.onyomi_to_katakana and match_type == "onyomi":
                 reading = to_katakana(reading)
 
             tag = (
-                "on"
-                if highlight_match_type == "onyomi"
-                else "kun" if highlight_match_type == "kunyomi" else "juk"
+                "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
             )
             is_num = surface_kanji.isdigit()
         else:
@@ -755,11 +755,13 @@ def reconstruct_from_alignment(
         f" {kanji_to_highlight_pos}, kanji_matches: {alignment['kanji_matches']},"
     )
     # Determine match type of the highlight segment
-    highlight_match_type = "none"
-    if kanji_to_highlight_pos >= 0 and alignment["kanji_matches"][kanji_to_highlight_pos]:
-        highlight_match_type = alignment["kanji_matches"][kanji_to_highlight_pos]["match_type"]
-    elif kanji_to_highlight_pos >= 0 and juku_parts:
-        highlight_match_type = "jukujikun"
+    highlight_match_type: MatchType = "none"
+    if kanji_to_highlight_pos >= 0:
+        highlighted_match = alignment["kanji_matches"][kanji_to_highlight_pos]
+        if highlighted_match:
+            highlight_match_type = highlighted_match["match_type"]
+        elif juku_parts:
+            highlight_match_type = "jukujikun"
 
     final_result: FinalResult = {
         "segments": segments,
@@ -782,7 +784,9 @@ def reconstruct_from_alignment(
     )
 
 
-def whole_word_mora_split(word: str, furigana: str) -> tuple[list[list[str]], list[int], list[int]]:
+def whole_word_mora_split(
+    word: str, furigana: str
+) -> tuple[list[list[list[str]]], list[int], list[int]]:
     """Simple mora split for whole-word case - either the whole furigana or split in half
     Returns: (possible_splits, katakana_positions, long_vowel_positions)
     """
@@ -990,8 +994,8 @@ def kana_highlight(
         # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七)
         alignment_word = replace_numeric_substrings(full_word)
         alignment = None
-        katakana_positions = []
-        long_vowel_positions = []
+        katakana_positions: list[int] = []
+        long_vowel_positions: list[int] = []
 
         if is_whole_word_case:
             possible_whole_word_splits, katakana_positions, long_vowel_positions = (
@@ -1030,7 +1034,7 @@ def kana_highlight(
         # Step 4: Handle jukujikun positions if any
         final_okurigana = alignment["final_okurigana"]
         final_rest_kana = alignment["final_rest_kana"]
-        juku_parts: dict[int, str] = {}
+        juku_parts = {}
 
         if not alignment["is_complete"] or alignment["jukujikun_positions"]:
             # Process jukujikun positions (even for complete alignments) to allow okurigana

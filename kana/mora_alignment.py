@@ -5,7 +5,7 @@ This module implements the combinatorial mora alignment algorithm that tries
 all possible ways to split mora among kanji, returning the first complete match.
 """
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
 from .get_ordered_sublists import get_ordered_sublists
@@ -13,7 +13,7 @@ from .reading_matcher import (
     match_reading_to_mora,
 )
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-from ..kanji.all_kanji_data import all_kanji_data
+from ..kanji.all_kanji_data import KanjiData, all_kanji_data
 from ..utils.logger import Logger
 
 
@@ -27,7 +27,7 @@ def contains_repeated_kanji(word: str) -> bool:
     return False
 
 
-def is_valid_split_for_repeaters(word: str, split: list[list[str]]) -> bool:
+def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> bool:
     """
     Filter splits to only those valid for repeater kanji (々)
     For each 々 at position i, the mora split at position i must have the same
@@ -46,7 +46,7 @@ def find_first_complete_alignment(
     furigana: str,
     maybe_okuri: str,
     mora_list: Optional[list[str]] = None,
-    possible_splits: Optional[list[list[str]]] = None,
+    possible_splits: Optional[Sequence[Sequence[Sequence[str]]]] = None,
     logger: Logger = Logger("error"),
 ) -> MoraAlignment:
     """
@@ -63,7 +63,8 @@ def find_first_complete_alignment(
     :param maybe_okuri: The kana following the word (for last kanji extraction)
     :param mora_list: List of mora units to distribute across kanji, optional if possible_splits
        provided
-    :param possible_splits: Precomputed list of possible mora splits, optional, replaces mora_list
+    :param possible_splits: Precomputed list of possible mora splits, each split a list of
+       mora lists, one per kanji; optional, replaces mora_list
     :param is_whole_word: Whether the alignment is for the whole word (affects matching logic)
     :return: MoraAlignment with the first complete match or best partial match
     """
@@ -107,8 +108,11 @@ def find_first_complete_alignment(
                 " repeaters, using original splits"
             )
 
-    # Convert splits of lists of strings to lists of strings
-    possible_splits = [["".join(mora) for mora in split] for split in possible_splits]
+    # From here on a split is one joined mora string per kanji, which is what MoraAlignment
+    # carries and what every reader of mora_split expects
+    joined_splits: list[list[str]] = [
+        ["".join(mora) for mora in split] for split in possible_splits
+    ]
 
     best_alignment: Optional[MoraAlignment] = None
     best_jukujikun_count = kanji_count + 1  # Start with worst possible
@@ -148,7 +152,7 @@ def find_first_complete_alignment(
             kanji_data = all_kanji_data.get(kanji, None)
             if kanji_data is None:
                 logger.error(f"Kanji data not found for '{kanji}'")
-                kanji_data = {}
+                kanji_data = KanjiData(onyomi="", kunyomi="")
 
             repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
             check_okurigana = is_last_kanji or (next_kanji_is_repeater and repeater_is_last)
@@ -355,7 +359,7 @@ def find_first_complete_alignment(
             best_alignment = alignment
         return alignment
 
-    for mora_split in possible_splits:
+    for mora_split in joined_splits:
         result = process_mora_split(mora_split)
         # Early exit on complete match
         if result["is_complete"]:
@@ -374,16 +378,16 @@ def find_first_complete_alignment(
     # Fallback: all kanji are jukujikun
     logger.debug(
         "find_first_complete_alignment - no valid alignment found, all jukujikun, possible_splits:"
-        f" {possible_splits}, mora_list: {mora_list}"
+        f" {joined_splits}, mora_list: {mora_list}"
     )
-    mora_split = None
-    if possible_splits:
+    fallback_split: list[str] = []
+    if joined_splits:
         # It doesn't matter which split we return here, as split_mora_for_jukujikun will handle
         # redistributing mora among jukujikun kanji later
-        mora_split = possible_splits[0]
+        fallback_split = joined_splits[0]
     elif mora_list is not None:
         # Use original mora_list as split, it doesn't matter that it's not split properly here
-        mora_split = mora_list
+        fallback_split = mora_list
     else:
         logger.error(
             "find_first_complete_alignment - cannot create fallback mora_split, no valid splits or"
@@ -391,7 +395,7 @@ def find_first_complete_alignment(
         )
     return MoraAlignment(
         kanji_matches=[None] * kanji_count,
-        mora_split=mora_split,
+        mora_split=fallback_split,
         jukujikun_positions=list(range(kanji_count)),
         is_complete=False,
         final_okurigana="",

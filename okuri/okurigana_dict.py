@@ -64,16 +64,16 @@ for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items():
     if k in E_I_ENDING_KANA:
         E_I_ENDING_KANA.update(vs)
 
-GODAN_ENDINGS: dict[str, str] = {
-    "う": "u",
-    "く": "k",
-    "ぐ": "g",
-    "す": "s",
-    "つ": "t",
-    "ぬ": "n",
-    "ぶ": "b",
-    "む": "m",
-    "る": "r",
+GODAN_ENDINGS: dict[str, PartOfSpeech] = {
+    "う": "v5u",
+    "く": "v5k",
+    "ぐ": "v5g",
+    "す": "v5s",
+    "つ": "v5t",
+    "ぬ": "v5n",
+    "ぶ": "v5b",
+    "む": "v5m",
+    "る": "v5r",
 }
 
 # Ending kana for noun-form per ending kana in dictionary form
@@ -142,7 +142,7 @@ def get_part_of_speech(
     kanji: str,
     kanji_reading: str,
     logger: Logger = Logger("error"),
-) -> Union[str, None]:
+) -> Optional[PartOfSpeech]:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
     :param okurigana: Always required.
@@ -196,7 +196,7 @@ def get_part_of_speech(
     godan_type = GODAN_ENDINGS.get(okurigana[-1])
     logger.debug(f"last char: {okurigana[-1]}")
     if godan_type:
-        return f"v5{godan_type}"
+        return godan_type
 
     return None  # Return None if no pattern matches
 
@@ -207,7 +207,7 @@ def get_okuri_dict_for_okurigana(
     kanji_reading: str,
     part_of_speech: Optional[PartOfSpeech] = None,
     logger: Logger = Logger("error"),
-) -> tuple[Union[dict, None], PartOfSpeech]:
+) -> tuple[Union[dict, None], Optional[PartOfSpeech]]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.

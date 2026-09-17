@@ -9,6 +9,7 @@ from typing import Optional
 
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
 from ..mecab_controller.kana_conv import to_hiragana
+from ..kanji.all_kanji_data import KanjiData
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from .mora_splitter import long_vowel_variants
 from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
@@ -161,7 +162,7 @@ def match_onyomi_to_mora(
     word: str,
     furigana: str,
     mora_sequence: str,
-    kanji_data: dict,
+    kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
     logger: Logger = Logger("error"),
@@ -231,7 +232,7 @@ def match_onyomi_to_mora(
 def match_kunyomi_to_mora(
     kanji: str,
     mora_sequence: str,
-    kanji_data: dict,
+    kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,
@@ -317,7 +318,7 @@ def match_kunyomi_to_mora(
             full_reading = kunyomi_reading
 
         # Build list of readings to try (in priority order)
-        readings_to_try = []
+        readings_to_try: list[tuple[str, ReadingType, str]] = []
 
         # 1. Try stem first (e.g., "ひ" from "ひ.く")
         readings_to_try.append((stem, "plain", kunyomi_reading))
@@ -441,7 +442,7 @@ def match_reading_to_mora(
     word: str,
     furigana: str,
     mora_sequence: str,
-    kanji_data: dict,
+    kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,

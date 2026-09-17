@@ -10,7 +10,7 @@ and word edge splitting.
 from typing import TypedDict, Optional, List, Dict
 
 from .mora_alignment import MoraAlignment
-from ..all_types.main_types import ReadingMatchInfo
+from ..all_types.main_types import MatchType, ReadingMatchInfo
 from ..utils.logger import Logger
 
 
@@ -22,7 +22,7 @@ class ExceptionAlignmentEntry(TypedDict):
     :param mora: The kana reading for this kanji portion (no tags)
     """
 
-    type: str
+    type: MatchType
     mora: str
 
 
@@ -118,48 +118,54 @@ def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAli
         parts
     ), f"Exception alignment parts length mismatch for '{word}': {len(parts)} vs {kanji_count}"
     kanji_matches: List[Optional[ReadingMatchInfo]] = []
-    mora_split: List[List[str]] = []
+    mora_split: List[str] = []
     jukujikun_positions: List[int] = []
 
     for idx, entry in enumerate(parts):
-        mora_split.append([entry["mora"]])
+        mora_split.append(entry["mora"])
         t = entry["type"]
         if t == "jukujikun":
-            kanji_matches.append({
-                "reading": entry["mora"],
-                "dict_form": entry["mora"],
-                "match_type": "jukujikun",
-                "reading_variant": "plain",
-                "matched_mora": entry["mora"],
-                "kanji": word[idx],
-                "okurigana": "",
-                "rest_kana": "",
-            })
+            kanji_matches.append(
+                ReadingMatchInfo(
+                    reading=entry["mora"],
+                    dict_form=entry["mora"],
+                    match_type="jukujikun",
+                    reading_variant="plain",
+                    matched_mora=entry["mora"],
+                    kanji=word[idx],
+                    okurigana="",
+                    rest_kana="",
+                )
+            )
             # Keep positions list for reference (not necessary if reconstruct handles juk type)
             jukujikun_positions.append(idx)
         elif t in ("onyomi", "kunyomi"):
-            kanji_matches.append({
-                "reading": entry["mora"],
-                "dict_form": entry["mora"],
-                "match_type": t,
-                "reading_variant": "plain",
-                "matched_mora": entry["mora"],
-                "kanji": word[idx],
-                "okurigana": "",
-                "rest_kana": "",
-            })
+            kanji_matches.append(
+                ReadingMatchInfo(
+                    reading=entry["mora"],
+                    dict_form=entry["mora"],
+                    match_type=t,
+                    reading_variant="plain",
+                    matched_mora=entry["mora"],
+                    kanji=word[idx],
+                    okurigana="",
+                    rest_kana="",
+                )
+            )
         else:
             # Unknown type: treat as jukujikun
-            kanji_matches.append({
-                "reading": entry["mora"],
-                "dict_form": entry["mora"],
-                "match_type": "jukujikun",
-                "reading_variant": "plain",
-                "matched_mora": entry["mora"],
-                "kanji": word[idx],
-                "okurigana": "",
-                "rest_kana": "",
-            })
+            kanji_matches.append(
+                ReadingMatchInfo(
+                    reading=entry["mora"],
+                    dict_form=entry["mora"],
+                    match_type="jukujikun",
+                    reading_variant="plain",
+                    matched_mora=entry["mora"],
+                    kanji=word[idx],
+                    okurigana="",
+                    rest_kana="",
+                )
+            )
             jukujikun_positions.append(idx)
 
     return MoraAlignment(

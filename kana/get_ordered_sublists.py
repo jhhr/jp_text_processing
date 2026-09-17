@@ -1,10 +1,12 @@
 from itertools import combinations
 from typing import Sequence, TypeVar
 
-T = TypeVar("T", bound=Sequence)
+T = TypeVar("T")
 
 
-def get_ordered_sublists(list_to_split: T, split_count: int) -> list[list[T]]:
+def get_ordered_sublists(
+    list_to_split: Sequence[T], split_count: int
+) -> list[list[Sequence[T]]]:
     """
     Splits a sequence into all possible combinations of N subsequences while preserving order.
 
@@ -34,12 +36,12 @@ def get_ordered_sublists(list_to_split: T, split_count: int) -> list[list[T]]:
     if split_count == n:
         return [[list_to_split[i : i + 1] for i in range(n)]]
 
-    results = []
+    results: list[list[Sequence[T]]] = []
 
     # Choose positions where to split (between elements)
     for split_positions in combinations(range(1, n), split_count - 1):
         # Convert split positions to actual subsequences
-        sublists = []
+        sublists: list[Sequence[T]] = []
         prev = 0
 
         for pos in split_positions:

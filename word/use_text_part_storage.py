@@ -1,12 +1,21 @@
 import re
-from typing import Callable
+from typing import Callable, Protocol
 
 from ..utils.logger import Logger
 
 TextPartIndexes = list[tuple[int, int, str]]
 OffsetIndexes = list[tuple[int, int]]
-IndexIncrementer = Callable[[int, int, int | None], None]
 TextPartRestorer = Callable[[str], str]
+
+
+# Takes the indexes of a <b>...</b> pair being inserted, rather than one index and an offset
+BTagIndexIncrementer = Callable[[int, int], None]
+
+
+class IndexIncrementer(Protocol):
+    """Shifts the stored parts' indexes to account for text inserted at a given index."""
+
+    def __call__(self, after_part_free_index: int, offset: int, strict: bool = False) -> None: ...
 
 
 def make_diff_string_for_indexes(

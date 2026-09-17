@@ -1,15 +1,16 @@
 import sys
+from typing import Optional
 
 from .word_highlight import word_highlight
 
-from ..utils.logger import Logger  # type: ignore[no-redef]
+from ..utils.logger import Logger
 
 
 def test(
     test_name: str,
     text: str,
     word: str,
-    expected: str = None,
+    expected: Optional[str] = None,
     ignore_fail: bool = False,
     debug: bool = False,
 ):

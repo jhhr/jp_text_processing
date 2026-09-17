@@ -1,3 +1,5 @@
+from typing import Optional
+
 from .check_word_reading_type import WordReadingType, check_word_reading_type
 
 from ..utils.logger import Logger
@@ -6,7 +8,7 @@ from ..utils.logger import Logger
 def test(
     test_name: str,
     word: str,
-    expected: WordReadingType = None,
+    expected: Optional[WordReadingType] = None,
     ignore_fail: bool = False,
     debug: bool = False,
 ):

@@ -3,6 +3,7 @@ import sys
 
 from .use_text_part_storage import (
     use_text_part_storage,
+    BTagIndexIncrementer,
     IndexIncrementer,
     TextPartIndexes,
     TextPartRestorer,
@@ -133,7 +134,7 @@ def apply_tag_fixes(restored_text: str) -> str:
 def use_tag_cleaning_with_b_insertion(
     text: str,
     logger: Logger = Logger("error"),
-) -> tuple[str, IndexIncrementer, TextPartRestorer, TextPartIndexes]:
+) -> tuple[str, BTagIndexIncrementer, TextPartRestorer, TextPartIndexes]:
     """
     Stores indexes of all HTML tags and removes them temporarily, to
     be restored later. Also provides helper to increment indexes for <b> tag insertions.

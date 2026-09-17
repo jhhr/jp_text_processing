@@ -48,11 +48,13 @@ def highlight_inflected_words_with_mecab(
     possible_parts_of_speech: list[PartOfSpeech] = []
     # Check if the last character is in the conjugatable okuri list
     if base_form_word_ending in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH:
-        possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(base_form_word_ending)
+        possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH[base_form_word_ending]
     elif base_form_word_ending in GODAN_FORM_VERB_STARTINGS:
         # Or, if it's a godan verb in noun form, convert to dictionary form
         base_form_word_ending = GODAN_FORM_VERB_STARTINGS[base_form_word_ending]
-        possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(base_form_word_ending)
+        possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(
+            base_form_word_ending, []
+        )
 
     word_stem = base_form_word[:-1]
     # Set noun form verbs to basic verb from, so that token.headword can match them
@@ -107,7 +109,7 @@ def highlight_inflected_words_with_mecab(
         use_tag_cleaning_with_b_insertion(space_free_text, logger=logger)
     )
 
-    def increment_indexes_for_b(start: int, end: Optional[int] = None) -> None:
+    def increment_indexes_for_b(start: int, end: int) -> None:
         increment_for_b_tag_insertion(increment_space_indexes, start, end)
         increment_tag_indexes(start, end)
 

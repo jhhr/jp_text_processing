@@ -8,6 +8,7 @@ from .mecab_common import (
 )
 from ..all_types.main_types import (
     OkuriResults,
+    OkuriType,
 )
 from ..utils.logger import Logger
 
@@ -69,7 +70,7 @@ def get_conjugated_okuri_with_mecab(
         return OkuriResults("", maybe_okuri, "no_okuri", None), False
     text_to_parse = f"{parse_text_prefix}{maybe_okuri}"
 
-    okuri_type = "detected_okuri"
+    okuri_type: OkuriType = "detected_okuri"
     is_suru_verb = False
 
     # exceptions that parsing gets wrong

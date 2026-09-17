@@ -4,13 +4,16 @@ from typing import NamedTuple, Tuple, Union, Optional, Literal
 
 from ..mecab_controller.kana_conv import to_katakana, to_hiragana
 
-from ..all_types.main_types import WrapMatchEntry
+from ..all_types.main_types import WrapMatchEntry, WrapTag
 
 from ..utils.logger import Logger
 
 from ..kanji.number_to_kanji import number_to_kanji
 
 TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
+
+# The tags TAG_WRAPPED_FURIGANA_RE can capture, as the WrapMatchEntry literals
+READING_TAGS: dict[str, WrapTag] = {"on": "on", "kun": "kun", "juk": "juk"}
 
 IS_NUMBER_RE = re.compile(r"^[0-9０-９]+$")
 
@@ -19,7 +22,7 @@ FuriReconstruct = Literal["furigana", "furikanji", "kana_only"]
 
 
 class TagOrder(NamedTuple):
-    tag: str
+    tag: WrapTag
     highlight: Union[str, None]
     contents: str
     position: int
@@ -36,7 +39,7 @@ def get_tag_order(furigana: str, logger=Logger("error")) -> list[TagOrder]:
     tag_order = []
     for match in TAG_WRAPPED_FURIGANA_RE.finditer(furigana):
         highlight = match.group(1)
-        tag = match.group(2)
+        tag = READING_TAGS[match.group(2)]
         contents = match.group(3)
         tag_order.append(TagOrder(tag, highlight, contents, match.start()))
     return tag_order
@@ -86,8 +89,8 @@ def match_tags_with_kanji(word: str, furigana: str, logger=Logger("error")) -> l
                 all_same_tag = True
                 for i in range(1, tags_to_consume):
                     if tag_index + i < len(tag_order):
-                        next_tag = tag_order[tag_index + i]
-                        if next_tag.tag != tag:
+                        other_tag = tag_order[tag_index + i]
+                        if other_tag.tag != tag:
                             all_same_tag = False
                             break
 
@@ -96,8 +99,8 @@ def match_tags_with_kanji(word: str, furigana: str, logger=Logger("error")) -> l
                     accumulated_kana = kana
                     for i in range(1, tags_to_consume):
                         if tag_index + i < len(tag_order):
-                            next_tag = tag_order[tag_index + i]
-                            accumulated_kana += next_tag.contents
+                            extra_tag = tag_order[tag_index + i]
+                            accumulated_kana += extra_tag.contents
                     kanji_tags.append(
                         WrapMatchEntry(
                             kanji=number_str,

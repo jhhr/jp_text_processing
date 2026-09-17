@@ -1,7 +1,7 @@
 import re
 import sys
 
-from ..utils.logger import Logger  # type: ignore[no-redef]
+from ..utils.logger import Logger
 
 JPN_NUMBER_TO_NUM = {
     "１": 1,
@@ -151,7 +151,7 @@ def number_to_kanji(num_str: str, logger: Logger = Logger("error")) -> str:
     if num in KANJI_NUMERALS:
         return KANJI_NUMERALS[num]
 
-    result = []
+    result: list[str] = []
 
     recursive_number_to_kanji(num, result, digit_mult=1, logger=logger)
 

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from ..mecab_controller.basic_types import (
     Inflection,
@@ -50,7 +50,7 @@ def verb_conjugation_conditions(
     prev_prev_token = all_tokens[token_index - 2] if token_index > 1 else None
     prev_token = all_tokens[token_index - 1] if token_index > 0 else None
     next_token = all_tokens[token_index + 1] if token_index < len(all_tokens) - 1 else None
-    return (
+    return bool(
         # handle ている / でいる
         (
             token.part_of_speech == PartOfSpeech.particle
@@ -98,7 +98,7 @@ def verb_conjugation_conditions(
 def get_all_conjugation_conditions(
     token: MecabParsedToken,
     all_tokens: list[MecabParsedToken],
-    word_type: MecabWordType,
+    word_type: Optional[MecabWordType],
     logger: Logger = Logger("error"),
 ) -> tuple[bool, bool]:
     """Check if the token meets any conjugation conditions."""

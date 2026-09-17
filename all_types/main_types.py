@@ -22,7 +22,16 @@ Edge = Literal["left", "right", "middle", "whole", "none"]
 MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
 
 
-class WrapMatchEntry(TypedDict):
+WrapTag = Literal["on", "kun", "juk", "mix"]
+
+
+class _WrapMatchEntryOptional(TypedDict, total=False):
+    """Keys of WrapMatchEntry the builders may leave out. (NotRequired needs Python 3.11.)"""
+
+    is_noun_suru_verb: Optional[bool]
+
+
+class WrapMatchEntry(_WrapMatchEntryOptional):
     """
     Structure describing a single kanji ↔ furigana pairing for reconstruction.
 
@@ -31,16 +40,15 @@ class WrapMatchEntry(TypedDict):
     :param furigana: Reading for the kanji
     :param highlight: Whether this entry belongs to the highlighted span
     :param is_num: Whether the kanji represents a numeric block
-    :param is_noun_suru_verb: Whether this match is to a noun that functions as a suru-verb and has
-        okurigana attached (which is a する conjugation)
+    :param is_noun_suru_verb: Optional. Whether this match is to a noun that functions as a
+        suru-verb and has okurigana attached (which is a する conjugation)
     """
 
     kanji: str
-    tag: Literal["on", "kun", "juk", "mix"]
+    tag: WrapTag
     furigana: str
     highlight: bool
     is_num: bool
-    is_noun_suru_verb: Optional[bool]
 
 
 class YomiMatchResult(TypedDict):
@@ -67,11 +75,9 @@ class FinalResult(TypedDict):
     :param segments: Sequence of wrap entries split into runs that are all highlighted or all not
     :param highlight_segment_indices: Indices of the highlighted segments in `segments`, in order
     :param word: The full word being reconstructed (used for spacing/okuri decisions)
-    :param edge: Legacy edge position of the highlight for okuri tagging
     :param highlight_match_type: The match type that was highlighted
     :param okurigana
     :param rest_kana
-    :param was_katakana: Whether the original furigana was in katakana
     :param katakana_positions: List of character indices in original furigana that were katakana
     :param restored_chars: Index in the matched furigana → the character the original had there,
         for the kana that were rewritten or dropped before matching, ー among them
@@ -81,11 +87,9 @@ class FinalResult(TypedDict):
     segments: list[list[WrapMatchEntry]]
     highlight_segment_indices: list[int]
     word: str
-    edge: Edge
-    match_type: MatchType
+    highlight_match_type: MatchType
     okurigana: str
     rest_kana: str
-    was_katakana: bool
     katakana_positions: list[int]
     restored_chars: dict[int, str]
     original_furigana: str
@@ -163,7 +167,13 @@ ReadingType = Literal[
 ]
 
 
-class ReadingMatchInfo(TypedDict):
+class _ReadingMatchInfoOptional(TypedDict, total=False):
+    """Keys of ReadingMatchInfo the builders may leave out. (NotRequired needs Python 3.11.)"""
+
+    is_noun_suru_verb: Optional[bool]
+
+
+class ReadingMatchInfo(_ReadingMatchInfoOptional):
     """
     Information about a successful reading match for a kanji.
 
@@ -175,8 +185,8 @@ class ReadingMatchInfo(TypedDict):
     :param kanji: The kanji character this match is for
     :param okurigana: Extracted okurigana (only for last kanji when is_last_kanji=True)
     :param rest_kana: Remaining kana after okurigana extraction
-    :param is_noun_suru_verb: Whether this match is to a noun that functions as a suru-verb and has
-        okurigana attached (which is a する conjugation)
+    :param is_noun_suru_verb: Optional. Whether this match is to a noun that functions as a
+        suru-verb and has okurigana attached (which is a する conjugation)
     """
 
     reading: str
@@ -187,7 +197,6 @@ class ReadingMatchInfo(TypedDict):
     kanji: str
     okurigana: str
     rest_kana: str
-    is_noun_suru_verb: Optional[bool]
 
 
 class MoraAlignment(TypedDict):
@@ -195,7 +204,8 @@ class MoraAlignment(TypedDict):
     Result of aligning mora to kanji in a word.
 
     :param kanji_matches: List of ReadingMatchInfo for each kanji (None if jukujikun/unmatched)
-    :param mora_split: The actual mora split used (list of mora sublists, one per kanji)
+    :param mora_split: The actual mora split used (the mora assigned to each kanji, joined,
+        one string per kanji)
     :param jukujikun_positions: List of indices where no reading matched (jukujikun positions)
     :param is_complete: True if all kanji matched a reading (no jukujikun positions)
     :param final_okurigana: Okurigana extracted from last kanji (if any)
@@ -203,7 +213,7 @@ class MoraAlignment(TypedDict):
     """
 
     kanji_matches: list[Optional[ReadingMatchInfo]]
-    mora_split: list[list[str]]
+    mora_split: list[str]
     jukujikun_positions: list[int]
     is_complete: bool
     final_okurigana: str

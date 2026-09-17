@@ -19,7 +19,7 @@ CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH: dict[str, list[PartOfSpeech]] = {
 }
 
 
-CONJUGATABLE_LAST_OKURI: set[str] = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.keys()
+CONJUGATABLE_LAST_OKURI: set[str] = set(CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH)
 
 
 def get_conjugatable_okurigana_stem(
