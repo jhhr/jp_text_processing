@@ -558,6 +558,93 @@ Return type: {return_type}
         expected_furigana=" 見逃[みのが]した 映画[エイガ]をみる",
         expected_furikanji=" みのが[見逃]した エイガ[映画]をみる",
     )
+    # A word opening with kana only gives that kana back when the kanji's own readings say it is
+    # part of the word. A prefix test on its own could not tell お前[おまえ] from a particle at the
+    # start of the text: か家族[かぞく] lost its first mora and came out as か <juk> 家族[ぞく]</juk>.
+    test(
+        test_name="a particle opening the text is not eaten by the word after it",
+        kanji="",
+        sentence="か家族[かぞく]と",
+        expected_furigana="か 家族[カゾク]と",
+        expected_furigana_with_tags_split="か<on> 家[カ]</on><on> 族[ゾク]</on>と",
+        expected_furigana_with_tags_merged="か<on> 家族[カゾク]</on>と",
+        expected_furikanji="か カゾク[家族]と",
+        expected_furikanji_with_tags_split="か<on> カ[家]</on><on> ゾク[族]</on>と",
+        expected_furikanji_with_tags_merged="か<on> カゾク[家族]</on>と",
+        expected_kana_only="かカゾクと",
+        expected_kana_only_with_tags_split="か<on>カ</on><on>ゾク</on>と",
+        expected_kana_only_with_tags_merged="か<on>カゾク</on>と",
+    )
+    test(
+        test_name="a particle opening the text, with highlight",
+        kanji="家",
+        sentence="か家族[かぞく]と",
+        expected_furigana="か<b> 家[カ]</b> 族[ゾク]と",
+        expected_furigana_with_tags_split="か<b><on> 家[カ]</on></b><on> 族[ゾク]</on>と",
+        expected_furigana_with_tags_merged="か<b><on> 家[カ]</on></b><on> 族[ゾク]</on>と",
+        expected_furikanji="か<b> カ[家]</b> ゾク[族]と",
+        expected_furikanji_with_tags_split="か<b><on> カ[家]</on></b><on> ゾク[族]</on>と",
+        expected_furikanji_with_tags_merged="か<b><on> カ[家]</on></b><on> ゾク[族]</on>と",
+        expected_kana_only="か<b>カ</b>ゾクと",
+        expected_kana_only_with_tags_split="か<b><on>カ</on></b><on>ゾク</on>と",
+        expected_kana_only_with_tags_merged="か<b><on>カ</on></b><on>ゾク</on>と",
+    )
+    test(
+        test_name="a particle opening the text, kanji with a sound change",
+        kanji="",
+        sentence="が学校[がっこう]に",
+        expected_furigana="が 学校[ガッコウ]に",
+        expected_furigana_with_tags_split="が<on> 学[ガッ]</on><on> 校[コウ]</on>に",
+        expected_furigana_with_tags_merged="が<on> 学校[ガッコウ]</on>に",
+        expected_furikanji="が ガッコウ[学校]に",
+        expected_furikanji_with_tags_split="が<on> ガッ[学]</on><on> コウ[校]</on>に",
+        expected_furikanji_with_tags_merged="が<on> ガッコウ[学校]</on>に",
+        expected_kana_only="がガッコウに",
+        expected_kana_only_with_tags_split="が<on>ガッ</on><on>コウ</on>に",
+        expected_kana_only_with_tags_merged="が<on>ガッコウ</on>に",
+    )
+    test(
+        test_name="a particle opening the text before a jukujikun word",
+        kanji="",
+        sentence="も紅葉[もみじ]が",
+        expected_furigana="も 紅葉[もみじ]が",
+        expected_furigana_with_tags_split="も<juk> 紅[もみ]</juk><juk> 葉[じ]</juk>が",
+        expected_furigana_with_tags_merged="も<juk> 紅葉[もみじ]</juk>が",
+        expected_furikanji="も もみじ[紅葉]が",
+        expected_furikanji_with_tags_split="も<juk> もみ[紅]</juk><juk> じ[葉]</juk>が",
+        expected_furikanji_with_tags_merged="も<juk> もみじ[紅葉]</juk>が",
+        expected_kana_only="ももみじが",
+        expected_kana_only_with_tags_split="も<juk>もみ</juk><juk>じ</juk>が",
+        expected_kana_only_with_tags_merged="も<juk>もみじ</juk>が",
+    )
+    test(
+        test_name="honorific opening the text is given back to it",
+        kanji="前",
+        sentence="お前[おまえ]",
+        expected_furigana="お<b> 前[まえ]</b>",
+        expected_furigana_with_tags_split="お<b><kun> 前[まえ]</kun></b>",
+        expected_furigana_with_tags_merged="お<b><kun> 前[まえ]</kun></b>",
+        expected_furikanji="お<b> まえ[前]</b>",
+        expected_furikanji_with_tags_split="お<b><kun> まえ[前]</kun></b>",
+        expected_furikanji_with_tags_merged="お<b><kun> まえ[前]</kun></b>",
+        expected_kana_only="お<b>まえ</b>",
+        expected_kana_only_with_tags_split="お<b><kun>まえ</kun></b>",
+        expected_kana_only_with_tags_merged="お<b><kun>まえ</kun></b>",
+    )
+    test(
+        test_name="honorific opening the text before a jukujikun word",
+        kanji="",
+        sentence="お土産[おみやげ]",
+        expected_furigana="お 土産[みやげ]",
+        expected_furigana_with_tags_split="お<juk> 土[みや]</juk><juk> 産[げ]</juk>",
+        expected_furigana_with_tags_merged="お<juk> 土産[みやげ]</juk>",
+        expected_furikanji="お みやげ[土産]",
+        expected_furikanji_with_tags_split="お<juk> みや[土]</juk><juk> げ[産]</juk>",
+        expected_furikanji_with_tags_merged="お<juk> みやげ[土産]</juk>",
+        expected_kana_only="おみやげ",
+        expected_kana_only_with_tags_split="お<juk>みや</juk><juk>げ</juk>",
+        expected_kana_only_with_tags_merged="お<juk>みやげ</juk>",
+    )
     test(
         test_name="Should work for 4-kanji word",
         kanji="漢",

@@ -8,6 +8,18 @@ try:
     from mecab_controller.kana_conv import to_hiragana
 except ImportError:
     from ..mecab_controller.kana_conv import to_hiragana
+try:
+    from kana.mora_alignment import find_first_complete_alignment
+except ImportError:
+    from ..kana.mora_alignment import find_first_complete_alignment
+try:
+    from kana.mora_splitter import split_to_mora_list
+except ImportError:
+    from ..kana.mora_splitter import split_to_mora_list
+try:
+    from utils.logger import Logger
+except ImportError:
+    from ..utils.logger import Logger
 
 # Regex for a word that opens with kana and then has nothing but kanji before its furigana, so
 # that the kana it opens with can be taken out of the reading. For example
@@ -16,10 +28,10 @@ except ImportError:
 # (c) いざという時[いざというとき]
 # (d) スペイン語[すぺいんご]   - the word's kana is katakana, the reading's is hiragana
 #
-# The kana is only taken when the reading opens with it too, which the replacer checks, and
-# only where the word itself starts, so that a particle in a sentence is never mistaken for
-# part of the word after it. Without this the main pass hands the whole reading to the kanji
-# and the opening kana spells itself twice: お前[おまえ] came out as お 前[おまえ], read おおまえ.
+# The match only starts where the word itself does, so that a particle mid-sentence is never
+# mistaken for part of the word after it. At the start of the text, of a line or after a tag
+# there is no such boundary to go by, so the replacer decides those by the reading; see it for
+# why a prefix test on its own is not enough.
 LEADING_KANA_CLEANING_REC = re.compile(
     rf"""
 (?<![^ >])                      # the word's own start: the text's, a space's or a tag's
@@ -32,8 +44,36 @@ LEADING_KANA_CLEANING_REC = re.compile(
     re.VERBOSE,
 )
 
+# The prefixes that spell themselves even when the kanji's readings settle nothing either way:
+# the honorifics, a katakana run, and any run of more than one kana. A lone hiragana in front of
+# a kanji is a particle far more often than it is part of the word, so も紅葉[もみじ] keeps its
+# reading whole while お土産[おみやげ] gives the お back - both readings the kanji cannot account for.
+SELF_READING_PREFIX_REC = re.compile(r"^(?:[おご]|御|[ァ-ヶー]+|[ぁ-んァ-ヶー]{2,})$")
 
-def leading_kana_cleaning_replacer(match):
+# Probing a reading the writer may not have meant is expected to fail, so the alignment's
+# complaints about it are not the caller's business.
+SILENT_LOGGER = Logger("error", log=lambda _message: None)
+
+
+def unread_kanji_count(kanji: str, furigana: str) -> int:
+    """
+    How many of `kanji` no listed reading can account for if `furigana` is their whole reading.
+
+    Zero means every kanji was matched to a reading of its own, which is the alignment the main
+    pass is looking for; a higher count means that many were left to be guessed at as jukujikun.
+    """
+    mora_result = split_to_mora_list(furigana, len(kanji))
+    alignment = find_first_complete_alignment(
+        word=kanji,
+        furigana=furigana,
+        maybe_okuri="",
+        mora_list=mora_result["mora_list"],
+        logger=SILENT_LOGGER,
+    )
+    return len(alignment["jukujikun_positions"])
+
+
+def leading_kana_cleaning_replacer(match, logger: Logger = Logger("error")):
     """
     re.sub replacer for LEADING_KANA_CLEANING_REC, giving the kanji only its own reading:
     (a) お前[おまえ] becomes お前[まえ]
@@ -41,17 +81,41 @@ def leading_kana_cleaning_replacer(match):
     (c) いざという時[いざというとき] becomes いざという時[とき]
     (d) スペイン語[すぺいんご] becomes スペイン語[ご]
 
-    The word is left alone unless the reading really does open with the same kana, read the
-    same way - お金[かね] omits the お from its reading, and there is nothing to take out of
-    it - and unless something is left over afterwards for the kanji to be read as.
+    That the reading opens with the same kana as the word proves nothing on its own: a particle
+    at the start of a field, of a line or after a tag opens the same way, and taking its kana out
+    of the reading cost the word its first mora - か家族[かぞく] came out as か 家族[ぞく], with
+    家 left unread and the word tagged jukujikun. So the kanji's own listed readings decide it:
+    whichever spelling of the reading leaves fewer kanji unaccounted for is the one the writer
+    meant. 家族 reads かぞく whole and ぞく not at all, so the か stays in; 前 reads まえ but not
+    おまえ, so the お comes out.
+
+    When neither spelling can be fully read - お土産[おみやげ], も紅葉[もみじ], both jukujikun
+    either way - the readings settle nothing and SELF_READING_PREFIX_REC decides instead.
     """
     pre = match.group("pre")
+    kanji = match.group("kanji")
     furigana = match.group("furi")
     # Compared as hiragana: the word may write its kana as katakana while the reading is kana.
     prefix = to_hiragana(pre)
     if not to_hiragana(furigana).startswith(prefix) or len(furigana) <= len(prefix):
+        # お金[かね] omits the お from its reading, so there is nothing to take out of it.
         return match.group(0)
-    return f"{pre}{match.group('kanji')}[{furigana[len(prefix):]}]"
+    stripped = furigana[len(prefix) :]
+    kept_unread = unread_kanji_count(kanji, furigana)
+    stripped_unread = unread_kanji_count(kanji, stripped)
+    if stripped_unread != kept_unread:
+        take_the_kana = stripped_unread < kept_unread
+    else:
+        # The kanji's readings account for neither spelling, so the prefix has to decide.
+        take_the_kana = bool(SELF_READING_PREFIX_REC.match(pre))
+    logger.debug(
+        f"leading_kana_cleaning_replacer - {pre}{kanji}[{furigana}]: unread kanji"
+        f" {kept_unread} keeping the kana vs {stripped_unread} taking it,"
+        f" taking it: {take_the_kana}"
+    )
+    if not take_the_kana:
+        return match.group(0)
+    return f"{pre}{kanji}[{stripped}]"
 
 
 # Regex for a word written as one furigana group whose reading covers okurigana in the middle,

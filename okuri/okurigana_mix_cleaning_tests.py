@@ -193,6 +193,37 @@ def main():
         text=" 私[わたし]は 元気[げんき]です",
         expected=" 私[わたし]は 元気[げんき]です",
     )
+    # A particle at the start of the text, of a line or after a tag has no space in front of it
+    # to mark where the word begins, so only the kanji's readings tell it from a prefix. Taking
+    # its kana cost the word its first mora: か家族[かぞく] became か家族[ぞく], leaving 家 unread.
+    test(
+        test_name="a particle opening the text is not taken for part of the word",
+        text="か家族[かぞく]と",
+        expected="か家族[かぞく]と",
+    )
+    test(
+        test_name="a particle opening the text whose kanji takes a sound change",
+        text="が学校[がっこう]に",
+        expected="が学校[がっこう]に",
+    )
+    test(
+        test_name="a particle opening the text before a jukujikun word",
+        text="も紅葉[もみじ]が",
+        expected="も紅葉[もみじ]が",
+    )
+    # The honorific is still given back when the kanji can account for neither spelling: 土産
+    # reads みやげ as jukujikun either way, so the prefix itself has to decide.
+    test(
+        test_name="honorific prefix before a jukujikun word",
+        text="お土産[おみやげ]",
+        expected="お土産[みやげ]",
+    )
+    # A reading that spells a particle out belongs to the particle, not to the kanji.
+    test(
+        test_name="a particle spelled out in the reading is given back",
+        text="と時間[とじかん]",
+        expected="と時間[じかん]",
+    )
     test(
         test_name="an already cleaned word is not cleaned again",
         text="消[き]え去[さ]る",
@@ -221,6 +252,8 @@ def main():
         ("其の物", "そのもの"),
         ("包み紙", "つつみがみ"),
         ("良い塩梅", "いいあんばい"),
+        ("土産", "みやげ"),
+        ("紅葉", "もみじ"),
     ]:
         test_reads_back(f"{word} reads back", word, reading)
 

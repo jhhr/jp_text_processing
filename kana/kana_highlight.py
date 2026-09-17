@@ -1133,7 +1133,9 @@ def kana_highlight(
     # follows sees one word rather than a 々 with no kanji in front of it to repeat
     clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
-    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
+    clean_text = LEADING_KANA_CLEANING_REC.sub(
+        partial(leading_kana_cleaning_replacer, logger=logger), clean_text
+    )
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
