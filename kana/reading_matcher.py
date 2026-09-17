@@ -20,6 +20,10 @@ try:
 except ImportError:
     from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 try:
+    from kana.mora_splitter import long_vowel_variants
+except ImportError:
+    from .mora_splitter import long_vowel_variants
+try:
     from okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
 except ImportError:
     from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
@@ -86,11 +90,13 @@ def check_reading_match(
     if not reading:
         return "", "none"
 
-    # Normalize long vowel marks in the observed mora for matching (e.g. コー -> コウ).
-    normalized_mora = mora_string.replace("ー", "う")
+    # Spell out any long vowel mark in the observed mora, so that a reading written out in full
+    # can match it (せんせー -> せんせい, とーきょー -> とうきょう). The mark stands for the vowel of the
+    # kana before it, which may be spelled more than one way, so every spelling is a candidate.
+    long_vowel_spellings = long_vowel_variants(mora_string)
 
     def matches(candidate: str) -> bool:
-        return candidate == mora_string or candidate == normalized_mora
+        return candidate == mora_string or candidate in long_vowel_spellings
 
     # 1. Plain match
     if matches(reading):

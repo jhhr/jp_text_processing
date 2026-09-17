@@ -195,12 +195,12 @@ LONG_VOWEL_MAP = {
     # All single kana mora mapped to their vowel sounds
     "か": "あ",
     "く": "う",
-    "け": "お",
+    "け": "え",
     "こ": "お",
     "き": "い",
     "が": "あ",
     "ぐ": "う",
-    "げ": "お",
+    "げ": "え",
     "ご": "お",
     "ぎ": "い",
     "さ": "あ",
@@ -266,6 +266,11 @@ LONG_VOWEL_MAP = {
     "ゐ": "い",
     "ゑ": "え",
     "を": "お",
+    # The small kana that end a palatalized mora, which is what a ー after one lengthens
+    "ゃ": "あ",
+    "ゅ": "う",
+    "ょ": "お",
+    "ゎ": "あ",
     # All small vowel kana, these would be used in palatalized mora
     "ぁ": "あ",
     "ぃ": "い",

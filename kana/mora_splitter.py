@@ -50,6 +50,46 @@ def normalize_long_vowel_marks(furigana: str) -> tuple[str, list[int]]:
     return furigana, [i for i, char in enumerate(furigana) if char == "ー"]
 
 
+def long_vowel_variants(kana_string: str) -> frozenset[str]:
+    """
+    Spell out every ー in a kana string as the vowel it stands for.
+
+    The vowel a ー lengthens is the vowel of the kana before it (LONG_VOWEL_MAP), but the vowel
+    is not always how the word is spelled out: an お-row long vowel is usually written with う
+    (とーきょー = とうきょう) and an え-row one with い (せんせー = せんせい), while the doubled
+    vowel spelling also exists (おおきい, おねえさん). Both are returned for those two rows, so a
+    caller matching against dictionary readings can accept either spelling.
+
+    A ー with no mappable kana before it (string-initial, or after ん or っ) is left as it is.
+
+    :param kana_string: Hiragana with zero or more ー in it
+    :return: Every spelling the string could stand for, empty if it holds no ー
+    """
+    if "ー" not in kana_string:
+        return frozenset()
+
+    # Alternative spellings of a lengthened vowel, beyond the vowel itself
+    alternatives = {"お": "う", "え": "い"}
+
+    variants = [""]
+    for char in kana_string:
+        if char != "ー":
+            variants = [variant + char for variant in variants]
+            continue
+        expanded = []
+        for variant in variants:
+            vowel = LONG_VOWEL_MAP.get(variant[-1:]) if variant else None
+            if vowel is None:
+                expanded.append(variant + char)
+                continue
+            expanded.append(variant + vowel)
+            if vowel in alternatives:
+                expanded.append(variant + alternatives[vowel])
+        variants = expanded
+
+    return frozenset(variants)
+
+
 def attach_small_tsu(mora_list: list[str]) -> list[str]:
     """
     Attach a っ that stands alone to a neighbouring mora.
