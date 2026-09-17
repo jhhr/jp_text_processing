@@ -21,3 +21,15 @@ explicit_package_bases = true
 [[tool.mypy.overrides]]
 module = "jp_text_processing.mecab_controller.*"
 ignore_errors = true
+
+# The suites live inside the package next to what they test and are named `*_tests.py`, not
+# pytest's default `test_*.py`. Having this section here is also what makes this directory
+# pytest's rootdir, so a run from `anki_shared/` reads these options and not the parent
+# add-on repo's `pytest.ini`.
+#
+# `anki_shared/` has to be the working directory for `jp_text_processing` to be importable,
+# and it holds an `anki/` package of its own that shadows the real one; pytest-anki's plugin
+# is autoloaded and imports `aqt`, which then dies on `anki.lang`. Nothing here needs Anki.
+[tool.pytest.ini_options]
+python_files = ["*_tests.py"]
+addopts = "-p no:anki"
