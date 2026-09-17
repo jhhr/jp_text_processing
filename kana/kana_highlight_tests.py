@@ -184,7 +184,7 @@ def main(test_nums: Optional[list[str]] = None) -> int:
                     # Uncaught exception, rerun with debug logging. The rerun outlives this
                     # iteration, which rebinds rerun_args, so bind them here.
 
-                    def rerun(args=rerun_args):
+                    def rerun_after_crash(args=rerun_args):
                         set_level("debug")
                         try:
                             kana_highlight(*args)
@@ -192,7 +192,7 @@ def main(test_nums: Optional[list[str]] = None) -> int:
                             package_logger.error("Error during rerun with debug logging: %s", e)
                             raise e
 
-                    record_failure(cur_test_num, rerun)
+                    record_failure(cur_test_num, rerun_after_crash)
                     print_progress(RED)
                     continue
 
@@ -215,12 +215,12 @@ Return type: {return_type}
                     # Store the first failed test with logging enabled to see what went
                     # wrong. diff and rerun_args are bound here because the loop rebinds
                     # them before the stored rerun is ever called.
-                    def rerun(args=rerun_args, case_diff=diff):
+                    def rerun_with_diff(args=rerun_args, case_diff=diff):
                         set_level("debug")
                         kana_highlight(*args)
                         print(case_diff)
 
-                    record_failure(cur_test_num, rerun)
+                    record_failure(cur_test_num, rerun_with_diff)
                     continue
                 if expected_failure is not None:
                     unexpected_pass_keys.append((cur_test_num, expected_failure))
@@ -5226,8 +5226,9 @@ Return type: {return_type}
         print(f"\n{RED}{total_failed_test_cases}/{run_test_cases} test cases failed{RESET}")
         print(f"{RED}Failed tests: {' '.join(failed_test_keys)}{RESET}")
         print(
-            "\nTo rerun particular tests with debug logging, run: `python run_with_setup.py"
-            " kana_highlight_tests.py X.Y Z.W ...` where X.Y Z.W are the test numbers from above"
+            "\nTo rerun particular cases, run this from the package's parent directory:"
+            " `python -B -m jp_text_processing.kana.kana_highlight_tests X.Y Z.W ...`"
+            " where X.Y Z.W are the case numbers from above"
         )
     if expected_failure_keys:
         print(f"{YELLOW}{len(expected_failure_keys)} expected failures:{RESET}")
@@ -5254,11 +5255,5 @@ Return type: {return_type}
 
 
 if __name__ == "__main__":
-    # Get potential test_num from command line args
-    test_nums = None
-    if len(sys.argv) >= 3:
-        # Running with python run_with_setup.py ..., so test nums are those after the first two args
-        test_nums = sys.argv[2:]
-    else:
-        test_nums = sys.argv[1:]
-    sys.exit(main(test_nums))
+    # Every argument is a case number: "X" for a whole test, "X.Y" for one of its cases.
+    sys.exit(main(sys.argv[1:]))
