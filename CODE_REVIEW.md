@@ -1,544 +1,408 @@
 # Code review: jp_text_processing
 
-Reviewed at commit `782a5bc` (main, 2026-09-17). Scope: every tracked file in the repository, the
-bundled `mecab_controller` submodule read for context only. Nothing in this report changes code;
-each finding was verified by reading the code and, where it says so, by running it.
+Reviewed at commit `1536ad7` (main, 2026-09-17). This is a fresh review of the whole tree after
+the 23 commits that followed the previous review at `782a5bc`; it replaces that report. Scope:
+every tracked file, the bundled `mecab_controller` submodule read for context only. Nothing in
+this report changes code. Every finding was checked by reading the code and, where it says so, by
+running it; the fixes marked *verified* were applied on a scratch copy and the full pytest suite
+run against them, then reverted.
 
 ## Summary
 
-The library does a hard job well most of the time: 1874 kana_highlight test cases pass, the other
-test scripts pass, and the alignment/okurigana pipeline handles a large number of awkward Japanese
-cases. The problems are concentrated in a few places:
+The codebase is in much better shape than at the last review. The hand-rolled test harnesses are
+gone and every suite runs under pytest with a non-zero exit on failure; logging goes through the
+standard `logging` module and nothing threads a logger through call signatures; mypy is clean with
+the repo's own config; about 600 lines of dead code and the dual import scheme are gone; and all
+five of the previous high-severity bugs are fixed.
 
-- **Five high-severity correctness bugs** that produce wrong furigana or wrong highlights on
-  plausible input: reading order gets scrambled around a partially matched word, a particle in
-  front of a word is stripped out of the kanji reading, `[sound:...]` tags are destroyed,
-  `一万`/`一億` lose their `一`, and kana-only word highlighting matches unrelated words.
-- **The test scripts cannot fail CI.** Most of them call `sys.exit(0)` on failure and the main
-  suite never sets a non-zero exit code, so a red run looks green to any automation.
-- **Structural debt**: a dual import scheme repeated in every file, generic top-level package
-  names, stale type definitions, ~600 lines of dead code, and an exhaustive alignment search that
-  reaches one second per word at 11 kanji.
+What is left is concentrated in three places:
 
-Tooling results on the current tree:
+- **Two ways to corrupt or crash on ordinary input.** The okurigana-mix cleaning regex reads
+  through the closing `]` into the next word, so a sentence with two words sharing the same
+  okurigana (`見え[みえ]ない … 消え[きえ]た`) comes out of both `kana_filter` and
+  `kana_highlight` with the second word garbled. `word_highlight` raises on any one-kana word it
+  cannot find verbatim.
+- **Two alignment gaps.** A kanji written twice in a row is assumed to repeat its reading, so
+  `毎月月末[まいつきげつまつ]` tags げつ as kunyomi; and a word at the start of a line is not
+  recognised as a word start, so it skips two cleaning passes.
+- **Performance.** The alignment search is still exhaustive: 1.0 s at 11 kanji, 3.2 s with
+  okurigana after it, and a word that opens with kana is aligned three times.
+
+Tooling on the current tree (run from the package's parent directory):
 
 | Check | Result |
 | --- | --- |
-| `kana/kana_highlight_tests.py` | 1874 cases pass, 1.2 s |
-| `kana/kana_filter_tests.py`, `check_word_reading_type_tests.py`, `okuri/okurigana_mix_cleaning_tests.py`, `word/word_highlight_tests.py` | pass |
-| Inline `main()` tests in 7 library modules | pass |
-| `ruff check --select E,F,B,W` | 44 findings (32 are `B008` mutable-default `Logger(...)`) |
-| `pyflakes` | 7 findings (unused imports, unused `nonlocal`) |
-| `mypy --ignore-missing-imports` | 197 errors in 36 files |
+| `python -m pytest jp_text_processing` | 2601 passed, 240 skipped, 1 xfailed, 7 s |
+| `mypy --config-file jp_text_processing/pyproject.toml -p jp_text_processing` | clean, 64 files |
+| `pyflakes` (outside `mecab_controller/`) | clean |
+| `ruff check` with pyupgrade/isort/simplify/bugbear rules | 90 findings, 80 auto-fixable, 1 real (`B018`, see L7) |
 
-There is no `pyproject.toml`, `requirements.txt`, CI config, or lint config in the repo, so the
-tool runs above used default settings.
+The 240 skips are modes a `kana_highlight` case gives no expectation for, by design. The one
+xfail is the colloquial 無[ねえ] word-highlight case, marked strict.
 
 ---
 
-## Fix review (main at 61cf286, 2026-09-17)
-
-Nine commits on main address H1–H5, M1, M3 and M7. Each was checked against its original
-failing input, against the pre-fix code (c5f1edb) on the same inputs, and by the four touched
-test suites, which all pass (`kana_highlight_tests` now 2168 cases).
-
-| Finding | Commit | Verdict | Notes |
-|---|---|---|---|
-| H1 | a7afa09 | Fixed | Per-run redistribution. `kana_only` output round-trips the furigana in order on every crafted input (`山川保田[ぱぴぷほぺぽ]`, two runs, runs at both ends). |
-| H2 | 864e2fd | Fixed, with a cost | `か家族[かぞく]`, `も紅葉[もみじ]` correct; every お/ご/katakana/multi-kana prefix probed is unchanged from before. Each prefixed word now runs two extra alignments, and the spelling that is wrong always fails, so it takes the exhaustive path (M4): the 6-kanji `ご協力者募集中` went from 22 ms to 107 ms. Cheap short-circuit: when the stripped probe leaves 0 unread and `SELF_READING_PREFIX_REC` matches the prefix, skip the kept probe. |
-| H3 | 83ce57e | Fixed | Whole match returned for every return type. |
-| H4 | ec910d3 | Fixed, rule applied inconsistently | 一万, 一億, 一千万 correct. Brute force against a reference over 50 000 numbers found one systematic deviation: a 千 that heads a myriad group keeps its 一 only when nothing follows it before the unit. 1000万 → 一千万 but 1200万 → 千二百万 and 1203兆 → 千二百三兆. The commit message says a 千 topping a 万-group keeps it; the lookahead `(?!千[万億兆京])` only covers the bare case. If 一千二百万 is intended, use `(?!千[一二三四五六七八九十百]*[万億兆京])`. Either convention is acceptable Japanese, but a furigana like いっせんにひゃくまん will only align under one of them. |
-| H5 | a1648fd, 61cf286 | Fixed, one regression | はし/あめ no longer highlight, はしらないで still does, バズった and バズってる are bolded whole. **Regression:** `バズられた` (passive of an unknown verb) was fully highlighted before and is not highlighted at all now. mecab gives バズ/られ/た and `POSSIBLE_OKURIGANA_PROGRESSION_DICT` has no `is_last` on ら→れ→た for v5r or v1, so the stem is rejected. Accept the stem also when the next token passes `get_all_conjugation_conditions` (られ has headword られる and is a verb); that keeps はしが rejected. Limitation, not a regression: `バズっている` stops at って because mecab tokenizes って as one particle and the ている rule in `verb_conjugation_conditions` wants the previous token to be exactly て/で, while 食べている is bolded whole. |
-| M1 | 5ba21b1 | Fixed | Every one of the 82 `LONG_VOWEL_MAP` entries now matches its gojūon row (checked programmatically). とーきょー, せんせー, けーざい, ぎゅーにゅー, おーきい all match. |
-| M3 | 772aa85 | Fixed, two caveats | Design choice to be aware of: every `<b>` in the text is stripped, including the caller's emphasis on unrelated words (`<b>今日</b>は 食[た]べる` → `今日は …`). Bug: `</?b>` misses tags with attributes, so `<b class='x'>食[た]</b>べる` keeps the opening tag and loses the closing one, leaving unbalanced HTML. `</?b(?:\s[^>]*)?>` would cover it. |
-| M7 | 3f3d381 | Fixed | 漢字, 生物 in 生物学, 物理 in 生物物理学 highlight correctly in all return types; `人々` as `kanji_to_highlight` now highlights (it did not before). Single-kanji and repeater words are identical to before on every probe. |
-
-M2 stays latent (see below); M4, M5, M6, M8 and the Low/Design items are untouched.
-
-Noticed while verifying, pre-existing and not caused by these commits:
-
-- `highlight_inflected_words_with_mecab` loses or misplaces HTML tags that wrap the highlighted
-  word: `あ<span>食べた</span>` → `あ<b>食べた</b>` (span gone), `<span>はしって</span>` →
-  `<b><span>は</span>しって</b>`. A space inside the word breaks the same bookkeeping:
-  `食べ た` → `<b >食べた</b>`.
-- Katakana-stem verbs that mecab knows never highlight: `サボった`/サボる, `ミスった`/ミスる.
-  `base_form_word` is rebuilt with a katakana ending (サボル), which never equals mecab's headword
-  サボる, and the hiragana retry (さぼる) does not either. ググる only works because mecab does
-  not know it and the stem path takes over.
-
 ## High severity
 
-### H1. Reading order is scrambled when a matched kanji sits between unmatched kanji
+### H1. The okurigana-mix cleaning regex reads past the closing bracket and corrupts the next word
 
-`kana/jukujikun_processor.py:209-261` (`process_jukujikun_positions`, fallback redistribution).
-
-When an alignment is partial, the code concatenates the mora of every unmatched position into one
-string, re-splits it, and deals it out evenly across the jukujikun positions. It ignores where the
-matched kanji sits, so mora that belong after the matched kanji can be dealt to positions before it.
-
-Verified:
-
-```
-kana_highlight("", "山川保田[ぱぴぷほぺぽ]", "kana_only", WithTagsDef(False, False, False, False))
--> 'ぱぴぷぺほぽ'      # input reading was ぱぴぷほぺぽ: ほ and ぺ have swapped
-kana_highlight("", "国際連合安全保障理[ぱぴぷぺぽぱぴぷぺぽぱぴぷぺ]", "kana_only", ...)
--> 'ぱぴぷぺぽぱぴぷぺぱぴぽぷぺ'   # 保 kept its ぽ, two later mora moved in front of it
-```
-
-Any word where reading matching succeeds for a middle kanji but fails on both sides (unknown
-reading, misspelt furigana, kanji missing from `all_kanji_data.json`) silently reorders the
-learner's reading. `kana_only` output, which is what a card shows, is affected directly.
-
-Fix: redistribute per contiguous run of jukujikun positions. For each run, take only the mora that
-`alignment["mora_split"]` assigned to that run's slots (they are already in order and already
-bounded by the neighbouring matched kanji), and deal those out. Never pool mora across a matched
-position.
-
-### H2. Leading-kana cleaning strips particles out of the kanji reading
-
-`okuri/okurigana_mix_cleaning_replacer.py:506-537` (`LEADING_KANA_CLEANING_REC`,
-`leading_kana_cleaning_replacer`), applied in `kana/kana_highlight.py:1123`.
-
-The pass exists for お前[おまえ] and スペイン語[すぺいんご]. Its only guard is "the reading starts
-with the same kana", which any particle or leading kana that happens to share the kanji's first
-mora also satisfies.
-
-Verified:
+`okuri/okurigana_mix_cleaning_replacer.py:133` and `:136`: the reading groups are `(?P<furi1>.+)`
+and `(?P<furi2>.+)`. `.` matches `]`, and `furi1` is deliberately greedy (the comment below the
+pattern explains why: `hira1` has to be the *last* occurrence of that kana in the reading). Greedy
+`.+` therefore also matches across `]` and the words after it, and stops at the last place in the
+whole text where `hira1` is followed by `]`. Two words in one sentence whose okurigana ends in the
+same kana are enough:
 
 ```
-kana_highlight("", "か家族[かぞく]と", "furigana")   -> 'か<juk> 家族[ぞく]</juk>と'
-kana_highlight("", "が学校[がっこう]に", "furigana") -> 'が<juk> 学校[っこう]</juk>に'
+kana_filter("彼は 見え[みえ]ない 所[ところ]で 消え[きえ]た")
+  -> "彼はみえないところで 消え[き]えた"       (bracket and kanji left in the kana output)
+kana_highlight("", "これは 上げ[あげ]て 下げ[さげ]る", "furigana")
+  -> "これは<kun> 上[あげ]</kun>て 下げ[さ]げる"  (上げ mis-split, 下げ left unprocessed)
+kana_filter("食べ[たべ]たい 食べ[たべ]る")
+  -> "たべたい 食べ[た]べる"
 ```
 
-The word loses its first mora, fails to align, and is tagged jukujikun. Triggers on any text
-where a kana precedes a kanji word without a space at the start of a field, a line, or after a
-tag, which is exactly where the lookbehind `(?<![^ >])` allows the match.
+The first word gets the whole span up to the other word's bracket as its reading, and the second
+word is rewritten into a form nothing downstream recognises. `kana_filter` is the add-on's
+replacement for Anki's kana filter, so this reaches every card that has two such words on a line.
+Only words with okurigana before the bracket trigger it, but those are the common verb and
+adjective forms.
 
-Fix: do not strip on a string-prefix test alone. Either restrict `pre` to the prefixes that
-genuinely carry their own reading (お/ご/御 honorifics, katakana runs, or an explicit list), or
-try the alignment both with and without the prefix removed and keep the one that aligns
-completely. The second option is safest because it uses the kanji data as the oracle.
+**Fix (verified, 2601 pass):** bound both groups to the bracket, `(?P<furi1>[^\]]+)` and
+`(?P<furi2>[^\]]+)`. Greediness within the bracket is unchanged, so 勿体無い[もったいない] and
+行き来[いきき] still split as the comment describes. Add the three inputs above as cases in
+`okurigana_mix_cleaning_tests.py` and `kana_filter_tests.py`; nothing in either suite currently has
+two mixed-okurigana words in one text.
 
-### H3. `[sound:...]` after a kanji is destroyed or read as furigana
+### H2. `word_highlight` raises on a one-kana word that is not in the text verbatim
 
-`kana/kana_highlight.py:893-946`.
-
-The `startswith("sound:")` guard at line 942 sits after the non-kana cleaning at line 893, which
-turns `sound:test.mp3` into an empty string. The invalid-furigana branch then runs instead and the
-guard is unreachable. If the filename contains kana, the kana are used as the reading.
-
-Verified:
-
-```
-kana_highlight("", "漢字[sound:test.mp3]", "kana_only")   -> '<err>sound:test.mp3</err>'
-kana_highlight("", "漢字[sound:test.mp3]", "furigana")    -> '<err> 漢字[sound:test.mp3]</err>'
-kana_highlight("", "漢字[sound:かんじ.mp3]", "furigana")  -> '<on> 漢字[カンジ]</on>'
-```
-
-`kana_filter` (line 177) does this correctly by checking the raw group first.
-
-Fix: test `match.group(2).startswith("sound:")` on the raw bracket content before any cleaning and
-return `match.group(0)` unchanged. Add a test case for each return type.
-
-### H4. Numbers drop the `一` in 一万, 一億, 一兆, 一京
-
-`kanji/number_to_kanji.py:160-164`, with the wrong behaviour asserted by its own tests at
-lines 233-242.
-
-The post-processing strips `一` before every unit. That is right for 十/百/千 but wrong for 万 and
-above, which always keep `一` (一万円, 一億人). Verified:
+`word/highlight_inflected_words_with_mecab.py:59-63`: `word_stem = base_form_word[:-1]` is empty
+for a one-character word, and `is_katakana_str("")` in the submodule raises `ValueError: string
+can't be empty`. The path is reached whenever the kana-only branch of `word_highlight` fails its
+plain regex search, which is any one-kana word not present in the text:
 
 ```
-number_to_kanji("10000")     -> '万'      (expected 一万)
-number_to_kanji("10001")     -> '万一'    (expected 一万一)
-number_to_kanji("100000000") -> '億'      (expected 一億)
-kana_highlight("円", "10000円[いちまんえん]", "furigana")
--> '<kun> 10000[いちまん]</kun><b><on> 円[エン]</on></b>'   # alignment fails, digits tagged <kun>
+word_highlight("これは犬です", "ね")   -> ValueError
+word_highlight("食べた", "る")         -> ValueError
+word_highlight("ねこ", "ね")           -> "<b>ね</b>こ"   (found verbatim, never reaches mecab)
 ```
 
-Fix: only strip `一` before 十, 百, 千 (and not before a 千 that itself precedes 万, so 一千万 is
-kept). Update the tests at lines 233-242 to the correct readings.
+A one-kana word is an unusual thing to highlight, but the entry point is called from card
+rendering and an exception there aborts the whole card. Found by fuzzing 3750 random calls; it was
+the only exception.
 
-### H5. Kana-only word highlighting matches any token whose headword equals the stem
+**Fix (verified):** after computing `word_stem`, `if not word_stem: return text`. A one-kana word
+has no stem to inflect and the verbatim search has already failed, so there is nothing more to
+find.
 
-`word/highlight_inflected_words_with_mecab.py:154-156`:
+### H3. A kanji written twice in a row is given the first kanji's match without checking the second
 
-```python
-elif (token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
-) or token.headword == word_stem:
+`kana/mora_alignment.py:140` treats `next_kanji == kanji` the same as `々`, and at `:290-292` the
+second occurrence gets a copy of the first one's `ReadingMatchInfo` with only `matched_mora`
+replaced. The second reading is never matched against the kanji's own readings. That is correct
+for 々 (it has no readings of its own) and for a genuine doubled word, but a doubled kanji is just
+as often two words meeting, and then the readings differ:
+
+```
+毎月月末[まいつきげつまつ] -> <on> 毎[マイ]</on><kun> 月月[つきげつ]</kun><on> 末[マツ]</on>
+毎年年末[まいとしねんまつ] -> <on> 毎[マイ]</on><kun> 年年[としねん]</kun><on> 末[マツ]</on>
 ```
 
-The second clause ignores part of speech. For a verb like はしる the stem is はし, so the noun
-はし (橋/箸) is highlighted. Verified:
+げつ and ねん are onyomi and come out tagged `<kun>`, merged into one chunk with the kunyomi
+before them, and never converted to katakana. The existing 生物物理学 case passes only because
+both 物 happen to read ぶつ. The unchecked copy can also accept a wrong split: whatever mora the
+trial split hands the second kanji is taken as its reading, so the search can exit "complete" on a
+split the second kanji would have rejected.
 
-```
-word_highlight("はしをわたる", "はしる", Logger("error")) -> '<b>はし</b>をわたる'
-word_highlight("あめがふる",  "あめる", Logger("error")) -> '<b>あめ</b>がふる'
-```
-
-Fix: apply the stem clause only when the token is a verb or i-adjective (or when
-`get_word_type_from_mecab_token(token) == word_type`), or drop it and rely on headword matching
-plus the hiragana/katakana retry.
+**Fix (verified, 2601 pass, both words above come out `<kun> 月[つき]</kun><on> 月[ゲツ]</on>`):**
+when `next_kanji != "々"`, call `match_reading_to_mora` for the second occurrence on `second_mora`
+(with `is_last_kanji=(i + 1) == kanji_count - 1` and the same okurigana context) and use that
+match if there is one; fall back to the copy only when the second mora matches nothing, which
+keeps the doubled-kunyomi words like 各々 that only list the doubled reading. The 々 rewrite rule
+(`rendaku_matched` or written 々) can stay as it is.
 
 ---
 
 ## Medium severity
 
-### M1. Long vowel mark ー is only understood as う
+### M1. A word at the start of a line is not a word start
 
-`kana/reading_matcher.py:90` normalises `ー` to `う` and nothing else. Readings written with ー
-after an え/い/あ/お vowel do not match. Verified:
-
-```
-kana_highlight("生", "先生[せんせー]", "furigana") -> '<on> 先[セン]</on><b><juk> 生[せー]</juk></b>'
-kana_highlight("京", "東京[とーきょー]", "furigana") -> correct, because both are う-row
-```
-
-`regex/mora.py:194` already has `LONG_VOWEL_MAP` (preceding kana → vowel). Fix: build the
-normalised candidate with that map (せー → せえ, and also try せい for the え row, since えい is
-usually written ー) instead of a blanket replace.
-
-### M2. `verb_conjugation_conditions` looks up neighbours by value, not position (latent)
-
-`okuri/mecab_common.py:62` uses `all_tokens.index(token)`. `MecabParsedToken` is a frozen
-dataclass with value equality, so a repeated token resolves to its first occurrence: on
-食べていて見ていて every later て resolves to index 1 and every later い to index 2.
-
-Downgraded after testing. The callers (`get_conjugated_okuri_with_mecab.py:183`,
-`highlight_inflected_words_with_mecab.py:132`) stop at the first token that is not accepted, so a
-later duplicate is only examined when every earlier token was accepted, and the neighbour-dependent
-conditions then give the same answer for the first occurrence as for the real one. An identity-based
-lookup was compared against the current code on 24 inputs built to have repeated て/で/いる/ない
-tokens in one parse; no output differed. Treat it as a correctness hazard for future conditions,
-not a current bug. Fix is still one line: pass the index in from the callers' loops.
-
-### M3. Existing `<b>` tags in the input produce nested `<b>`
-
-`kana/kana_highlight.py:873` says the text is "cleaned from any previous `<b>` tags"; no cleaning
-happens. Verified:
+Both word-boundary lookbehinds are `(?<![^ >])` (`okurigana_mix_cleaning_replacer.py:22` and
+`:123`): the character before the word must be a space, a `>`, or nothing. A newline is neither,
+so the first word of every line after the first skips leading-kana cleaning and okurigana-mix
+cleaning, although the comment on the pattern says a line start counts:
 
 ```
-kana_highlight("字", "<b>漢字[かんじ]</b>", "furigana")
--> '<b><on> 漢[カン]</on><b><on> 字[ジ]</on></b></b>'
+kana_filter("行[い]く\n食べ[たべ]る")     -> "いく\n食べ[たべ]る"   (bracket left in the output)
+kana_highlight("", "行[い]く\nお前[おまえ]", "furigana")
+                                          -> "…\nお<juk> 前[おまえ]</juk>"   (お not taken out)
 ```
 
-Re-running the highlighter over its own output (a common Anki workflow) compounds this.
+The same inputs with `<br>` instead of `\n` are handled. Anki fields written in the HTML editor
+use `<br>`, but fields pasted or imported as plain text carry `\n`.
 
-Fix: strip `<b>`/`</b>` before processing, or state in the docstring that the caller must.
+**Fix (verified):** `(?<![^\s>])` in both patterns.
 
-### M4. Alignment search is exhaustive and gets slow past ten kanji
+### M2. The alignment search is exhaustive
 
-`kana/mora_alignment.py:107` enumerates every ordered split via `get_ordered_sublists`
-(C(mora-1, kanji-1) splits) and scores each from scratch. Measured with mecab warm:
+Unchanged from the previous review's M4, restated with current numbers because every prefixed
+word now pays it three times (H2's fix runs two probe alignments before the real one):
 
-| Input | Splits tried | Time |
+| Input | Time | `check_reading_match` calls |
 | --- | --- | --- |
-| 東京特許許可局 (7 kanji) | – | 12 ms |
-| 国際連合安全保障理事会 (11 kanji, 16 mora) | 2588 | 1.06 s |
-| same word, reading that matches nothing | – | 1.36 s |
+| 東京特許許可局 (7 kanji) | 10 ms | |
+| ご協力者募集中 (6 kanji, kana prefix) | 92 ms | three full alignments |
+| 国際連合安全保障理事会 (11 kanji, 16 mora) | 1.0 s | 29 500, of which 188 distinct (kanji, chunk, context) |
+| 国際連合安全保障理事会…する (okurigana after it) | 3.2 s | 304 700 |
 
-The profile shows 295k `check_reading_match` calls for that one word, and 25k
-`match_kunyomi_to_mora` calls each of which re-parses the reading string and rebuilds candidate
-lists. On top of that every `logger.debug(f"... {alignment}")` formats a full dict repr even when
-debug is off (`utils/logger.py` takes the finished string).
+Every (kanji, chunk) pair is re-scored once per split that contains it, about 150 times over for
+the 11-kanji word. The best alignment of the rest of the word depends only on which kanji you are
+at and where in the mora sequence you are, not on the path taken to get there, so the search is a
+dynamic program over (kanji index, mora position): kanji × mora² reading checks instead of
+C(mora−1, kanji−1) splits.
 
-Fix, in order of payoff:
-1. Memoise `match_reading_to_mora(kanji, mora_sequence, okuri)` for the duration of one
-   `find_first_complete_alignment` call; the same (kanji, substring) pair is scored hundreds of
-   times across splits.
-2. Replace the enumerate-all-splits loop with a left-to-right DP over mora positions (for each
-   kanji, for each end position, best alignment so far). This is polynomial and gives the same
-   "first complete / best partial" answer.
-3. Make debug logging lazy (`logger.debug(lambda: ...)` or check `logger.level` first) in the hot
-   loops of `mora_alignment.py` and `reading_matcher.py`.
+Two steps, in order. First an `lru_cache` on `match_reading_to_mora` keyed by kanji, chunk,
+okurigana, `is_last_kanji` and the repeater chunk; that alone turns the 29 500 calls into 188 with
+no change to the search. Then replace the split enumeration with the memoised recursion. What the
+DP has to keep: the repeater lookahead (a kanji followed by 々 is one step that advances two
+kanji), the last kanji's `maybe_okuri`, the yōon retry, and the tie-breaking order (today the
+first complete alignment in enumeration order wins, and among partials fewest jukujikun then most
+characters matched; a DP must define ties the same way or outputs shift). Check it is
+output-identical on the full suite before switching. The two probe alignments in
+`leading_kana_cleaning_replacer` become cheap with the same change; until then, skip the kept
+probe when the stripped one leaves nothing unread and `SELF_READING_PREFIX_REC` matches the
+prefix.
 
-### M5. The test scripts cannot fail a CI run
+Not part of this: `get_conjugated_okuri_with_mecab` is called from `match_onyomi_to_mora` for
+every onyomi match of every split (4022 times on the last input above), but the submodule's LRU
+cache on `translate` makes that 31 ms of the 3.2 s. Not worth touching before the search is.
 
-- `kana/kana_highlight_tests.py:main` prints "N test cases failed" and returns; the process exits 0.
-- `sys.exit(0)` on assertion failure: `kana/construct_wrapped_furi_word.py:484`,
-  `okuri/get_conjugated_okuri_with_mecab.py:420`, `okuri/starts_with_okurigana_conjugation.py:305`,
-  `kanji/number_to_kanji.py:261`, `word/word_up_to_okuri.py:299`, `word/word_highlight_tests.py:40`,
-  and `exit(0)` in `kana/check_word_reading_type_tests.py:36`.
-- Only `kana_filter_tests.py`, `okurigana_mix_cleaning_tests.py`, `use_tag_cleaning.py`, and
-  `use_text_part_storage.py` exit 1 on failure.
-- `ignore_fail=True` is used on three cases (two in `kana_highlight_tests.py`, one in
-  `word_highlight_tests.py`) to silence known failures without recording them as expected failures.
-- `kana/kana_highlight_tests.py:160-193` (`ruff B023`): the `rerun` closures capture `rerun_args`
-  and `diff` late, so the "debug log for first failed test" printed at the end re-runs the *last*
-  case of that test, not the one that failed.
+### M3. Kana-only word highlighting misses two verb shapes
 
-Fix: convert the scripts to `unittest` or `pytest` (each `test(...)` call becomes a parametrised
-case), exit non-zero on failure, mark the three ignored cases `xfail` with a reason, and add a
-one-line CI workflow that runs them. The mecab binary is bundled, so CI needs no system packages.
+Both in `highlight_inflected_words_with_mecab`, both known from the previous fix review and still
+open:
 
-### M6. Type definitions are out of sync with the code (mypy: 197 errors)
+- **Passive of a verb mecab does not know.** `word_highlight("バズられた", "バズる")` highlights
+  nothing. mecab gives バズ/られ/た, `inflected_stem_okurigana_len` walks
+  `POSSIBLE_OKURIGANA_PROGRESSION_DICT` for v5r/v1 over られた and finds no `is_last`, so the
+  stem is rejected. バズった and バズらない work. Before a1648fd the whole word was bolded.
+  Accepting the stem also when the token after it passes `get_all_conjugation_conditions` (られ
+  has headword られる and is a verb) covers it and still rejects はしが.
+- **Katakana-stem verbs mecab does know.** `word_highlight("サボった", "サボる")` highlights
+  nothing. `:60-63` rebuilds `base_form_word` with a katakana ending when the stem is katakana,
+  giving サボル, which never equals mecab's headword サボる. The conversion exists for noun-form
+  input (バズり → バズる), so apply it only to the noun-form branch, or compare headwords in
+  hiragana.
 
-- `all_types/main_types.py:66-90` `FinalResult` declares `highlight_segment_index`, `edge`,
-  `match_type`; the code builds it with `highlight_segment_indices`, `highlight_match_type`,
-  `restored_chars` (`kana/kana_highlight.py:809-819`) and reads those with `.get(...)`
-  (`kana/kana_highlight.py:266-273`), so the TypedDict guarantees nothing.
-- `YomiMatchResult` documents an `all_readings_processed` field that does not exist; the only
-  function using the type (`handle_furigana_doubling`, line 584) reads `match_type` which is not
-  a field either. Both are dead code (see L3).
-- `WrapMatchEntry` requires `is_noun_suru_verb` but `kana/construct_wrapped_furi_word.py:114-204`
-  and `kana/kana_highlight.py:771-777` build entries without it (8 mypy errors).
-- `kana/kana_highlight.py:1077`: `juku_parts: dict[int, str]` is actually
-  `dict[int, WrapMatchEntry]`.
-- `okuri/get_conjugatable_okurigana_stem.py:25`: `CONJUGATABLE_LAST_OKURI: set[str]` is assigned a
-  `dict_keys`. It is also unused.
-- `okuri/okurigana_dict.py:213-242`: declared return `tuple[dict | None, PartOfSpeech]` but
-  returns `(None, None)`.
+### M4. HTML around a highlighted word is nested or split by the mecab path
 
-Fix: make `FinalResult` match reality (or drop it and pass a dataclass), make
-`is_noun_suru_verb` `NotRequired`, and add mypy to CI once the import scheme (M8) stops producing
-"already defined" noise.
-
-### M7. Multi-character `kanji_to_highlight` takes the whole-word path and breaks alignment
-
-`kana/kana_highlight.py:980-986` treats `full_word == kanji_to_highlight` as a whole-word case and
-`whole_word_mora_split` (line 830) returns one mora slot for a multi-kanji word. Verified:
+`highlight_inflected_words_with_mecab` restores tags by stored index after inserting `<b>`, and
+two cases come out wrong:
 
 ```
-kana_highlight("漢字", "漢字[かんじ]", "furigana")
--> prints "[ERROR] find_first_complete_alignment - mora_split contains fewer parts than kanji_count"
--> '<juk> 漢字[かんじ]</juk>'
+word_highlight("<b>食べた</b>", "食べる")          -> "<b><b>食べた</b></b>"
+word_highlight("<span>はしって</span>", "はしる")  -> "<b><span>は</span>しって</b>"
 ```
 
-The docstring says `kanji_to_highlight` "should be a single kanji character", but the invalid-
-furigana branch at line 910 explicitly supports multi-character values, and `word_highlight`
-passes `""`. Fix: validate at entry (`len(kanji_to_highlight) <= 1` or raise), and make the
-whole-word shortcut condition `len(full_word) == 1 or word_is_repeated_kanji`.
-
-### M8. Dual import scheme and generic top-level package names
-
-Every module repeats this block up to ten times:
-
-```python
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
-```
-
-Consequences observed:
-- `mypy` reports "Name already defined (possibly by an import)" for each block, which is most of
-  the 197 errors and hides the real ones.
-- A real `ImportError` inside a dependency (for example the bundled mecab binary missing at
-  `mecab_controller/mecab_exe_finder.py:35`, which asserts at import time) is caught and re-raised
-  as a misleading relative-import error.
-- The first form imports top-level packages named `kana`, `word`, `kanji`, `okuri`, `regex`,
-  `utils`, `test`. `regex` is a widely installed PyPI package and `utils` is the most common
-  accidental module name in any environment; whichever is found first on `sys.path` wins, silently.
-  When both forms resolve (repo root on `sys.path` and the repo imported as a package) the same
-  module is loaded twice under two names, so module-level state such as the mecab singleton and
-  the caches is duplicated.
-- The scheme is not even consistent: `kana/kana_highlight.py:5` and
-  `okuri/check_okurigana_for_inflection.py:2-9` use plain relative imports, while
-  `okuri/get_conjugated_okuri_with_mecab.py:174` and the `word/` modules use a third variant
-  (`from mecab_common import ...`, no package prefix).
-
-Fix: add a `pyproject.toml` that declares the package (`jp_text_processing`), use relative imports
-everywhere, and run tests with `python -m jp_text_processing.kana.kana_highlight_tests` (or
-pytest) from the parent directory. `test/run_with_setup.py` and its `.vscode` glue then go away.
+The first is what happens when the highlighter is run on its own output; `kana_highlight` strips
+existing `<b>` for exactly this reason (`kana/kana_highlight.py:47`) and `word_highlight` does
+not. The second is the stem-match path (`stem_okuri_remaining`) closing the highlight inside a
+token, which the index bookkeeping in `use_tag_cleaning` does not model. Both are in the branch
+`balance_b_tags` was added to protect. Strip `<b>`/`</b>` from the text on entry the way
+`kana_highlight` does, and add the `<span>` case to `word_highlight_tests.py`; it is the shape
+the add-on produces when a previous run wrapped the word.
 
 ---
 
 ## Low severity
 
-### L1. Double spaces anywhere in the text are collapsed
+### L1. `EXISTING_BOLD_TAGS_REC` misses a `<b>` with attributes
 
-`kana/kana_highlight.py:1130` runs `re.sub(r" {2}", " ", processed_text)` over the whole output,
-including HTML the caller owns. Verified: `"<pre>a   b</pre> 漢字[かんじ]"` comes back with
-`a  b`. Fix: collapse only the spaces the reconstruction itself introduces (the leading space in
-`render_segment`), not the entire string.
+`kana/kana_highlight.py:47`, `</?b>`: `<b class="x">漢字[かんじ]</b>` keeps its opening tag and
+loses the closing one, leaving `<b class="x"><b>…</b>…` unbalanced. `</?b(?:\s[^>]*)?>` covers it.
+Carried over from the previous fix review.
 
-### L2. `process_jukujikun_positions` mutates its input and has an unbound-variable path
+### L2. Number conversion
 
-- `kana/jukujikun_processor.py:174-197` appends to `alignment["jukujikun_positions"]` and
-  overwrites `alignment["kanji_matches"][0]` on the alignment passed in. The caller then reads the
-  same object (`kana/kana_highlight.py:1095`), so the function's effect depends on call order.
-- Lines 217-229: if the `try` at 217 raises, `juku_mora_str` is never assigned, and the
-  `logger.debug(f"... {juku_mora_str}")` on line 229 raises `NameError` regardless of log level.
-  Not reachable today (the only way in is `mora_split=None`, which the fallback at
-  `mora_alignment.py:399-411` produces only when both inputs are missing), but the handler is wrong.
+- `kanji/number_to_kanji.py:164`: the rule that a 千 heading a myriad group keeps its 一 only
+  applies when nothing follows the 千: 10000000 → 一千万 but 12000000 → 千二百万 and 1203兆 →
+  千二百三兆. Both spellings are acceptable Japanese, but a furigana of いっせんにひゃくまん aligns
+  only against one of them. `(?!千[一二三四五六七八九十百]*[万億兆京])` makes it consistent. The
+  tests at `number_to_kanji_tests.py:90-103` pin the bare case only.
+- `:141-142`: `clean_num_str = num_str.strip()` is overwritten on the next line by a comprehension
+  over the unstripped `num_str`, so `" 12 "` is returned as-is. Either strip in the comprehension
+  or delete the line.
 
-### L3. Dead code (about 600 lines)
+### L3. `verb_conjugation_conditions` finds a token's neighbours by value
 
-Unreferenced anywhere outside their own definitions (checked with grep over all `.py` files):
+`okuri/mecab_common.py:48`, `all_tokens.index(token)`. `MecabParsedToken` is a frozen dataclass
+with value equality, so a token that appears twice in the text resolves to the first occurrence
+and `prev_token`/`next_token` are the wrong neighbours. Only the で rule (`next_token.headword ==
+"いる"`) reads a neighbour whose identity matters; a probe with two で in one text
+(`急いで 読んでいる`) still came out right because いる is checked by its own previous token. Latent;
+pass the index from the caller's loop instead.
 
-- `kana/kana_highlight.py`: `re_match_from_right/left/middle` (128-137), `onyomi_replacer`,
-  `kunyomi_replacer` (140-157), `furigana_reverser` (193-210), `REPLACED_FURIGANA_*_RE` (213-215),
-  `apply_katakana_conversion` (218-246), `is_reading_in_furigana_section` (411-520),
-  `process_kunyomi_match` (523-546), `handle_furigana_doubling` (549-599),
-  `JUKUJIKUN_KUNYOMI_OVERLAP` (119-125), `SMALL_TSU_POSSIBLE_*`/`VOWEL_CHANGE_DICT_*` (102-113,
-  duplicates of `reading_matcher.py:40-47`).
-- `regex/onyomi.py`: the whole file (438 lines).
-- `regex/kanji_furi.py`: `KANJI_RE_OPT`, `FURIGANA_NO_GROUPS_*`, `KANJI_AND_REPEATER_*`,
-  `HIRAGANA_RE`, `KATAKANA_REC`.
-- `kana/katakana_positions.py:convert_positions_to_katakana`.
-- `okuri/check_okurigana_for_inflection.py:check_any_okurigana_for_inflection` (also has an
-  off-by-one: `range(len(maybe_okuri) - 1)` never tries the full string).
-- `okuri/okurigana_dict.py`: `ONYOMI_GODAN_SU_FIRST_KANA`; `okuri/get_conjugatable_okurigana_stem.py`:
-  `CONJUGATABLE_LAST_OKURI`.
-- `word/word_up_to_okuri.py`: whole module (and `WORD_SPLIT_REC` inside it is unused even there).
-- `kana/construct_wrapped_furi_word.py`: `get_tag_order`, `match_tags_with_kanji`, `TagOrder`
-  (57-216) are only used by the module's own inline test; production goes through
-  `construct_wrapped_furi_word` with entries built by `reconstruct_from_alignment`.
-- `all_types/main_types.py`: `YomiMatchResult`, `Edge`, `MoraAlignment.is_complete` is redundant
-  with `jukujikun_positions` being empty (and `kana_highlight.py:1079` tests both).
+### L4. Exception handling inside `process_jukujikun_positions` has two rough edges
 
-### L4. Small defects
+`kana/jukujikun_processor.py:198-243`:
 
-- `okuri/check_okurigana_for_inflection.py:46`: bare `maybe_okuri` expression statement (ruff B018).
-- `kana/construct_wrapped_furi_word.py:423-427`: both branches of the `if` are identical.
-- `kanji/number_to_kanji.py:140-141`: `clean_num_str = num_str.strip()` is overwritten on the next
-  line using the unstripped `num_str`, so `" 12"` is not converted.
-- `kana/kana_highlight.py:862-875`: the docstring sits after the first statement, so it is a
-  no-op string expression and `help(kana_highlight)` is empty.
-- `kana/kana_highlight.py:884`: `nonlocal kanji_to_highlight` is never assigned.
-- `word/word_up_to_okuri.py:251`: `import re` inside the function, already imported at the top.
-- `okuri/starts_with_okurigana_conjugation.py:248`: `not x in y` (ruff E713).
-- `word/word_highlight.py:254`: `word[: -len(ending_okurigana)]` with an empty
-  `ending_okurigana` is `word[:-0]`, i.e. `""`. Harmless today because the branch that follows
-  uses `word`, not `word_without_furigana`.
-- `word/word_highlight.py:210`: `text=None` is returned as `None` although the signature says `str`.
-- `okuri/okurigana_dict.py`: 12 duplicate tuples in `ALL_OKURI_BY_PART_OF_SPEECH` (e.g.
-  `(28, "られます")` twice). Harmless, but a sign the table is hand-maintained.
+- The loop mutates the caller's alignment (`jukujikun_positions.append`, `kanji_matches[0] =`),
+  which the docstring does not say and `kana_highlight` does not expect (it reads
+  `alignment["jukujikun_positions"]` again afterwards).
+- `:230-243` gives an unmatched kanji in front of an exception a synthetic *onyomi* match for the
+  prefix kana, but leaves its index in `jukujikun_positions`, so the redistribution still assigns
+  it a `<juk>` entry. The entry wins for the tag and the synthetic match wins for
+  `highlight_match_type`, so a caller asking what kind of reading was highlighted is told onyomi
+  for something rendered as jukujikun. No exception word in the table triggers it today (every
+  prefix probed, 生真面目, 不真面目, 白薔薇, 大風邪, matched a real reading); either drop the block
+  or remove the index from `jukujikun_positions` when it fires.
 
-### L5. The empty-okurigana marker is added for every part of speech
+### L5. Degenerate furigana produces empty tags and empty brackets
 
-`okuri/okurigana_dict.py:1522-1527` calls `add_char_dict("", ..., is_last=True)` inside the loop
-for every entry, so `okuri_dict[""]` is `{"is_last": True}` for every POS. The dedicated
-`(1, "")` entry at line 267 and the guards `not okuri_dict[""]` at
-`starts_with_okurigana_conjugation.py:248` and `:278` are therefore dead, and any unmatched
-suffix yields `"empty_okuri"` rather than `"no_okuri"`:
+Too few mora for the kanji is handled without crashing, but the output has holes:
 
 ```
-starts_with_okurigana_conjugation("かた", "む", "読", "よ")
--> OkuriResults(okurigana='', rest_kana='かた', result='empty_okuri', part_of_speech='v5m')
+kana_highlight("国", "国際連合[こ]", "furigana")   -> <b><juk> 国[こ]</juk></b><juk> 際連合[]</juk>
+kana_highlight("国", "国際連合[こ]", "kana_only")  -> <b><juk>こ</juk></b><juk></juk>
+kana_highlight("漢", "漢字[]", "kana_only")        -> ""            (the word disappears)
 ```
 
-Downstream this scores as priority 1 instead of 0 in `match_kunyomi_to_mora` (line 433-438). It
-happens to work for noun forms like 読み方 but the semantics are not what the code claims. Fix:
-add the `""` marker only for the POS values that allow a bare stem (adj-i for 〜気な, verb
-noun forms), and add a test that a verb with a non-conjugation suffix returns `no_okuri`.
+`construct_wrapped_furi_word` already merges an entry with empty furigana into the one before it
+(`:145-152`) but only inside one segment; the highlight boundary splits these into separate
+segments. The last case is the empty-furigana branch of `furigana_replacer` returning the (empty)
+furigana in kana-only mode; returning the kanji would at least keep the text.
 
-### L6. Kanji character class gaps
+### L6. Every run of two spaces anywhere in the text is collapsed
 
-`regex/kanji_furi.py:7` (`KANJI_CHAR_RE`) and the copies in `word/word_highlight.py:44-52` and
-`kana/make_furigana_from_reading.py:9`:
+`kana/kana_highlight.py`, end of `kana_highlight`: `re.sub(r" {2}", " ", processed_text)` runs on
+the whole output, including spaces the caller had in plain text, and only collapses pairs (three
+spaces become two). Carried over. Limit it to the space the reconstruction adds, i.e. replace
+` ` + ` <tag>` at the seams rather than any double space.
 
-- CJK Extension B and later (U+20000+) are not matched. Verified:
-  `kana_highlight("", "𠮷野[よしの]", "furigana")` gives `'𠮷<juk> 野[よしの]</juk>'`, the kanji is
-  pushed outside the bracket. 𠮷 appears in common surnames.
-- 〇 (U+3007, used in numbers like 二〇二六) and 〆 are not kanji here.
-- `\d` accepts every Unicode decimal digit but `replace_numeric_substrings` only converts
-  `[0-9０-９]`, so `३月[さんがつ]` logs "Kanji data not found" twice and tags the digit `<kun>`.
-- `all_kanji_data.json` has no entry for `々`, so a word starting with 々 logs an error.
+### L7. Small defects
 
-Fix: one shared character class including `\U00020000-\U0003134F`, 〇, 〆; restrict digits to
-`[0-9０-９]`; and reference that class from `word_highlight.py` and `make_furigana_from_reading.py`
-instead of retyping it.
+- `okuri/check_okurigana_for_inflection.py:33`: a bare `maybe_okuri` expression statement, the one
+  real ruff finding (`B018`).
+- `kana/kana_highlight.py:517`: the docstring of `kana_highlight` sits after the `if with_tags_def
+  is None` block, so it is a string expression, not the function's docstring (`help()` and IDEs
+  show nothing).
+- `kana/construct_wrapped_furi_word.py:226-229`: both arms of `if return_type == "kana_only"` build
+  the same string.
+- `word/word_highlight.py:666`: the final `return text` is unreachable; every branch above returns.
+- `kana/kana_highlight.py`, `is_whole_word_case` → `whole_word_mora_split` is called with
+  `full_word` while the alignment runs on `alignment_word` (digits converted). They agree today
+  only because a one-character word converts to one kanji.
+- 80 of the 90 ruff findings are import order and `Optional[X]` → `X | None`; all auto-fixable,
+  none behavioural. Worth one `ruff --fix` commit, and a `[tool.ruff]` section in `pyproject.toml`
+  so the rule set is the repo's rather than whatever the environment has.
 
-### L7. Import-time side effects
+### L8. Import-time side effects and shared state
 
-- `okuri/mecab_common.py:34` constructs `MecabController()` at import. Importing
-  `kana.kana_highlight` therefore requires the mecab binary to exist (asserted in
-  `mecab_exe_finder.get_bundled_executable`) and `chmod`s it, before any text is processed.
-  Anything that only wants `kana_filter` or `number_to_kanji` pays this too.
-- `kanji/all_kanji_data.py:15` loads a 1 MB JSON at import.
-- `Logger("error")` is evaluated as a default argument in 32 signatures (ruff B008); every function
-  shares one instance, so setting a level on it in one place changes it everywhere.
+Carried over: `okuri/mecab_common.py:20` starts a `MecabController` and `kanji/all_kanji_data.py:17`
+loads the JSON when the modules are imported, so importing the package to use `number_to_kanji`
+pays for both; and `MecabController._cache` (`mecab_controller/mecab_controller.py:59`) is a
+class attribute, one cache for every instance. Neither matters inside Anki, both matter for tests
+and any second embedding.
 
-Fix: a lazy `get_mecab()` singleton, a lazily loaded kanji table, and `logger: Logger | None = None`
-with a module-level default.
+### L9. Heuristics carried over
 
-### L8. Logging
-
-`utils/logger.py` is a 35-line reimplementation that prints coloured strings to stdout. Library
-code emits `[ERROR]` lines to stdout for ordinary inputs (any kanji absent from the table, any
-multi-character `kanji_to_highlight`), which inside Anki go to the console or nowhere. Every
-`logger.debug(f"...")` call formats its argument eagerly (see M4). Fix: use `logging` with a
-`jp_text_processing` logger; callers configure handlers, `isEnabledFor(DEBUG)` guards the
-expensive reprs.
-
-### L9. `get_word_type_from_mecab_token` na-adjective heuristic
-
-`okuri/mecab_common.py:46` classifies any noun ending in か as a na-adjective (intended for 静か).
-Nouns such as ほか, なにか, いつか, and anything that is a question word plus か, are then treated
-as taking な as okurigana. Fix: use mecab's `形容動詞語幹` subclass (`%f[1]`) instead of the last
-kana.
+- `okuri/mecab_common.py:32`: a noun ending in か is a na-adjective (静か yes, but also 誰か,
+  何か, 幾つか).
+- `okuri/okurigana_dict.py:1513`: the empty-okurigana marker (for 恥ずかし気な) is added to every
+  part of speech, so a verb stem with nothing after it scores `empty_okuri` too.
+- `regex/kanji_furi.py:7`: `KANJI_CHAR_RE` stops at the BMP and Extension A; 〆, 〇 and Extension
+  B+ kanji are not kanji to the furigana regexes and their brackets are left untouched.
 
 ---
 
 ## Design observations
 
-### D1. Packaging and developer workflow
+### D1. Special cases live as code in four places
 
-There is no `pyproject.toml`, no declared dependencies, no lock file, no CI, no lint or type-check
-configuration, and the README covers two functions in six lines. Tests are run through a custom
-launcher (`test/run_with_setup.py`) that `exec`s a file with a synthetic `__package__`, wired up
-via checked-in `.vscode` files. All of that exists to work around M8. A package definition plus
-`pytest` removes the launcher, the VS Code glue, and the try/except import blocks in one change.
+Kanji-specific behaviour is written into the functions that hit it: 久/仄々/為/抉 in
+`get_conjugated_okuri_with_mecab.py:54,83-93`, 為 again in `reading_matcher.py:268` and
+`jukujikun_processor.py:296`, 見/着/煮/似/干/居/射/鋳 and 行/呉/有/在 in
+`okurigana_dict.get_part_of_speech`, and the whole-word/exception table in
+`furigana_exceptions.py`. Each was added for one test case. One table keyed by kanji (or word +
+reading) with the override as data, consulted from one place, would make the next case a row
+rather than a branch, and would make it possible to see what is special-cased at all.
 
-### D2. Module boundaries and duplication
+### D2. The word highlighter and the furigana highlighter disagree about HTML
 
-- `kana/kana_highlight.py` is 1133 lines, 285 of them in one nested closure (`furigana_replacer`,
-  lines 877-1120) that reads eleven variables from the enclosing scope. It also contains the dead
-  first-generation matcher (L3). Splitting it into `parse → normalise → align → reconstruct` as
-  top-level functions with explicit arguments would make the pipeline testable piece by piece.
-- Constants are defined in more than one place: `SMALL_TSU_POSSIBLE_HIRAGANA` and
-  `VOWEL_CHANGE_DICT_HIRAGANA` in both `kana_highlight.py` and `reading_matcher.py`; the kanji
-  character class retyped five times across `regex/kanji_furi.py`, `word/word_highlight.py` (four
-  regexes), and `kana/make_furigana_from_reading.py`; the katakana-position restore loop appears
-  in both `reconstruct_furigana` (`kana_highlight.py:288-303`) and `construct_wrapped_furi_word`
-  (`:380-394`).
-- `all_types/main_types.py` mixes result types with a duplicated `PartOfSpeech`/`PARTS_OF_SPEECH`
-  pair that must be kept in sync by hand.
+`kana_highlight` strips `<b>` on entry and re-adds its own; `word_highlight` keeps the caller's
+tags out of the way by index bookkeeping (`use_text_part_storage`, `use_tag_cleaning`,
+`use_splitter_dot_cleaning`, ~450 lines) and then repairs crossings after the fact
+(`balance_b_tags`, `apply_tag_fixes`). M4 and L1 are both consequences. The bookkeeping exists so
+that `<b>` can be placed by character offset into text that still contains tags; an alternative
+is to tokenise the text into (tag | text) runs once, run the matching over the concatenated text
+runs with a run map, and insert `<b>` by run rather than by offset. That is a rewrite of the word
+side only and would retire three helper modules.
 
-### D3. Special cases are scattered as code, not data
+### D3. `silenced()` is a global switch
 
-Word- and kanji-specific exceptions live in at least six places: `為` in
-`reading_matcher.py:284`, `jukujikun_processor.py:253`, `get_conjugated_okuri_with_mecab.py:242`
-and `okurigana_dict.py:170`; `久/仄々/抉` in `get_conjugated_okuri_with_mecab.py:242-279`;
-`行/呉/有/在/見/着/煮/似/干/居/射/鋳` in `okurigana_dict.py:167-200`; whole-word overrides in
-`furigana_exceptions.py`; `JUKUJIKUN_KUNYOMI_OVERLAP` (dead) in `kana_highlight.py`. Each new
-exception means finding the right `if` in the right file. One exceptions table keyed by
-(kanji, reading) with a documented precedence would make these reviewable and testable.
+`utils/logger.py`: the probe in `unread_kanji_count` disables the package logger for everyone,
+including errors from unrelated threads and the whole `process_mora_split` under it. Fine inside
+Anki's single thread; if the package is ever called from a worker, replace it with a logger
+adapter or a filter that drops records from the probe's own frames.
 
-The exception dictionary itself (`furigana_exceptions.py:38`) is keyed by a `"word_furigana"`
-string that `jukujikun_processor.py:156` splits back apart on `_`; a tuple key avoids the parsing.
-`process_jukujikun_positions` also scans every exception with substring tests on every call
-(line 153), which is fine at 16 entries and will not be at 500.
+### D4. No CI and no declared dev dependencies
 
-### D4. Mutable shared state
-
-The mecab controller is a module singleton with a class-level LRU cache shared by every instance
-(`mecab_controller/mecab_controller.py:53`); `process_jukujikun_positions` edits the alignment it
-is handed (L2); `Logger` instances are shared through default arguments (L7). None of this is a
-problem for single-threaded Anki use, but it makes the functions order-dependent and hard to test
-in isolation.
+`pyproject.toml` now documents how to run the suite and why from the parent directory, which is
+the right place for it; but there is no `.github/workflows`, no `requirements-dev.txt` or
+`[project.optional-dependencies]` naming pytest/mypy/ruff, and `README.md` does not mention tests
+at all. With the suite at 7 s and exit codes correct, a workflow that runs pytest and mypy on push
+is a small addition and would have caught H1 the day it was written, had the case existed.
 
 ### D5. Test suite shape
 
-The 1874-case suite in `kana_highlight_tests.py` is the project's real asset. Its weaknesses are
-mechanical: exit codes (M5), one giant `main()` with 235 `test(...)` calls instead of discoverable
-cases, no assertion that a case ran without `[ERROR]` output (H1 and M7 both log errors and still
-"pass"), inline `main()` test blocks embedded in seven library modules (which import `sys` and
-carry test data into production), and no tests at all for `mora_alignment.py`, `jukujikun_processor.py`,
-`furigana_normalizer.py`, or `reading_matcher.py` in isolation. Property-style tests like the
-`test_reads_back` loop in `okurigana_mix_cleaning_tests.py` are the right idea and would have
-caught H1 if applied to `kana_highlight` output generally (kana_only output must be a permutation-
-free copy of the input reading plus okurigana).
+The conversion to pytest is thorough and the ids are readable. Two things would pay off:
+
+- The suites that exercise the cleaning regexes have no multi-word inputs; H1 and M1 are both
+  "two words in one text" bugs. A handful of sentence-level cases in `kana_filter_tests.py` would
+  cover them.
+- `kana_highlight_tests.py` runs nine modes per case but skips the ones a case does not specify,
+  240 today. A skipped mode is still a mode the case runs through untested; filling in the
+  expectations for the ones that matter (kana-only for every furigana case, at least) would turn
+  those skips into coverage.
 
 ---
 
+## Status of the previous review's findings
+
+| Old | Status now |
+| --- | --- |
+| H1 reading order scrambled | Fixed (a7afa09, d9327db). |
+| H2 leading kana stripped | Fixed (864e2fd). The extra probes' cost is in M2 here. |
+| H3 `[sound:…]` destroyed | Fixed (83ce57e). |
+| H4 一万/一億 | Fixed (ec910d3); the 千二百万 inconsistency is L2 here. |
+| H5 kana-only highlight matched any stem | Fixed (a1648fd, 61cf286); the バズられた regression is M3 here. |
+| M1 long vowel mark | Fixed (5ba21b1). |
+| M2 neighbours by value | Still latent, L3 here. |
+| M3 nested `<b>` | Fixed for `kana_highlight` (772aa85); attributes are L1, `word_highlight` is M4. |
+| M4 exhaustive search | Open, M2 here. |
+| M5 tests cannot fail CI | Fixed (2df474b and the pytest conversion). |
+| M6 mypy 197 errors | Fixed (1a9f76e, 7787e4a): clean with the repo config. |
+| M7 multi-character `kanji_to_highlight` | Fixed (3f3d381). |
+| M8 dual imports, generic package names | Imports fixed (ea65189). Package names unchanged; harmless now that every import is relative. |
+| L1 double spaces | Open, L6 here. |
+| L2 mutation / unbound variable | Unbound variable fixed (1fa819a); mutation open, L4 here. |
+| L3 dead code | Fixed (d3f4bd0). |
+| L5 empty-okuri marker | Open, L9 here. |
+| L6 kanji class gaps | Open, L9 here. |
+| L7 import-time side effects | Open, L8 here. |
+| L8 logging | Fixed (76f9d7b, 9f577bb, 52cbfea). |
+| L9 na-adjective heuristic | Open, L9 here. |
+| D1 packaging | Partly: `pyproject.toml` exists; CI and dev deps are D4 here. |
+| D5 test suite shape | Fixed; follow-ups in D5 here. |
+
 ## Suggested order of work
 
-1. H3, H4, H5: small, local fixes with clear tests. One afternoon.
-2. H1 and H2: alignment logic changes; add reads-back property tests first so regressions show.
-3. M5 and D1: package definition, pytest conversion, CI. Everything after this is safer.
-4. M8 and L3: delete the dual imports and the dead code once tests run under pytest.
-5. M6, L7, L8: types, lazy singletons, `logging`.
-6. M4: memoise, then DP alignment, guided by the profile in this report.
-7. M1, M3, M7, L1, L5, L6, L9 as time allows.
+1. **H1**, one line, verified; add the sentence cases with it.
+2. **H2**, one guard, verified.
+3. **M1**, two characters, verified; belongs in the same commit as H1 since it is the same pair of
+   patterns.
+4. **H3**, verified; the only one of the four that changes alignment output, so run the suite
+   after it on its own.
+5. **M3** and **M4** together, both in `highlight_inflected_words_with_mecab`.
+6. **M2** in two steps as described, measuring after the cache before deciding on the DP.
+7. `ruff --fix`, L7's four small edits, and a CI workflow (D4) so the next regression is caught.
