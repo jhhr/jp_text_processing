@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 from .get_conjugatable_okurigana_stem import get_conjugatable_okurigana_stem
 from .starts_with_okurigana_conjugation import (
@@ -9,7 +8,7 @@ from .starts_with_okurigana_conjugation import (
 from ..all_types.main_types import (
     PartOfSpeech,
 )
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 
 def check_okurigana_for_inflection(
@@ -18,7 +17,6 @@ def check_okurigana_for_inflection(
     maybe_okuri: str,
     kanji_to_match: str,
     part_of_speech: Optional[PartOfSpeech] = None,
-    logger: logging.Logger = package_logger,
 ) -> OkuriResults:
     """
     Function that checks the okurigana for a match with the okurigana
@@ -26,7 +24,6 @@ def check_okurigana_for_inflection(
     :param reading: the kunyomi/onyomi reading to check against
     :param maybe_okuri: the okurigana string to check for inflections
     :param kanji_to_match: the kanji string to match against
-    :param logger: the logger to use for debugging
     :param part_of_speech: optional override for the part of speech to use
 
     :return: (string, string) the okurigana that should be highlighted and the rest of the okurigana
@@ -100,7 +97,6 @@ def check_okurigana_for_inflection(
             kanji_to_match,
             reading,
             part_of_speech=part_of_speech,
-            logger=logger,
         )
     )
     logger.debug(

@@ -1,10 +1,9 @@
-import logging
 import sys
 from typing import Optional
 
 from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
-from ..utils.logger import console_logging, package_logger
+from ..utils.logger import console_logging, package_logger as logger
 
 
 def starts_with_okurigana_conjugation(
@@ -13,7 +12,6 @@ def starts_with_okurigana_conjugation(
     kanji: str,
     kanji_reading: str,
     part_of_speech: Optional[PartOfSpeech] = None,
-    logger: logging.Logger = package_logger,
 ) -> OkuriResults:
     """
     Determine if a kana text starts with okurigana and return that portion and the rest of the text.
@@ -22,7 +20,6 @@ def starts_with_okurigana_conjugation(
     :param kanji_okurigana: okurigana of the kanji.
     :param kanji: kanji whose okurigana is being checked in kana_text.
     :param kanji_reading: reading of the kanji.
-    :param logger: the logger to use
     :param part_of_speech: Optional override for the part of speech.
     :return: tuple of the okurigana (if any) and the rest of the text
     """
@@ -36,7 +33,6 @@ def starts_with_okurigana_conjugation(
         kanji,
         kanji_reading,
         part_of_speech=part_of_speech,
-        logger=logger,
     )
 
     if not okuri_dict:

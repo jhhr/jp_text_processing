@@ -6,7 +6,6 @@ splitting mora evenly among consecutive jukujikun positions and extracting okuri
 when the last kanji is jukujikun.
 """
 
-import logging
 from typing import Tuple
 
 from ..all_types.main_types import ReadingMatchInfo, WrapMatchEntry
@@ -14,7 +13,7 @@ from .mora_splitter import split_to_mora_list
 from .mora_alignment import MoraAlignment
 from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 
 def should_reject_lexicalized_na_suffix(
@@ -50,9 +49,7 @@ def should_reject_lexicalized_na_suffix(
     return True
 
 
-def split_mora_for_jukujikun(
-    mora_list: list[str], kanji: list[str], logger: logging.Logger = package_logger
-) -> list[str]:
+def split_mora_for_jukujikun(mora_list: list[str], kanji: list[str]) -> list[str]:
     """
     Split mora evenly for jukujikun kanji using arithmetic division.
 
@@ -106,7 +103,6 @@ def process_jukujikun_positions(
     furigana: str,
     alignment: MoraAlignment,
     remaining_kana: str,
-    logger: logging.Logger = package_logger,
 ) -> Tuple[dict[int, WrapMatchEntry], str, str]:
     """
     Process jukujikun (unmatched) positions in the alignment.
@@ -219,7 +215,7 @@ def process_jukujikun_positions(
                 continue
 
             run_kanji = [word[pos] for pos in run]
-            redistributed_mora = split_mora_for_jukujikun(run_mora, run_kanji, logger=logger)
+            redistributed_mora = split_mora_for_jukujikun(run_mora, run_kanji)
 
             # Assign redistributed mora to this run's jukujikun positions
             for idx, pos in enumerate(run):
@@ -266,7 +262,6 @@ def process_jukujikun_positions(
             maybe_okuri=remaining_kana,
             okuri_prefix="reading",
             strict_inflection=True,
-            logger=logger,
         )
         word_okuri_result, word_is_noun_suru_verb = get_conjugated_okuri_with_mecab(
             word=word,
@@ -274,7 +269,6 @@ def process_jukujikun_positions(
             maybe_okuri=remaining_kana,
             okuri_prefix="reading",
             strict_inflection=True,
-            logger=logger,
         )
         # Whatever is taken as okurigana has to be spent out of the kana that follow the word:
         # okurigana + rest_kana == remaining_kana. A candidate claiming more than that has taken

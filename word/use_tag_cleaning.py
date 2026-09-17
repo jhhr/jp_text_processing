@@ -1,4 +1,3 @@
-import logging
 import re
 import sys
 
@@ -9,7 +8,7 @@ from .use_text_part_storage import (
     TextPartIndexes,
     TextPartRestorer,
 )
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 
 def increment_for_b_tag_insertion(
@@ -134,7 +133,6 @@ def apply_tag_fixes(restored_text: str) -> str:
 
 def use_tag_cleaning_with_b_insertion(
     text: str,
-    logger: logging.Logger = package_logger,
 ) -> tuple[str, BTagIndexIncrementer, TextPartRestorer, TextPartIndexes]:
     """
     Stores indexes of all HTML tags and removes them temporarily, to
@@ -142,7 +140,6 @@ def use_tag_cleaning_with_b_insertion(
 
     Args:
         text: The original text containing parts to be stored.
-        logger: the logger to use
     Returns:
         A tuple containing:
             - The cleaned text with parts removed.
@@ -151,7 +148,7 @@ def use_tag_cleaning_with_b_insertion(
             - The indexes of the stored tags.
     """
     cleaned_text, increment_indexes, restore_parts, indexes = use_text_part_storage(
-        text, part_regex=r"<\/?[^>]+>", logger=logger
+        text, part_regex=r"<\/?[^>]+>"
     )
 
     def custom_incrementer(

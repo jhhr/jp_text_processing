@@ -1,7 +1,5 @@
-import logging
-from functools import partial
 import re
-from typing import Optional, Union
+from typing import Optional
 
 from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
@@ -14,7 +12,7 @@ from .orphaned_repeater_cleaning import (
     ORPHANED_REPEATER_CLEANING_REC,
     orphaned_repeater_cleaning_replacer,
 )
-from ..utils.logger import LegacyLogger, as_logger, package_logger
+from ..utils.logger import package_logger as logger
 from ..kanji.number_to_kanji import number_to_kanji
 from ..okuri.okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
@@ -85,7 +83,6 @@ def reconstruct_furigana(
     with_tags_def: WithTagsDef,
     reconstruct_type: FuriReconstruct = "furigana",
     force_merge: bool = False,
-    logger: logging.Logger = package_logger,
 ) -> str:
     """
     Reconstruct the furigana from the replace result
@@ -162,7 +159,6 @@ def reconstruct_furigana(
             katakana_positions=katakana_positions,
             restored_chars=restored_chars,
             original_start_index=render_cursor,
-            logger=logger,
         )
         render_cursor += segment_furi_len
         return rendered
@@ -260,7 +256,6 @@ def reconstruct_from_alignment(
     original_furigana: str,
     reconstruct_type: FuriReconstruct,
     furigana_prefix: str = "",
-    logger: logging.Logger = package_logger,
 ) -> str:
     """
     Build furigana string from mora alignment and jukujikun parts.
@@ -281,7 +276,6 @@ def reconstruct_from_alignment(
     :param original_furigana: The original furigana before hiragana conversion
     :param furigana_prefix: Kana taken off the front of the furigana before matching, given back to
         the first kanji's reading here
-    :param logger: the logger to use
     :return: FinalResult with complete furigana and word parts
     """
     alignment_len = len(alignment["kanji_matches"])
@@ -480,7 +474,6 @@ def reconstruct_from_alignment(
         final_result,
         with_tags_def,
         reconstruct_type=reconstruct_type,
-        logger=logger,
     )
 
 
@@ -509,9 +502,7 @@ def kana_highlight(
     text: str,
     return_type: FuriReconstruct = "kana_only",
     with_tags_def: Optional[WithTagsDef] = None,
-    logger: Union[logging.Logger, LegacyLogger, None] = None,
 ) -> str:
-    logger = as_logger(logger)
     if with_tags_def is None:
         with_tags_def = WithTagsDef(
             True,  # with_tags
@@ -530,7 +521,6 @@ def kana_highlight(
         remove the kanji and return only the kana
     :param with_tags_def: tuple, with_tags and merge_consecutive keys. Whether to wrap the readings
         with tags and whether to merge consecutive tags
-    :param logger: the logger to use; `None` is the package logger
     :return: The text cleaned from any previous<b> tags and<b> added around the furigana
         when the furigana corresponds to the kanji_to_highlight
     """
@@ -661,7 +651,6 @@ def kana_highlight(
         exception_alignment = check_exception(
             word=repeater_word,
             furigana=full_furigana,
-            logger=logger,
         )
         logger.debug("furigana_replacer - exception_alignment: %s", exception_alignment)
         if exception_alignment is not None:
@@ -672,7 +661,6 @@ def kana_highlight(
                 furigana=full_furigana,
                 alignment=exception_alignment,
                 remaining_kana=maybe_okuri,
-                logger=logger,
             )
             use_okurigana = ""
             use_rest_kana = maybe_okuri
@@ -693,7 +681,6 @@ def kana_highlight(
                 original_furigana=original_furigana,
                 reconstruct_type=return_type,
                 furigana_prefix=furigana_prefix,
-                logger=logger,
             )
             return final_result
 
@@ -720,7 +707,6 @@ def kana_highlight(
                 furigana=full_furigana,
                 maybe_okuri=maybe_okuri,
                 possible_splits=possible_whole_word_splits,
-                logger=logger,
             )
         else:
             mora_result = split_to_mora_list(full_furigana, len(full_word))
@@ -732,7 +718,6 @@ def kana_highlight(
                 furigana=full_furigana,
                 maybe_okuri=maybe_okuri,
                 mora_list=mora_result["mora_list"],
-                logger=logger,
             )
 
         logger.debug("furigana_replacer - juku_positions: %s", alignment['jukujikun_positions'])
@@ -751,7 +736,6 @@ def kana_highlight(
                 furigana=full_furigana,
                 alignment=alignment,
                 remaining_kana=maybe_okuri,
-                logger=logger,
             )
             logger.debug(
                 "furigana_replacer - juku_parts: %s, juku_okurigana: %s", juku_parts, juku_okurigana
@@ -781,7 +765,6 @@ def kana_highlight(
             original_furigana=original_furigana,
             reconstruct_type=return_type,
             furigana_prefix=furigana_prefix,
-            logger=logger,
         )
         logger.debug("furigana_replacer - final_result: %s\n", final_result)
         return final_result
@@ -794,9 +777,7 @@ def kana_highlight(
     # follows sees one word rather than a 々 with no kanji in front of it to repeat
     clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, clean_text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
-    clean_text = LEADING_KANA_CLEANING_REC.sub(
-        partial(leading_kana_cleaning_replacer, logger=logger), clean_text
-    )
+    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)

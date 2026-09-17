@@ -1,15 +1,12 @@
-import logging
 import re
 from .kana_highlight import kana_highlight, WithTagsDef
 
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 KANJI_RE = r"[\d々\u4e00-\u9faf\u3400-\u4dbf]"
 
 
-def make_furigana_from_reading(
-    word: str, reading: str, logger: logging.Logger = package_logger
-) -> str:
+def make_furigana_from_reading(word: str, reading: str) -> str:
     """Generate furigana for a given word based on its reading.
 
     Args:

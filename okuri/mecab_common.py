@@ -1,4 +1,3 @@
-import logging
 from typing import Literal, Optional
 
 from ..mecab_controller.basic_types import (
@@ -7,7 +6,6 @@ from ..mecab_controller.basic_types import (
     PartOfSpeech,
 )
 from ..mecab_controller.mecab_controller import MecabController
-from ..utils.logger import package_logger
 
 MecabWordType = Literal[
     "i_adjective",
@@ -100,7 +98,6 @@ def get_all_conjugation_conditions(
     token: MecabParsedToken,
     all_tokens: list[MecabParsedToken],
     word_type: Optional[MecabWordType],
-    logger: logging.Logger = package_logger,
 ) -> tuple[bool, bool]:
     """Check if the token meets any conjugation conditions."""
     add_to_conjugated_okuri = False

@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 from ..all_types.main_types import PartOfSpeech
@@ -23,12 +22,10 @@ from ..okuri.okurigana_dict import (
     GODAN_FORM_VERB_STARTINGS,
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 
-def highlight_inflected_words_with_mecab(
-    text: str, base_form_word: str, logger: logging.Logger = package_logger, depth: int = 0
-) -> str:
+def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: int = 0) -> str:
     """
     Find inflected words in the given text using MeCab.
     :param text: The text to analyze.
@@ -106,12 +103,12 @@ def highlight_inflected_words_with_mecab(
 
     # Store indexes of all whitespace as mecab wipes them out
     space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
-        text, part_regex=r"\s+", logger=logger
+        text, part_regex=r"\s+"
     )
 
     # Clean html tags from the text temporarily
     html_and_space_free_text, increment_tag_indexes, restore_tags, _ = (
-        use_tag_cleaning_with_b_insertion(space_free_text, logger=logger)
+        use_tag_cleaning_with_b_insertion(space_free_text)
     )
 
     def increment_indexes_for_b(start: int, end: int) -> None:
@@ -207,17 +204,15 @@ def highlight_inflected_words_with_mecab(
         )
         if is_hiragana_str(base_form_word):
             return highlight_inflected_words_with_mecab(
-                text, to_katakana(base_form_word), logger, depth + 1
+                text, to_katakana(base_form_word), depth + 1
             )
         elif is_katakana_str(base_form_word):
             return highlight_inflected_words_with_mecab(
-                text, to_hiragana(base_form_word), logger, depth + 1
+                text, to_hiragana(base_form_word), depth + 1
             )
         else:
             # Mixed kana, convert to hiragana, the next recursion will convert to katakana
-            return highlight_inflected_words_with_mecab(
-                text, to_hiragana(base_form_word), logger, 0
-            )
+            return highlight_inflected_words_with_mecab(text, to_hiragana(base_form_word), 0)
     logger.debug("Final highlighted result before restoring tags/spaces: '%s'", result)
 
     # Restore removed parts in reverse order

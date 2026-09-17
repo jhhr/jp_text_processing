@@ -11,7 +11,7 @@ from ..all_types.main_types import (
     OkuriResults,
     OkuriType,
 )
-from ..utils.logger import console_logging, package_logger, set_level
+from ..utils.logger import console_logging, package_logger as logger, set_level
 
 from ..mecab_controller.basic_types import (
     MecabParsedToken,
@@ -24,7 +24,6 @@ def get_conjugated_okuri_with_mecab(
     maybe_okuri: str,
     okuri_prefix: OkuriPrefix = "word",
     strict_inflection: bool = False,
-    logger: logging.Logger = package_logger,
 ) -> tuple[OkuriResults, bool]:
     """
     Determines the portion of text that is the conjugated okurigana for a kanji reading.
@@ -33,7 +32,6 @@ def get_conjugated_okuri_with_mecab(
     :param reading: The reading of the kanji or word occurring before the okurigana
     :param okuri_prefix: Whether the maybe_okuri is attached to the "word" (kanji) or "reading" (kana) portion
     :param strict_inflection: Whether to enforce strict inflection rules
-    :param logger: the logger to use
     :return: A tuple of the okurigana that is part of the conjugation for threading
             and the rest of the okurigana, along with a boolean indicating if it is a suru verb
     """
@@ -137,7 +135,6 @@ def get_conjugated_okuri_with_mecab(
                     maybe_okuri,
                     okuri_prefix="reading",
                     strict_inflection=strict_inflection,
-                    logger=logger,
                 )
             else:
                 logger.debug("No reading available to retry with, returning no okuri.")
@@ -184,7 +181,6 @@ def get_conjugated_okuri_with_mecab(
             token,
             rest_tokens,
             word_type,
-            logger,
         )
         if add_to_conjugated_okuri:
             added_conjugation_token = True

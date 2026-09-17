@@ -1,8 +1,7 @@
-import logging
 import re
 import sys
 
-from ..utils.logger import console_logging, package_logger
+from ..utils.logger import console_logging, package_logger as logger
 
 JPN_NUMBER_TO_NUM = {
     "１": 1,
@@ -57,9 +56,7 @@ for jpn_num, num in JPN_NUMBER_TO_NUM.items():
     NUMBER_TO_KANJI[jpn_num] = KANJI_NUMERALS[num]
 
 
-def recursive_number_to_kanji(
-    num: int, result: list[str], digit_mult=1, logger: logging.Logger = package_logger
-) -> None:
+def recursive_number_to_kanji(num: int, result: list[str], digit_mult=1) -> None:
     """
     Recursively converts a number to its kanji representation.
     Args:
@@ -124,13 +121,13 @@ def recursive_number_to_kanji(
                 logger.debug("Recursive call for unit %s, digit %s", unit, digit)
                 sub_num = digit * unit // 10
                 logger.debug("Recursively processing number %s", sub_num)
-                recursive_number_to_kanji(sub_num, result, digit_mult * 10, logger)
+                recursive_number_to_kanji(sub_num, result, digit_mult * 10)
 
         num //= 10
         unit *= 10
 
 
-def number_to_kanji(num_str: str, logger: logging.Logger = package_logger) -> str:
+def number_to_kanji(num_str: str) -> str:
     """
     Converts a string representation of a number into its kanji representation.
 
@@ -157,7 +154,7 @@ def number_to_kanji(num_str: str, logger: logging.Logger = package_logger) -> st
 
     result: list[str] = []
 
-    recursive_number_to_kanji(num, result, digit_mult=1, logger=logger)
+    recursive_number_to_kanji(num, result, digit_mult=1)
 
     # Reverse the result to get the correct order
     result.reverse()

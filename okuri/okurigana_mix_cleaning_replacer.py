@@ -1,11 +1,10 @@
-import logging
 import re
 
 from ..regex.kanji_furi import KANJI_CHAR_RE
 from ..mecab_controller.kana_conv import to_hiragana
 from ..kana.mora_alignment import find_first_complete_alignment
 from ..kana.mora_splitter import split_to_mora_list
-from ..utils.logger import package_logger, silent_logger
+from ..utils.logger import package_logger as logger, silenced
 
 # Regex for a word that opens with kana and then has nothing but kanji before its furigana, so
 # that the kana it opens with can be taken out of the reading. For example
@@ -45,19 +44,19 @@ def unread_kanji_count(kanji: str, furigana: str) -> int:
     pass is looking for; a higher count means that many were left to be guessed at as jukujikun.
     """
     mora_result = split_to_mora_list(furigana, len(kanji))
-    alignment = find_first_complete_alignment(
-        word=kanji,
-        furigana=furigana,
-        maybe_okuri="",
-        mora_list=mora_result["mora_list"],
-        # Probing a reading the writer may not have meant is expected to fail, so the
-        # alignment's complaints about it are not the caller's business.
-        logger=silent_logger,
-    )
+    # Probing a reading the writer may not have meant is expected to fail, so the alignment's
+    # complaints about it are not the caller's business.
+    with silenced():
+        alignment = find_first_complete_alignment(
+            word=kanji,
+            furigana=furigana,
+            maybe_okuri="",
+            mora_list=mora_result["mora_list"],
+        )
     return len(alignment["jukujikun_positions"])
 
 
-def leading_kana_cleaning_replacer(match, logger: logging.Logger = package_logger):
+def leading_kana_cleaning_replacer(match):
     """
     re.sub replacer for LEADING_KANA_CLEANING_REC, giving the kanji only its own reading:
     (a) お前[おまえ] becomes お前[まえ]

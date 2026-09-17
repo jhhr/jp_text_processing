@@ -1,15 +1,13 @@
-import logging
 import re
 from typing import Literal
 
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 WordReadingType = Literal["on", "kun", "juk", "mix", ""]
 
 
 def check_word_reading_type(
     word_with_tags: str,
-    logger: logging.Logger = package_logger,
 ) -> WordReadingType:
     """Check if the processed furigana string contains only <kun> or <on> tags.
     Args:

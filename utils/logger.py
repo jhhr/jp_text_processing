@@ -3,20 +3,20 @@ The package logs through the standard `logging` module, under one logger named
 `jp_text_processing`. Library code never prints: the logger starts with a `NullHandler`, so
 whoever embeds the package decides where its lines go by adding handlers to `package_logger`
 and setting its level. `console_logging` is that decision made for the suites and scripts.
+
+There is only the one logger, so nothing is threaded through call signatures: a module that
+logs takes it as `from ..utils.logger import package_logger as logger` and calls it directly.
 """
 
 import logging
 import sys
-from typing import Literal, Optional, Protocol, TextIO, Union
+from contextlib import contextmanager
+from typing import Iterator, Literal, Optional, TextIO, Union
 
 LOGGER_NAME = "jp_text_processing"
 
 package_logger = logging.getLogger(LOGGER_NAME)
 package_logger.addHandler(logging.NullHandler())
-
-# Discards everything, for probes whose failures are expected and not worth a line.
-silent_logger = logging.getLogger(f"{LOGGER_NAME}.silent")
-silent_logger.disabled = True
 
 LogLevel = Literal["error", "warning", "info", "debug"]
 
@@ -76,48 +76,18 @@ def set_level(level: Union[LogLevel, int]) -> None:
     package_logger.setLevel(LOG_LEVELS[level] if isinstance(level, str) else level)
 
 
-class LegacyLogger(Protocol):
+@contextmanager
+def silenced() -> Iterator[None]:
     """
-    The hand-rolled logger the add-ons still pass in (`anki_shared/utils/logger.py`): a level
-    name plus one method per level taking the finished message.
+    Drop everything the package logs for the duration of the block.
+
+    For probes whose failures are expected and not worth a line: the caller asked a question the
+    package answers by trying an alignment that may well not exist, and its complaints about the
+    attempt are not the caller's business.
     """
-
-    level: LogLevel
-
-    def error(self, message: str) -> None: ...
-
-    def warning(self, message: str) -> None: ...
-
-    def info(self, message: str) -> None: ...
-
-    def debug(self, message: str) -> None: ...
-
-
-class _LegacyLoggerHandler(logging.Handler):
-    """Hands each record to the legacy logger's method for its level, prefix and colour included."""
-
-    def __init__(self, legacy: LegacyLogger):
-        super().__init__()
-        self.legacy = legacy
-
-    def emit(self, record: logging.LogRecord) -> None:
-        method = getattr(self.legacy, record.levelname.lower(), self.legacy.error)
-        method(self.format(record))
-
-
-def as_logger(logger: Union[logging.Logger, LegacyLogger, None]) -> logging.Logger:
-    """
-    The `logging.Logger` the package works with, from whatever a caller handed in.
-
-    `None` is the package logger. A legacy hand-rolled logger is wrapped in a standalone
-    `logging.Logger` that filters at its level and delivers through its own methods, so the
-    caller's sink and prefixes keep working unchanged.
-    """
-    if logger is None:
-        return package_logger
-    if isinstance(logger, logging.Logger):
-        return logger
-    adapted = logging.Logger(f"{LOGGER_NAME}.legacy", LOG_LEVELS[logger.level])
-    adapted.propagate = False
-    adapted.addHandler(_LegacyLoggerHandler(logger))
-    return adapted
+    was_disabled = package_logger.disabled
+    package_logger.disabled = True
+    try:
+        yield
+    finally:
+        package_logger.disabled = was_disabled

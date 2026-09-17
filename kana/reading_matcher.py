@@ -5,7 +5,6 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
-import logging
 from typing import Optional
 
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
@@ -16,7 +15,7 @@ from .mora_splitter import long_vowel_variants
 from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
 from ..okuri.okurigana_dict import get_verb_noun_form_okuri
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 # Small tsu conversion possible endings
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
@@ -46,7 +45,6 @@ def check_reading_match(
     reading: str,
     mora_string: str,
     okurigana: str = "",
-    logger: logging.Logger = package_logger,
 ) -> tuple[str, ReadingType]:
     """
     Core function to check if a reading matches a mora string, trying various phonetic changes.
@@ -166,7 +164,6 @@ def match_onyomi_to_mora(
     kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
-    logger: logging.Logger = package_logger,
 ) -> Optional[ReadingMatchInfo]:
     """
     Try to match onyomi readings to a mora sequence.
@@ -210,7 +207,6 @@ def match_onyomi_to_mora(
                 maybe_okuri=maybe_okuri,
                 okuri_prefix="word",
                 strict_inflection=True,
-                logger=logger,
             )
             lexical_suffix_without_inflection = (
                 okuri_result.result == "rejected_lexical_suffix" and not is_noun_suru_verb
@@ -237,7 +233,6 @@ def match_kunyomi_to_mora(
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,
-    logger: logging.Logger = package_logger,
 ) -> Optional[ReadingMatchInfo]:
     """
     Try to match kunyomi readings to a mora sequence.
@@ -290,7 +285,6 @@ def match_kunyomi_to_mora(
                 reading="す.る",
                 maybe_okuri=maybe_okuri,
                 kanji_to_match=kanji,
-                logger=logger,
             )
             logger.debug("match_kunyomi_to_mora - special 為 okurigana check result: %s", res)
             match_info["okurigana"] = res.okurigana
@@ -454,7 +448,6 @@ def match_reading_to_mora(
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,
-    logger: logging.Logger = package_logger,
 ) -> tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
     """
     Try to match any reading (onyomi or kunyomi) to a mora sequence.
@@ -483,16 +476,15 @@ def match_reading_to_mora(
             maybe_okuri,
             is_last_kanji,
             repeater_mora_sequence,
-            logger,
         )
         onyomi_match = match_onyomi_to_mora(
-            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji
         )
         return (kunyomi_match, onyomi_match)
     else:
         # When no okurigana, prefer onyomi for performance
         onyomi_match = match_onyomi_to_mora(
-            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji, logger
+            kanji, word, furigana, mora_sequence, kanji_data, maybe_okuri, is_last_kanji
         )
         if onyomi_match:
             return (None, onyomi_match)
@@ -504,7 +496,6 @@ def match_reading_to_mora(
             maybe_okuri,
             is_last_kanji,
             repeater_mora_sequence,
-            logger,
         )
         if kunyomi_match:
             return (kunyomi_match, None)

@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Callable, Protocol
 
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 TextPartIndexes = list[tuple[int, int, str]]
 OffsetIndexes = list[tuple[int, int]]
@@ -23,7 +23,6 @@ def make_diff_string_for_indexes(
     cleaned_text: str,
     indexes: TextPartIndexes,
     offset_indexes: OffsetIndexes,
-    logger: logging.Logger = package_logger,
 ) -> str:
     """Creates a diff string showing the parts that were changed based on the given indexes.
 
@@ -60,7 +59,7 @@ def make_diff_string_for_indexes(
 
 
 def use_text_part_storage(
-    text: str, part_regex: str = r"<\/?[^>]+>", logger: logging.Logger = package_logger
+    text: str, part_regex: str = r"<\/?[^>]+>"
 ) -> tuple[str, IndexIncrementer, TextPartRestorer, TextPartIndexes]:
     """
     Stores indexes of all parts matching the given regex and removes them temporarily, to
@@ -68,7 +67,6 @@ def use_text_part_storage(
     Args:
         text: The original text containing parts to be stored.
         part_regex: The regex pattern to identify parts to be stored. Defaults to HTML tags.
-        logger: the logger to use
     Returns:
         A tuple containing:
             - The cleaned text with parts removed.
@@ -164,7 +162,7 @@ def use_text_part_storage(
             logger.debug(
                 "Diff state after increment_indexes - part regex: %s\n\033[90m'%s'\033[0m",
                 part_regex,
-                make_diff_string_for_indexes(cleaned_text, part_indexes, offset_indexes, logger),
+                make_diff_string_for_indexes(cleaned_text, part_indexes, offset_indexes),
             )
 
     def restore_parts(edited_text: str) -> str:

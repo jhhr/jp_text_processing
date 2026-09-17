@@ -7,12 +7,11 @@ exceptions now return a MoraAlignment dict that the main pipeline can feed into
 and word edge splitting.
 """
 
-import logging
 from typing import TypedDict, Optional, List, Dict
 
 from .mora_alignment import MoraAlignment
 from ..all_types.main_types import MatchType, ReadingMatchInfo
-from ..utils.logger import package_logger
+from ..utils.logger import package_logger as logger
 
 
 class ExceptionAlignmentEntry(TypedDict):
@@ -181,7 +180,6 @@ def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAli
 def check_exception(
     word: str,
     furigana: str,
-    logger: logging.Logger = package_logger,
 ) -> Optional[MoraAlignment]:
     """
     Check if word+furigana combination is in the exception dictionary and return a

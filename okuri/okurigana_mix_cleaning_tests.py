@@ -1,3 +1,4 @@
+import logging
 import re
 import sys
 
@@ -6,10 +7,12 @@ from .okurigana_mix_cleaning_replacer import (
     OKURIGANA_MIX_CLEANING_REC,
     leading_kana_cleaning_replacer,
     okurigana_mix_cleaning_replacer,
+    unread_kanji_count,
 )
 
 from ..kana.make_furigana_from_reading import make_furigana_from_reading
 from ..mecab_controller.kana_conv import to_hiragana
+from ..utils.logger import package_logger
 
 
 RED = "\033[91m"
@@ -57,6 +60,29 @@ def test_reads_back(test_name: str, word: str, reading: str):
     # A word keeps its own kana as it writes them, so スペイン語 reads back as スペインご.
     got_reading = to_hiragana(GROUP_RE.sub(lambda m: m[2], plain).replace(" ", ""))
     check(f"{test_name} ({furigana})", (got_word, got_reading), (word, to_hiragana(reading)))
+
+
+def test_probe_says_nothing(test_name: str, kanji: str, furigana: str):
+    """The alignment `unread_kanji_count` asks for is expected to fail - it is probing a reading
+    the writer may not have meant - so none of what that attempt logs is the caller's business.
+    Silencing it one call signature at a time used to leak whatever a function further down was
+    called without the silent logger."""
+    logged: list[str] = []
+
+    class Collect(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            logged.append(record.getMessage())
+
+    handler = Collect()
+    previous_level = package_logger.level
+    package_logger.addHandler(handler)
+    package_logger.setLevel(logging.DEBUG)
+    try:
+        unread_kanji_count(kanji, furigana)
+    finally:
+        package_logger.setLevel(previous_level)
+        package_logger.removeHandler(handler)
+    check(test_name, logged, [])
 
 
 def main():
@@ -223,6 +249,12 @@ def main():
         text="消[き]え去[さ]る",
         expected="消[き]え去[さ]る",
     )
+
+    # --- the probe behind the leading-kana decision keeps its complaints to itself ----------
+    # 土産/みやげ reaches the godan-ending lookup, which used to log on the package logger because
+    # its caller never took the silent one; 紅葉/もみじ stops before it and was quiet either way.
+    test_probe_says_nothing(test_name="土産 probe is silent", kanji="土産", furigana="みやげ")
+    test_probe_says_nothing(test_name="紅葉 probe is silent", kanji="紅葉", furigana="もみじ")
 
     # --- the property all of it exists to keep ----------------------------------------------
     for word, reading in [

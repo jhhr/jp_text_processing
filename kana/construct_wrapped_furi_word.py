@@ -1,4 +1,3 @@
-import logging
 import re
 import sys
 from typing import Tuple, Optional, Literal
@@ -7,7 +6,7 @@ from ..mecab_controller.kana_conv import to_katakana, to_hiragana
 
 from ..all_types.main_types import WrapMatchEntry, WrapTag
 
-from ..utils.logger import console_logging, package_logger
+from ..utils.logger import console_logging, package_logger as logger
 
 from ..kanji.number_to_kanji import number_to_kanji
 
@@ -27,7 +26,6 @@ def construct_wrapped_furi_word(
     katakana_positions: list[int] | None = None,
     restored_chars: dict[int, str] | None = None,
     original_start_index: int = 0,
-    logger: logging.Logger = package_logger,
 ) -> str:
     """
     Construct the word with furigana wrapped in the appropriate tags.
@@ -43,7 +41,6 @@ def construct_wrapped_furi_word(
         kana that were rewritten before matching (ー, an iteration mark, a small vowel)
     :param original_start_index: Offset into original_furigana for the first character of this
         segment, used when reconstructing per-segment output
-    :param logger: the logger to use
     :return: The constructed furigana string
     """
     if katakana_positions is None:
@@ -206,7 +203,7 @@ def construct_wrapped_furi_word(
 
         # For multi-kanji numbers (3+ kanji) in furikanji/furigana modes, use <mix> tag
         if is_num and return_type != "kana_only" and tag != "mix" and IS_NUMBER_RE.match(kanji):
-            kanji_number = number_to_kanji(kanji, logger)
+            kanji_number = number_to_kanji(kanji)
             if len(kanji_number) >= 3:
                 tag = "mix"
 
