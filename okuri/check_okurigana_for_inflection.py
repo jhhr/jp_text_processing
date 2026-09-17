@@ -1,8 +1,5 @@
 from typing import Optional
-from .get_conjugatable_okurigana_stem import (
-    CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH,
-    get_conjugatable_okurigana_stem,
-)
+from .get_conjugatable_okurigana_stem import get_conjugatable_okurigana_stem
 from .starts_with_okurigana_conjugation import (
     OkuriResults,
     starts_with_okurigana_conjugation,
@@ -117,66 +114,4 @@ def check_okurigana_for_inflection(
 
     # No match, this text doesn't contain okurigana for the kunyomi word
     logger.debug("\ncheck okurigana 8 - no match")
-    return OkuriResults("", maybe_okuri, "no_okuri")
-
-
-def check_any_okurigana_for_inflection(
-    maybe_okuri: str,
-    kanji_to_match: str,
-    logger: Logger = Logger("error"),
-) -> OkuriResults:
-    """
-    Check if the okurigana in the word_data matched any possible inflections, checking the starting
-    point for inflection in any position of the okurigana.
-
-    :param maybe_okuri: the okurigana string to check for inflections
-    :param kanji_to_match: the kanji string to match against
-    :param logger: the logger to use for debugging
-    """
-    if not maybe_okuri:
-        logger.debug("check_any_okurigana_for_inflection: no okurigana found")
-        return OkuriResults("", "", "no_okuri")
-    logger.debug(f"check_any_okurigana_for_inflection: okurigana: {maybe_okuri}")
-    # Check for inflections starting from the beginning of the okurigana
-    okuri_results: list[OkuriResults] = []
-    # Check each character in the okurigana to see if it can be a starting point
-    for okuri_index in range(len(maybe_okuri) - 1):
-        for (
-            base_conjugation_ending,
-            parts_of_speech,
-        ) in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.items():
-            # Otherwise, check conjugations for the possible parts of speech
-            okuri_upto_cur = maybe_okuri[: okuri_index + 1]
-
-            logger.debug(
-                f"check_any_okurigana_for_inflection: okuri_upto_cur: {okuri_upto_cur},"
-                f" base_conjugation_ending: {base_conjugation_ending}, parts_of_speech:"
-                f" {parts_of_speech}"
-            )
-            for part_of_speech in parts_of_speech:
-                cur_res = check_okurigana_for_inflection(
-                    okuri_upto_cur + base_conjugation_ending,
-                    "",
-                    maybe_okuri,
-                    kanji_to_match,
-                    logger=logger,
-                    part_of_speech=part_of_speech,
-                )
-                if cur_res.result == "empty_okuri":
-                    # Skip empty okuri results, they won't be correct
-                    continue
-                elif cur_res.result != "no_okuri":
-                    # If we found a valid okurigana, add it to the results
-                    logger.debug(
-                        f"check_any_okurigana_for_inflection: found okuri: {cur_res.okurigana},"
-                        f" rest_kana: {cur_res.rest_kana}, result: {cur_res.result}"
-                    )
-                    okuri_results.append(cur_res)
-
-    logger.debug(f"check_any_okurigana_for_inflection: all okuri results found: {okuri_results}")
-    # Return the result with the longest okurigana match
-    if okuri_results:
-        return max(okuri_results, key=lambda res: len(res.okurigana))
-
-    # No okurigana matched any inflection
     return OkuriResults("", maybe_okuri, "no_okuri")

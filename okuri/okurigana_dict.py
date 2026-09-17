@@ -92,13 +92,6 @@ GODAN_FORM_VERB_ENDINGS: dict[str, str] = {
 # Reverse mapping for godan verb endings to get dictionary form from noun form
 GODAN_FORM_VERB_STARTINGS: dict[str, str] = {v: k for k, v in GODAN_FORM_VERB_ENDINGS.items()}
 
-ONYOMI_GODAN_SU_FIRST_KANA: set[str] = {
-    "す",
-    "し",
-    "せ",
-    "さ",
-}
-
 
 def get_verb_noun_form_okuri(dict_form_verb_okuri: str, kanji: str, kanji_reading: str) -> str:
     """

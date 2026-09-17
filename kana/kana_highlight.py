@@ -1,6 +1,6 @@
 from functools import partial
 import re
-from typing import Literal, Optional, Tuple, cast
+from typing import Optional
 
 from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
@@ -25,18 +25,13 @@ from ..regex.kanji_furi import (
     KANJI_RE,
     DOUBLE_KANJI_REC,
     KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
-    FURIGANA_REC,
     NON_KANA_REC,
 )
-from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
 from ..all_types.main_types import (
-    Edge,
     MatchType,
     WithTagsDef,
-    YomiMatchResult,
     FinalResult,
     MoraAlignment,
-    ReadingType,
     WrapMatchEntry,
 )
 from .furigana_exceptions import check_exception
@@ -44,64 +39,6 @@ from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
 from .furigana_normalizer import normalize_furigana_for_matching
 from .mora_alignment import find_first_complete_alignment
 from .jukujikun_processor import process_jukujikun_positions
-
-
-SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
-SMALL_TSU_POSSIBLE_KATAKANA = [to_katakana(k) for k in SMALL_TSU_POSSIBLE_HIRAGANA]
-
-
-VOWEL_CHANGE_DICT_HIRAGANA = {
-    "お": ["よ", "ょ"],
-    "あ": ["や", "ゃ"],
-    "う": ["ゆ", "ゅ"],
-}
-VOWEL_CHANGE_DICT_KATAKANA = {
-    to_katakana(k): [to_katakana(v) for v in vs] for k, vs in VOWEL_CHANGE_DICT_HIRAGANA.items()
-}
-
-
-# Exceptions for words where the first kanji has a kunyomi reading that is the same as the
-# the whole reading for the jukujikun compound. This is used to avoid matching the kunyomi
-# reading for the first kanji as a separate word.
-JUKUJIKUN_KUNYOMI_OVERLAP: dict[str, str] = {
-    "風邪": "かぜ",
-    "薔薇": "ばら",
-    "真面": "まじ",
-    "蕎麦": "そば",
-    "襤褸": "ぼろ",
-}
-
-
-def re_match_from_right(text):
-    return re.compile(rf"(.*)({text})(.*?)$")
-
-
-def re_match_from_left(text):
-    return re.compile(rf"^(.*?)({text})(.*)$")
-
-
-def re_match_from_middle(text):
-    return re.compile(rf"^(.*?)({text})(.*?)$")
-
-
-def onyomi_replacer(match, wrap_readings_with_tags=True, convert_to_katakana=True):
-    """
-    re.sub replacer function for onyomi used with the above regexes§
-    """
-    onyomi_kana = to_katakana(match.group(2)) if convert_to_katakana else match.group(2)
-    if wrap_readings_with_tags:
-        onyomi_kana = f"<on>{onyomi_kana}</on>"
-    return f"{match.group(1)}<b>{onyomi_kana}</b>{match.group(3)}"
-
-
-def kunyomi_replacer(match, wrap_readings_with_tags=True):
-    """
-    re.sub replacer function for kunyomi used with the above regexes
-    """
-    kunyomi_kana = match.group(2)
-    if wrap_readings_with_tags:
-        kunyomi_kana = f"<kun>{kunyomi_kana}</kun>"
-    return f"{match.group(1)}<b>{kunyomi_kana}</b>{match.group(3)}"
 
 
 # Bold tags the text already carries: the caller's own emphasis, or what a previous run of the
@@ -140,62 +77,6 @@ def kana_filter(text):
         okurigana_mix_cleaning_replacer, text.replace("&nbsp;", " ")
     )
     return KANA_FILTER_REC.sub(bracket_replace, clean_text)
-
-
-def furigana_reverser(text):
-    """
-    Reverse the position of kanji and furigana in the text.
-    :param text: The text to process
-    :return: The text with kanji and furigana reversed
-    """
-
-    def bracket_reverser(match):
-        if match.group(1).startswith("sound:"):
-            # [sound:...] should not be reversed, do nothing
-            return match.group(0)
-        # Preserve leading space if present
-        leading_space = " " if match.group(0).startswith(" ") else ""
-        kanji = match.group(1)
-        furigana = match.group(2)
-        return f"{leading_space}{furigana}[{kanji}]"
-
-    return re.sub(FURIGANA_REC, bracket_reverser, text.replace("&nbsp;", " "))
-
-
-REPLACED_FURIGANA_MIDDLE_RE = re.compile(r"^(.+)<b>(.+)</b>(.+)$")
-REPLACED_FURIGANA_RIGHT_RE = re.compile(r"^(.+)<b>(.+)</b>$")
-REPLACED_FURIGANA_LEFT_RE = re.compile(r"^<b>(.+)</b>(.+)$")
-
-
-def apply_katakana_conversion(text: str, preserve_tags: bool = True) -> str:
-    """
-    Convert hiragana content to katakana, optionally preserving XML-style tags.
-
-    This is a unified helper for katakana conversion used throughout reconstruction.
-    When preserve_tags=True, converts only the content within tags while preserving
-    tag structure (e.g., <kun>もの</kun> → <kun>モノ</kun>).
-    When preserve_tags=False, converts all text including tag markers.
-
-    :param text: The text to convert
-    :param preserve_tags: Whether to preserve XML-style tags
-    :return: The converted text
-    """
-    if not text:
-        return text
-
-    if preserve_tags:
-        # Convert content within tags while preserving tag markers
-        def katakana_replacer(match):
-            tag_open = match.group(1)  # e.g., "<kun>"
-            content = match.group(3)  # The text content
-            tag_close = match.group(4)  # e.g., "</kun>"
-            return f"{tag_open}{to_katakana(content)}{tag_close}"
-
-        # Match any tag with content (handles on, kun, juk, oku, mix, b, etc.)
-        return re.sub(r"(<(on|kun|juk|oku|mix|b)>)([^<]+)(</\2>)", katakana_replacer, text)
-    else:
-        # Convert all text
-        return to_katakana(text)
 
 
 def reconstruct_furigana(
@@ -355,200 +236,6 @@ def reconstruct_furigana(
     result = "".join(rendered_segments)
 
     return f"{result}{rest_kana}"
-
-
-MatchProcess = Literal["replace", "match", "juku"]
-
-
-def is_reading_in_furigana_section(
-    reading: str,
-    furigana_section: str,
-    check_in_katakana: bool,
-    okurigana: str,
-    edge: Edge,
-    logger: Logger = Logger("error"),
-) -> Tuple[str, ReadingType]:
-    """
-    Function that checks if a reading is in the furigana section
-
-    :return: str, the reading that matched the furigana section
-    """
-    if not reading:
-        return "", "none"
-    # The reading might have a match with a changed kana like シ->ジ, フ->プ, etc.
-    # This only applies to the first kana in the reading and if the reading isn't a single kana
-    rendaku_readings = []
-    rendaku_dict = (
-        RENDAKU_CONVERSION_DICT_KATAKANA if check_in_katakana else RENDAKU_CONVERSION_DICT_HIRAGANA
-    )
-    if possible_rendaku_kana := rendaku_dict.get(reading[0]):
-        for kana in possible_rendaku_kana:
-            rendaku_readings.append(f"{kana}{reading[1:]}")
-    # Then also check for small tsu conversion of some consonants
-    # this only happens in the last kana of the reading
-    small_tsu_readings = []
-    small_tsu_list = (
-        SMALL_TSU_POSSIBLE_KATAKANA if check_in_katakana else SMALL_TSU_POSSIBLE_HIRAGANA
-    )
-    for kana in small_tsu_list:
-        if reading[-1] == kana:
-            small_tsu_readings.append(f"{reading[:-1]}っ")
-    # Handle う-->っ cases, these can have the っ in the okurigana so it's more like
-    # the う is dropped in these cases. So, check if the first okuri char is っ and this
-    # reading ends in う. If so, add a reading with う removed
-    # These only apply when the okuri could belong to this reading, so "whole" or "right" edge
-    u_dropped_readings = []
-    if okurigana and okurigana[0] == "っ" and reading[-1] == "う":
-        u_dropped_readings.append(f"{reading[:-1]}")
-        for rendaku_reading in rendaku_readings:
-            u_dropped_readings.append(f"{rendaku_reading[:-1]}")
-    # Handle vowel change
-    vowel_change_readings = []
-    vowel_change_dict = (
-        VOWEL_CHANGE_DICT_KATAKANA if check_in_katakana else VOWEL_CHANGE_DICT_HIRAGANA
-    )
-    if reading[0] in vowel_change_dict:
-        for kana in vowel_change_dict[reading[0]]:
-            vowel_change_readings.append(f"{kana}{reading[1:]}")
-
-    if edge == "whole":
-        # match the whole furigana or repeat twice in it, possibly with rendaku or small tsu
-        # (eg. the next kanji is the same or 々)
-        if reading == furigana_section:
-            return reading, "plain"
-        for u_dropped_reading in u_dropped_readings:
-            if u_dropped_reading == furigana_section:
-                return u_dropped_reading, "small_tsu"
-        if reading * 2 == furigana_section:
-            return reading * 2, "plain"
-        for rendaku_reading in rendaku_readings:
-            if rendaku_reading == furigana_section:
-                return rendaku_reading, "rendaku"
-            if f"{reading}{rendaku_reading}" == furigana_section:
-                return f"{reading}{rendaku_reading}", "rendaku"
-        for small_tsu_reading in small_tsu_readings:
-            if small_tsu_reading == furigana_section:
-                return small_tsu_reading, "small_tsu"
-            if f"{small_tsu_reading}{reading}" == furigana_section:
-                return f"{small_tsu_reading}{reading}", "small_tsu"
-        for vowel_change_reading in vowel_change_readings:
-            if vowel_change_reading == furigana_section:
-                return vowel_change_reading, "vowel_change"
-        return "", "none"
-    # For non-whole edge, also check readings are both rendaku and small tsu
-    rendaku_small_tsu_readings = []
-    for rendaku_reading in rendaku_readings:
-        for kana in SMALL_TSU_POSSIBLE_HIRAGANA:
-            if rendaku_reading[-1] == kana:
-                rendaku_small_tsu_readings.append(f"{rendaku_reading[:-1]}っ")
-    all_readings = (
-        [(reading, "plain")]
-        + [(r, "rendaku") for r in rendaku_readings]
-        + [(r, "small_tsu") for r in small_tsu_readings]
-        + [(r, "rendaku_small_tsu") for r in rendaku_small_tsu_readings]
-        + [(r, "vowel_change") for r in vowel_change_readings]
-    )
-    if edge == "left":
-        logger.debug(
-            f"check_reading_in_furigana_section - left edge, furigana_section: {furigana_section}"
-            f", all_readings: {all_readings}"
-        )
-        for r, t in all_readings:
-            if furigana_section.startswith(r):
-                return r, cast(ReadingType, t)
-        return "", "none"
-    if edge == "right":
-        for r, t in all_readings:
-            if furigana_section.endswith(r):
-                return r, cast(ReadingType, t)
-        for u_dropped_reading in u_dropped_readings:
-            if u_dropped_reading == furigana_section:
-                return u_dropped_reading, "small_tsu"
-        return "", "none"
-    # middle
-    for r, t in all_readings:
-        if r in furigana_section:
-            return r, cast(ReadingType, t)
-    return "", "none"
-
-
-def process_kunyomi_match(
-    furigana: str,
-    kunyomi_that_matched: str,
-    edge: Edge,
-    process_type: MatchProcess,
-    wrap_readings_with_tags: bool,
-) -> str:
-    """
-    Function that replaces the furigana with the kunyomi reading that matched
-    :return: string, the modified furigana or the matched part, depending on the process_type
-    """
-    if edge == "right":
-        reg = re_match_from_right(kunyomi_that_matched)
-    elif edge == "left":
-        reg = re_match_from_left(kunyomi_that_matched)
-    else:
-        reg = re_match_from_middle(kunyomi_that_matched)
-    if process_type == "match":
-        match = reg.match(furigana)
-        if match:
-            return match.group(2)
-        return ""
-    replacer = partial(kunyomi_replacer, wrap_readings_with_tags=wrap_readings_with_tags)
-    return re.sub(reg, replacer, furigana)
-
-
-def handle_furigana_doubling(
-    partial_result: YomiMatchResult,
-    cur_furigana_section: str,
-    matched_furigana: str,
-    check_in_katakana: bool,
-    onyomi_to_katakana: bool = True,
-    logger: Logger = Logger("error"),
-) -> str:
-    """
-    Function that handles the case of a word with doubled furigana, due it using the repeater
-    kanji 々.
-    """
-    doubled_furigana = ""
-    # If this was a normal match, the furigana should be repeating
-    # check if there's rendaku in the following furigana
-    furigana_after_matched = cur_furigana_section[len(matched_furigana) :]
-    rendaku_conversion_dict = (
-        RENDAKU_CONVERSION_DICT_KATAKANA if check_in_katakana else RENDAKU_CONVERSION_DICT_HIRAGANA
-    )
-    rendaku_matched_furigana = (
-        [f"{kana}{matched_furigana[1:]}" for kana in rendaku_conversion_dict[matched_furigana[0]]]
-        if matched_furigana[0] in rendaku_conversion_dict
-        else []
-    )
-    rendaku_matched_furigana.append(to_hiragana(matched_furigana))  # Add the original
-    logger.debug(
-        f"repeater kanji - doubling furigana: {matched_furigana},"
-        f" furigana_after_matched: {furigana_after_matched},"
-        f" rendaku_matched_furigana:{rendaku_matched_furigana}"
-    )
-    if furigana_after_matched:
-        for rf in rendaku_matched_furigana:
-            if furigana_after_matched.startswith(rf):
-                doubled_furigana = matched_furigana + (
-                    to_katakana(rf)
-                    if partial_result["match_type"] == "onyomi" and onyomi_to_katakana
-                    else rf
-                )
-                logger.debug(
-                    f"repeater kanji - found rendaku match: {rf} in"
-                    f" furigana_after_matched: {furigana_after_matched}"
-                )
-                break
-    else:
-        logger.debug(
-            "repeater kanji - no furigana_after_matched, simply doubling with"
-            f" matched_furigana: {matched_furigana}"
-        )
-        doubled_furigana = matched_furigana * 2
-
-    return doubled_furigana
 
 
 def reconstruct_from_alignment(
@@ -1026,19 +713,17 @@ def kana_highlight(
                 logger=logger,
             )
 
-        logger.debug(
-            f"furigana_replacer - alignment complete: {alignment['is_complete']}, juku_positions:"
-            f" {alignment['jukujikun_positions']}"
-        )
+        logger.debug(f"furigana_replacer - juku_positions: {alignment['jukujikun_positions']}")
 
         # Step 4: Handle jukujikun positions if any
         final_okurigana = alignment["final_okurigana"]
         final_rest_kana = alignment["final_rest_kana"]
         juku_parts = {}
 
-        if not alignment["is_complete"] or alignment["jukujikun_positions"]:
-            # Process jukujikun positions (even for complete alignments) to allow okurigana
-            # extraction for jukujikun exception cases like 清々しい.
+        if alignment["jukujikun_positions"]:
+            # Process the jukujikun positions, which the furigana exceptions may set even on
+            # an otherwise complete alignment, to allow okurigana extraction for cases like
+            # 清々しい.
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
                 furigana=full_furigana,

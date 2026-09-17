@@ -2757,7 +2757,7 @@ Return type: {return_type}
         test_name="jukujikun test 風邪 not matched",
         kanji="引",
         # When not matched, jukujikun are automatically merged together
-        # This is done intentionally in match_tags_with_kanji.py, so could be changed
+        # This is done intentionally in construct_wrapped_furi_word, so could be changed
         # Kind of makes sense you can't really choose which kanji matches with
         # which part of the furigana
         sentence="風邪[かぜ]を引[ひ]いた。",

@@ -1,6 +1,6 @@
 import re
 import sys
-from typing import NamedTuple, Tuple, Union, Optional, Literal
+from typing import Tuple, Optional, Literal
 
 from ..mecab_controller.kana_conv import to_katakana, to_hiragana
 
@@ -10,201 +10,10 @@ from ..utils.logger import Logger
 
 from ..kanji.number_to_kanji import number_to_kanji
 
-TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
-
-# The tags TAG_WRAPPED_FURIGANA_RE can capture, as the WrapMatchEntry literals
-READING_TAGS: dict[str, WrapTag] = {"on": "on", "kun": "kun", "juk": "juk"}
-
 IS_NUMBER_RE = re.compile(r"^[0-9０-９]+$")
 
 
 FuriReconstruct = Literal["furigana", "furikanji", "kana_only"]
-
-
-class TagOrder(NamedTuple):
-    tag: WrapTag
-    highlight: Union[str, None]
-    contents: str
-    position: int
-
-
-def get_tag_order(furigana: str, logger=Logger("error")) -> list[TagOrder]:
-    """
-    Get the order of <on>, <kun>, and <juk> tags in the furigana string.
-
-    :param furigana: The furigana string containing the tags.
-    :return: A list of tuples containing the tag name and its position.
-    """
-    logger.debug(f"get_tag_order furigana: {furigana}")
-    tag_order = []
-    for match in TAG_WRAPPED_FURIGANA_RE.finditer(furigana):
-        highlight = match.group(1)
-        tag = READING_TAGS[match.group(2)]
-        contents = match.group(3)
-        tag_order.append(TagOrder(tag, highlight, contents, match.start()))
-    return tag_order
-
-
-def match_tags_with_kanji(word: str, furigana: str, logger=Logger("error")) -> list[WrapMatchEntry]:
-    """
-    Match the tags with each kanji in the word.
-
-    :param word: The word containing kanji characters.
-    :param furigana: The furigana string containing the tags.
-    :return: A list of tuples containing the kanji and its corresponding tag.
-    """
-    tag_order = get_tag_order(furigana, logger)
-    logger.debug(f"match_tags_with_kanji - word: {word}, tag_order: {tag_order}")
-    kanji_tags: list[WrapMatchEntry] = []
-    kanji_index = 0
-    tag_index = 0
-    loop_count = 0
-    max_loops = len(word) * len(tag_order) + 10  # Safety limit
-    while tag_index < len(tag_order):
-        loop_count += 1
-        if loop_count > max_loops:
-            logger.debug(
-                f"match_tags_with_kanji - infinite loop detected! word={word},"
-                f" tag_order={tag_order}, kanji_index={kanji_index}, tag_index={tag_index}"
-            )
-            break
-        cur_tag = tag_order[tag_index]
-        tag, highlight, kana, _ = cur_tag
-        if kanji_index < len(word):
-            cur_kanji = word[kanji_index]
-            next_kanji = word[kanji_index + 1] if kanji_index + 1 < len(word) else None
-            # Merge any consecutive numbers into a single logical unit, consuming tags based on
-            # how many kanji the number converts to (e.g., "３０" → "三十" = 2 kanji = 2 tags).
-            # For numbers with mixed tags (kun+on), keep them as separate results so kana_only
-            # mode can output them separately.
-            if IS_NUMBER_RE.match(cur_kanji):
-                number_start = kanji_index
-                while kanji_index < len(word) and IS_NUMBER_RE.match(word[kanji_index]):
-                    kanji_index += 1
-                number_str = word[number_start:kanji_index]
-                # Convert to kanji to determine how many tags we need to consume
-                kanji_number = number_to_kanji(number_str, logger)
-                tags_to_consume = len(kanji_number)
-                # Check if all tags are the same type
-                all_same_tag = True
-                for i in range(1, tags_to_consume):
-                    if tag_index + i < len(tag_order):
-                        other_tag = tag_order[tag_index + i]
-                        if other_tag.tag != tag:
-                            all_same_tag = False
-                            break
-
-                if all_same_tag:
-                    # All tags are the same, accumulate kana and create single result
-                    accumulated_kana = kana
-                    for i in range(1, tags_to_consume):
-                        if tag_index + i < len(tag_order):
-                            extra_tag = tag_order[tag_index + i]
-                            accumulated_kana += extra_tag.contents
-                    kanji_tags.append(
-                        WrapMatchEntry(
-                            kanji=number_str,
-                            tag=tag,
-                            highlight=bool(highlight),
-                            furigana=accumulated_kana,
-                            is_num=True,
-                        )
-                    )
-                    tag_index += tags_to_consume
-                else:
-                    # Mixed tags - create separate results for each kanji in the converted number
-                    # so they can be handled differently in kana_only vs furikanji modes
-                    for i, kanji_char in enumerate(kanji_number):
-                        if tag_index < len(tag_order):
-                            cur_num_tag = tag_order[tag_index]
-                            # For the first kanji, use the full number str; for others use empty
-                            # (they'll get merged in furikanji mode but split in kana_only)
-                            if i == 0:
-                                kanji_tags.append(
-                                    WrapMatchEntry(
-                                        kanji=number_str,
-                                        tag=cur_num_tag.tag,
-                                        highlight=bool(cur_num_tag.highlight),
-                                        furigana=cur_num_tag.contents,
-                                        is_num=True,
-                                    )
-                                )
-                            else:
-                                kanji_tags.append(
-                                    WrapMatchEntry(
-                                        kanji="",  # Empty kanji for subsequent parts
-                                        tag=cur_num_tag.tag,
-                                        highlight=bool(cur_num_tag.highlight),
-                                        furigana=cur_num_tag.contents,
-                                        is_num=True,
-                                    )
-                                )
-                            tag_index += 1
-            elif next_kanji == "々":
-                # Only merge with the next tag when it matches the same tag type; otherwise keep
-                # separate so adjacent repeater groups with different readings don't collapse.
-                next_tag = tag_order[tag_index + 1] if tag_index + 1 < len(tag_order) else None
-                if next_tag is None:
-                    # Single tag can span repeated-kanji words (e.g., 悠々[ゆうゆう]).
-                    # Keep both kanji under the current tag and consume only this tag.
-                    kanji_tags.append(
-                        WrapMatchEntry(
-                            kanji=cur_kanji + next_kanji,
-                            tag=tag,
-                            highlight=bool(highlight),
-                            furigana=kana,
-                            is_num=False,
-                        )
-                    )
-                    kanji_index += 2
-                    tag_index += 1
-                elif next_tag.tag == tag:
-                    combined_kana = kana + next_tag.contents
-                    kanji_tags.append(
-                        WrapMatchEntry(
-                            kanji=cur_kanji + next_kanji,
-                            tag=tag,
-                            highlight=bool(highlight),
-                            furigana=combined_kana,
-                            is_num=False,
-                        )
-                    )
-                    kanji_index += 2
-                    tag_index += 2  # Skip the next tag since we combined it
-                else:
-                    kanji_tags.append(
-                        WrapMatchEntry(
-                            kanji=word[kanji_index],
-                            tag=tag,
-                            highlight=bool(highlight),
-                            furigana=kana,
-                            is_num=False,
-                        )
-                    )
-                    kanji_index += 1
-                    tag_index += 1
-            else:
-                kanji_tags.append(
-                    WrapMatchEntry(
-                        kanji=word[kanji_index],
-                        tag=tag,
-                        highlight=bool(highlight),
-                        furigana=kana,
-                        is_num=False,
-                    )
-                )
-                kanji_index += 1
-                tag_index += 1
-        else:
-            # Ran out of kanji but still have tags - this shouldn't happen in normal cases
-            # Just skip remaining tags to avoid infinite loop
-            logger.debug(
-                f"match_tags_with_kanji - ran out of kanji at tag_index={tag_index}, word={word},"
-                f" tag_order={tag_order}"
-            )
-            break
-
-    return kanji_tags
 
 
 def construct_wrapped_furi_word(
@@ -429,8 +238,7 @@ def construct_wrapped_furi_word(
 
 
 def test(
-    word: str,
-    furigana: str,
+    entries: list[WrapMatchEntry],
     expected_kana_only: Optional[str] = None,
     expected_kana_only_merged: Optional[str] = None,
     expected_furigana: Optional[str] = None,
@@ -456,18 +264,17 @@ def test(
         if not expected:
             continue
         try:
-            kanji_tags = match_tags_with_kanji(word, furigana)
-            result = construct_wrapped_furi_word(kanji_tags, return_type, merge_consecutive)
+            result = construct_wrapped_furi_word(entries, return_type, merge_consecutive)
             assert result == expected
         except AssertionError:
             # Re-run with logging enabled to see what went wrong
             print("\n")
             construct_wrapped_furi_word(
-                kanji_tags, return_type, merge_consecutive, logger=Logger("debug")
+                entries, return_type, merge_consecutive, logger=Logger("debug")
             )
             print(f"""\033[91mTest failed
 type: {return_type}, merge: {merge_consecutive}
-word: {kanji_tags}, furigana: {furigana}
+entries: {entries}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
 \033[0m""")
@@ -475,11 +282,22 @@ word: {kanji_tags}, furigana: {furigana}
             sys.exit(1)
 
 
+def entry(
+    kanji: str, tag: WrapTag, furigana: str, highlight: bool = False, is_num: bool = False
+) -> WrapMatchEntry:
+    """Shorthand for a test case's wrap entry, in the shape reconstruct_from_alignment builds."""
+    return WrapMatchEntry(
+        kanji=kanji, tag=tag, furigana=furigana, highlight=highlight, is_num=is_num
+    )
+
+
 def main():
     test(
-        word="漢字",
-        # one part highlighted, other not, no difference when merging
-        furigana="<b><on>かん</on></b><on>じ</on>",
+        # 漢字: one part highlighted, other not, no difference when merging
+        entries=[
+            entry("漢", "on", "かん", highlight=True),
+            entry("字", "on", "じ"),
+        ],
         expected_kana_only="<b><on>かん</on></b><on>じ</on>",
         expected_kana_only_merged="<b><on>かん</on></b><on>じ</on>",
         expected_furigana="<b><on> 漢[かん]</on></b><on> 字[じ]</on>",
@@ -488,8 +306,11 @@ def main():
         expected_furikanji_merged="<b><on> かん[漢]</on></b><on> じ[字]</on>",
     )
     test(
-        word="大人",
-        furigana="<juk>おと</juk><juk>な</juk>",
+        # 大人
+        entries=[
+            entry("大", "juk", "おと"),
+            entry("人", "juk", "な"),
+        ],
         expected_kana_only="<juk>おと</juk><juk>な</juk>",
         expected_kana_only_merged="<juk>おとな</juk>",
         expected_furigana="<juk> 大[おと]</juk><juk> 人[な]</juk>",
@@ -498,9 +319,11 @@ def main():
         expected_furikanji_merged="<juk> おとな[大人]</juk>",
     )
     test(
-        word="友達",
-        # different tags, should not merge
-        furigana="<kun>とも</kun><on>だち</on>",
+        # 友達: different tags, should not merge
+        entries=[
+            entry("友", "kun", "とも"),
+            entry("達", "on", "だち"),
+        ],
         expected_kana_only="<kun>とも</kun><on>だち</on>",
         expected_kana_only_merged="<kun>とも</kun><on>だち</on>",
         expected_furigana="<kun> 友[とも]</kun><on> 達[だち]</on>",
@@ -509,9 +332,8 @@ def main():
         expected_furikanji_merged="<kun> とも[友]</kun><on> だち[達]</on>",
     )
     test(
-        word="悠々",
-        # repeated kanji, should merge always
-        furigana="<on>ゆうゆう</on>",
+        # 悠々: repeated kanji, one entry covering both characters
+        entries=[entry("悠々", "on", "ゆうゆう")],
         expected_kana_only="<on>ゆうゆう</on>",
         expected_kana_only_merged="<on>ゆうゆう</on>",
         expected_furigana="<on> 悠々[ゆうゆう]</on>",
@@ -520,9 +342,11 @@ def main():
         expected_furikanji_merged="<on> ゆうゆう[悠々]</on>",
     )
     test(
-        word="時間",
-        # both parts not highlighted and same tag, can get merged
-        furigana="<on>ジ</on><on>カン</on>",
+        # 時間: both parts not highlighted and same tag, can get merged
+        entries=[
+            entry("時", "on", "ジ"),
+            entry("間", "on", "カン"),
+        ],
         expected_kana_only="<on>ジ</on><on>カン</on>",
         expected_kana_only_merged="<on>ジカン</on>",
         expected_furigana="<on> 時[ジ]</on><on> 間[カン]</on>",
@@ -531,9 +355,12 @@ def main():
         expected_furikanji_merged="<on> ジカン[時間]</on>",
     )
     test(
-        word="不自然",
-        # three same tag parts, can get merged
-        furigana="<on>ふ</on><on>じ</on><on>ぜん</on>",
+        # 不自然: three same tag parts, can get merged
+        entries=[
+            entry("不", "on", "ふ"),
+            entry("自", "on", "じ"),
+            entry("然", "on", "ぜん"),
+        ],
         expected_kana_only="<on>ふ</on><on>じ</on><on>ぜん</on>",
         expected_kana_only_merged="<on>ふじぜん</on>",
         expected_furigana="<on> 不[ふ]</on><on> 自[じ]</on><on> 然[ぜん]</on>",
@@ -542,9 +369,11 @@ def main():
         expected_furikanji_merged="<on> ふじぜん[不自然]</on>",
     )
     test(
-        word="11個",
-        # numbers, always merge
-        furigana="<on>じゅう</on><on>いっ</on><on>こ</on>",
+        # 11個: a number block, always merged into one reading
+        entries=[
+            entry("11", "on", "じゅういっ", is_num=True),
+            entry("個", "on", "こ"),
+        ],
         expected_kana_only="<on>じゅういっ</on><on>こ</on>",
         expected_kana_only_merged="<on>じゅういっこ</on>",
         expected_furigana="<on> 11[じゅういっ]</on><on> 個[こ]</on>",
@@ -553,9 +382,13 @@ def main():
         expected_furikanji_merged="<on> じゅういっこ[11個]</on>",
     )
     test(
-        word="40分",
-        # numbers, merged in furigana and furikanji modes always
-        furigana="<kun>よん</kun><on>じゅっ</on><on>ぷん</on>",
+        # 40分: a number block read with two tags, so the second entry carries no kanji of its
+        # own; furigana and furikanji merge it into the block and tag the result <mix>
+        entries=[
+            entry("40", "kun", "よん", is_num=True),
+            entry("", "on", "じゅっ", is_num=True),
+            entry("分", "on", "ぷん"),
+        ],
         expected_kana_only="<kun>よん</kun><on>じゅっ</on><on>ぷん</on>",
         expected_kana_only_merged="<kun>よん</kun><on>じゅっぷん</on>",
         expected_furigana="<mix> 40[よんじゅっ]</mix><on> 分[ぷん]</on>",
@@ -563,18 +396,6 @@ def main():
         expected_furikanji="<mix> よんじゅっ[40]</mix><on> ぷん[分]</on>",
         expected_furikanji_merged="<mix> よんじゅっ[40]</mix><on> ぷん[分]</on>",
     )
-    # Numbers where the number of tags > number of kanji will break currently
-    # test(
-    #     word="２１９１年",
-    #     # numbers, always merge
-    #     furigana="<on>に</on><on>せん</on><on>ひゃく</on><on>きゅう</on><on>じゅう</on><on>いち</on><on>ねん</on>",
-    #     expected_kana_only="<on>にせんひゃくきゅうじゅういちねん</on>",
-    #     expected_kana_only_merged="<on>にせんひゃくきゅうじゅういちねん</on>",
-    #     expected_furigana="<on> ２１９１[にせんひゃくきゅうじゅういち]</on><on> 年[ねん]</on>",
-    #     expected_furigana_merged="<on> ２１９１年[にせんひゃくきゅうじゅういちねん]</on>",
-    #     expected_furikanji="<on> にせんひゃくきゅうじゅういち[２１９１]</on><on> ねん[年]</on>",
-    #     expected_furikanji_merged="<on> にせんひゃくきゅうじゅういちねん[２１９１年]</on>",
-    # )
     print("\n\033[92mTests passed\033[0m")
 
 

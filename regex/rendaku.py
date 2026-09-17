@@ -23,8 +23,3 @@ RENDAKU_CONVERSION_DICT_HIRAGANA: dict[str, list[str]] = {
     "ほ": ["ぼ", "ぽ"],
     "う": ["ぬ"],
 }
-# Convert HIRAGANA_CONVERSION_DICT to katakana with to_katakana
-RENDAKU_CONVERSION_DICT_KATAKANA: dict[str, list[str]] = {
-    to_katakana(k): [to_katakana(v) for v in vs]
-    for k, vs in RENDAKU_CONVERSION_DICT_HIRAGANA.items()
-}

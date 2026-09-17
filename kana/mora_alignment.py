@@ -76,7 +76,6 @@ def find_first_complete_alignment(
             kanji_matches=[],
             mora_split=[],
             jukujikun_positions=[],
-            is_complete=True,
             final_okurigana="",
             final_rest_kana=maybe_okuri,
         )
@@ -318,7 +317,6 @@ def find_first_complete_alignment(
             kanji_matches=kanji_matches,
             mora_split=mora_split,
             jukujikun_positions=jukujikun_positions,
-            is_complete=len(jukujikun_positions) == 0,
             final_okurigana=final_okurigana,
             final_rest_kana=final_rest_kana,
         )
@@ -326,7 +324,7 @@ def find_first_complete_alignment(
         logger.debug(f"find_first_complete_alignment - alignment result: {alignment}")
 
         # Early exit: if we found a complete match, return immediately
-        if alignment["is_complete"]:
+        if not jukujikun_positions:
             logger.debug("find_first_complete_alignment - complete alignment found")
             return alignment
 
@@ -362,12 +360,12 @@ def find_first_complete_alignment(
     for mora_split in joined_splits:
         result = process_mora_split(mora_split)
         # Early exit on complete match
-        if result["is_complete"]:
+        if not result["jukujikun_positions"]:
             return result
     # Also try yōon splits generated during processing
     for youon_mora_split in youon_mora_splits:
         result = process_mora_split(youon_mora_split, skip_youon_check=True)
-        if result["is_complete"]:
+        if not result["jukujikun_positions"]:
             return result
 
     # No complete match found, return best partial alignment
@@ -397,7 +395,6 @@ def find_first_complete_alignment(
         kanji_matches=[None] * kanji_count,
         mora_split=fallback_split,
         jukujikun_positions=list(range(kanji_count)),
-        is_complete=False,
         final_okurigana="",
         final_rest_kana=maybe_okuri,
     )

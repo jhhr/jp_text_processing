@@ -16,9 +16,6 @@ class WithTagsDef(NamedTuple):
     include_suru_okuri: bool
 
 
-Edge = Literal["left", "right", "middle", "whole", "none"]
-
-
 MatchType = Literal["onyomi", "kunyomi", "jukujikun", "none"]
 
 
@@ -49,24 +46,6 @@ class WrapMatchEntry(_WrapMatchEntryOptional):
     furigana: str
     highlight: bool
     is_num: bool
-
-
-class YomiMatchResult(TypedDict):
-    """
-    TypedDict for the result of the onyomi or kunyomi match check
-    :param text
-    :param type
-    :param match_edge
-    :param actual_match
-    :param matched_reading
-    :param all_readings_processed: True when the loop over readings reached the last reading
-    """
-
-    text: str
-    type: MatchType
-    match_edge: Edge
-    actual_match: str
-    matched_reading: str
 
 
 class FinalResult(TypedDict):
@@ -207,7 +186,6 @@ class MoraAlignment(TypedDict):
     :param mora_split: The actual mora split used (the mora assigned to each kanji, joined,
         one string per kanji)
     :param jukujikun_positions: List of indices where no reading matched (jukujikun positions)
-    :param is_complete: True if all kanji matched a reading (no jukujikun positions)
     :param final_okurigana: Okurigana extracted from last kanji (if any)
     :param final_rest_kana: Remaining kana after okurigana extraction
     """
@@ -215,6 +193,5 @@ class MoraAlignment(TypedDict):
     kanji_matches: list[Optional[ReadingMatchInfo]]
     mora_split: list[str]
     jukujikun_positions: list[int]
-    is_complete: bool
     final_okurigana: str
     final_rest_kana: str

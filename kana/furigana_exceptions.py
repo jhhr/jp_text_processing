@@ -172,7 +172,6 @@ def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAli
         kanji_matches=kanji_matches,
         mora_split=mora_split,
         jukujikun_positions=jukujikun_positions,
-        is_complete=True,
         final_okurigana="",
         final_rest_kana="",
     )
