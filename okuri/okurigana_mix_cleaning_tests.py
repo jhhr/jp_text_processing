@@ -1,6 +1,20 @@
+"""Cases for the two cleaning passes `kana_highlight` runs over mixed okurigana furigana, with
+pytest from `anki_shared/`:
+
+    python -m pytest jp_text_processing/okuri/okurigana_mix_cleaning_tests.py
+
+Pass `--log-cli-level=debug` to see what the passes logged for a case; pytest captures the
+package logger on its own, so nothing here has to turn logging on.
+
+A case that is known to fail gets `marks=pytest.mark.xfail(reason="...", strict=True)` in its
+`pytest.param`: strict so an unexpected pass fails the run and the reason gets dropped. None
+of the cases below need it today.
+"""
+
 import logging
 import re
-import sys
+
+import pytest
 
 from .okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
@@ -12,15 +26,8 @@ from .okurigana_mix_cleaning_replacer import (
 
 from ..kana.make_furigana_from_reading import make_furigana_from_reading
 from ..mecab_controller.kana_conv import to_hiragana
-from ..utils.logger import package_logger
+from ..utils.logger import LOGGER_NAME
 
-
-RED = "\033[91m"
-YELLOW = "\033[93m"
-GREEN = "\033[92m"
-RESET = "\033[0m"
-
-failed_tests: list[str] = []
 
 TAG_RE = re.compile(r"<[^>]+>")
 GROUP_RE = re.compile(r" ?([^ \[\]<>]+?)\[([^\]]*)\]")
@@ -32,25 +39,191 @@ def clean(text: str) -> str:
     return OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, text)
 
 
-def check(test_name: str, result, expected):
-    try:
-        assert result == expected
-    except AssertionError:
-        failed_tests.append(test_name)
-        print(
-            f"""{RED}{test_name}
-{YELLOW}Expected: {expected!r}
-{GREEN}Got:      {result!r}
-{RESET}"""
-        )
+CASES = [
+    # --- the shapes the module has always handled ------------------------------------------
+    pytest.param("消え去[きえさ]る", "消[き]え去[さ]る", id="okurigana between two kanji"),
+    pytest.param(
+        "隣り合わせ[となりあわせ]",
+        "隣[とな]り合[あ]わせ",
+        id="okurigana between two kanji and after the second",
+    ),
+    pytest.param("歯止め[はどめ]", "歯止[はど]め", id="okurigana only at the end"),
+    # --- a word that opens with kana, with okurigana in the middle too ---------------------
+    # Taking the match from the kanji alone left the opening kana outside the group, where it
+    # spelled itself a second time: すり下ろす[すりおろす] became すり 下[すりお]ろす.
+    pytest.param(
+        "すり下ろす[すりおろす]", "すり下[お]ろす", id="opening kana is not handed to the kanji"
+    ),
+    pytest.param(
+        "かも知れない[かもしれない]",
+        "かも知[し]れない",
+        id="opening kana before a kanji with long okurigana",
+    ),
+    pytest.param(
+        "にも拘らず[にもかかわらず]",
+        "にも拘[かかわ]らず",
+        id="opening kana of more than one mora",
+    ),
+    pytest.param(
+        "か如何か[かどうか]", "か如何[どう]か", id="opening kana before a two kanji reading"
+    ),
+    pytest.param(
+        "お問い合わせ[おといあわせ]",
+        "お問[と]い合[あ]わせ",
+        id="opening kana with two kanji runs after it",
+    ),
+    # --- a word that opens with kana and has no okurigana before the bracket ---------------
+    pytest.param("お前[おまえ]", "お前[まえ]", id="honorific prefix is not handed to the kanji"),
+    pytest.param("いい加減[いいかげん]", "いい加減[かげん]", id="opening kana before a compound"),
+    pytest.param(
+        "いざという時[いざというとき]",
+        "いざという時[とき]",
+        id="a whole phrase of opening kana",
+    ),
+    pytest.param(
+        "スペイン語[すぺいんご]",
+        "スペイン語[ご]",
+        id="katakana opening a word whose reading is hiragana",
+    ),
+    pytest.param(
+        "ゴミ箱[ごみばこ]",
+        "ゴミ箱[ばこ]",
+        id="katakana opening a word whose kanji takes rendaku",
+    ),
+    # --- the okurigana also occurs inside the reading --------------------------------------
+    # The okurigana is the kana *after* the kanji, so it is the last place that run can sit in
+    # the reading. Taking the first い of もったいない split 勿体無い into 勿体無[もった]い[ない],
+    # and the reading left over became a bracket with no word in front of it.
+    pytest.param(
+        "勿体無い[もったいない]",
+        "勿体無[もったいな]い",
+        id="okurigana that also occurs inside the reading",
+    ),
+    pytest.param(
+        "無理遣り[むりやり]",
+        "無理遣[むりや]り",
+        id="okurigana occurring twice in a short reading",
+    ),
+    pytest.param(
+        "羽搏く[はばたく]",
+        "羽搏[はばた]く",
+        id="okurigana whose kana ends the reading as well",
+    ),
+    # --- a second kanji still gets a reading of its own ------------------------------------
+    # The greedy first reading must not swallow the lot: 行き来[いきき] became 行[いき]き来[].
+    pytest.param("行き来[いきき]", "行[い]き来[き]", id="second kanji keeps a reading"),
+    pytest.param(
+        "其の物[そのもの]",
+        "其[そ]の物[もの]",
+        id="second kanji keeps a reading when the okurigana repeats",
+    ),
+    pytest.param(
+        "包み紙[つつみがみ]",
+        "包[つつ]み紙[がみ]",
+        id="second kanji keeps a reading with rendaku",
+    ),
+    pytest.param(
+        "良い塩梅[いいあんばい]",
+        "良[い]い塩梅[あんばい]",
+        id="opening kana and a second kanji together",
+    ),
+    # --- left alone -------------------------------------------------------------------------
+    pytest.param(
+        "お金[かね]", "お金[かね]", id="a reading that omits the word's honorific is not raided"
+    ),
+    pytest.param(
+        " 私[わたし]は 元気[げんき]です",
+        " 私[わたし]は 元気[げんき]です",
+        id="a particle before a word is not taken for part of it",
+    ),
+    # A particle at the start of the text, of a line or after a tag has no space in front of it
+    # to mark where the word begins, so only the kanji's readings tell it from a prefix. Taking
+    # its kana cost the word its first mora: か家族[かぞく] became か家族[ぞく], leaving 家 unread.
+    pytest.param(
+        "か家族[かぞく]と",
+        "か家族[かぞく]と",
+        id="a particle opening the text is not taken for part of the word",
+    ),
+    pytest.param(
+        "が学校[がっこう]に",
+        "が学校[がっこう]に",
+        id="a particle opening the text whose kanji takes a sound change",
+    ),
+    pytest.param(
+        "も紅葉[もみじ]が",
+        "も紅葉[もみじ]が",
+        id="a particle opening the text before a jukujikun word",
+    ),
+    # The honorific is still given back when the kanji can account for neither spelling: 土産
+    # reads みやげ as jukujikun either way, so the prefix itself has to decide.
+    pytest.param("お土産[おみやげ]", "お土産[みやげ]", id="honorific prefix before a jukujikun word"),
+    # A reading that spells a particle out belongs to the particle, not to the kanji.
+    pytest.param(
+        "と時間[とじかん]",
+        "と時間[じかん]",
+        id="a particle spelled out in the reading is given back",
+    ),
+    pytest.param(
+        "消[き]え去[さ]る", "消[き]え去[さ]る", id="an already cleaned word is not cleaned again"
+    ),
+]
 
 
-def test(test_name: str, text: str, expected: str):
+@pytest.mark.parametrize("text, expected", CASES)
+def test_okurigana_mix_cleaning(text: str, expected: str):
     """The cleaning passes turn `text` into `expected`."""
-    check(test_name, clean(text), expected)
+    assert clean(text) == expected
 
 
-def test_reads_back(test_name: str, word: str, reading: str):
+# The probe behind the leading-kana decision keeps its complaints to itself.
+# 土産/みやげ reaches the godan-ending lookup, which used to log on the package logger because
+# its caller never took the silent one; 紅葉/もみじ stops before it and was quiet either way.
+PROBE_CASES = [
+    pytest.param("土産", "みやげ", id="土産 probe is silent"),
+    pytest.param("紅葉", "もみじ", id="紅葉 probe is silent"),
+]
+
+
+@pytest.mark.parametrize("kanji, furigana", PROBE_CASES)
+def test_probe_says_nothing(kanji: str, furigana: str, caplog: pytest.LogCaptureFixture):
+    """The alignment `unread_kanji_count` asks for is expected to fail - it is probing a reading
+    the writer may not have meant - so none of what that attempt logs is the caller's business.
+    Silencing it one call signature at a time used to leak whatever a function further down was
+    called without the silent logger."""
+    with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+        unread_kanji_count(kanji, furigana)
+    assert [r.getMessage() for r in caplog.records if r.name.startswith(LOGGER_NAME)] == []
+
+
+# --- the property all of it exists to keep ----------------------------------------------
+READS_BACK_CASES = [
+    pytest.param("気持ち", "きもち", id="気持ち reads back"),
+    pytest.param("見付ける", "みつける", id="見付ける reads back"),
+    pytest.param("其の儘", "そのまま", id="其の儘 reads back"),
+    pytest.param("すり下ろす", "すりおろす", id="すり下ろす reads back"),
+    pytest.param("かも知れない", "かもしれない", id="かも知れない reads back"),
+    pytest.param("にも拘らず", "にもかかわらず", id="にも拘らず reads back"),
+    pytest.param("か如何か", "かどうか", id="か如何か reads back"),
+    pytest.param("お問い合わせ", "おといあわせ", id="お問い合わせ reads back"),
+    pytest.param("お前", "おまえ", id="お前 reads back"),
+    pytest.param("いい加減", "いいかげん", id="いい加減 reads back"),
+    pytest.param("いざという時", "いざというとき", id="いざという時 reads back"),
+    pytest.param("スペイン語", "すぺいんご", id="スペイン語 reads back"),
+    pytest.param("ゴミ箱", "ごみばこ", id="ゴミ箱 reads back"),
+    pytest.param("勿体無い", "もったいない", id="勿体無い reads back"),
+    pytest.param("無理遣り", "むりやり", id="無理遣り reads back"),
+    pytest.param("羽搏く", "はばたく", id="羽搏く reads back"),
+    pytest.param("行き来", "いきき", id="行き来 reads back"),
+    pytest.param("其の物", "そのもの", id="其の物 reads back"),
+    pytest.param("包み紙", "つつみがみ", id="包み紙 reads back"),
+    pytest.param("良い塩梅", "いいあんばい", id="良い塩梅 reads back"),
+    pytest.param("土産", "みやげ", id="土産 reads back"),
+    pytest.param("紅葉", "もみじ", id="紅葉 reads back"),
+]
+
+
+@pytest.mark.parametrize("word, reading", READS_BACK_CASES)
+def test_reads_back(word: str, reading: str):
     """Whatever furigana the word gets, dropping the readings has to give the word back and
     keeping them has to give the reading back. This is the property the whole pipeline owes
     its callers: match_words_to_notes writes the result into a note's vocab-furigana."""
@@ -59,235 +232,9 @@ def test_reads_back(test_name: str, word: str, reading: str):
     got_word = GROUP_RE.sub(lambda m: m[1], plain).replace(" ", "")
     # A word keeps its own kana as it writes them, so スペイン語 reads back as スペインご.
     got_reading = to_hiragana(GROUP_RE.sub(lambda m: m[2], plain).replace(" ", ""))
-    check(f"{test_name} ({furigana})", (got_word, got_reading), (word, to_hiragana(reading)))
-
-
-def test_probe_says_nothing(test_name: str, kanji: str, furigana: str):
-    """The alignment `unread_kanji_count` asks for is expected to fail - it is probing a reading
-    the writer may not have meant - so none of what that attempt logs is the caller's business.
-    Silencing it one call signature at a time used to leak whatever a function further down was
-    called without the silent logger."""
-    logged: list[str] = []
-
-    class Collect(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            logged.append(record.getMessage())
-
-    handler = Collect()
-    previous_level = package_logger.level
-    package_logger.addHandler(handler)
-    package_logger.setLevel(logging.DEBUG)
-    try:
-        unread_kanji_count(kanji, furigana)
-    finally:
-        package_logger.setLevel(previous_level)
-        package_logger.removeHandler(handler)
-    check(test_name, logged, [])
-
-
-def main():
-    # --- the shapes the module has always handled ------------------------------------------
-    test(
-        test_name="okurigana between two kanji",
-        text="消え去[きえさ]る",
-        expected="消[き]え去[さ]る",
-    )
-    test(
-        test_name="okurigana between two kanji and after the second",
-        text="隣り合わせ[となりあわせ]",
-        expected="隣[とな]り合[あ]わせ",
-    )
-    test(
-        test_name="okurigana only at the end",
-        text="歯止め[はどめ]",
-        expected="歯止[はど]め",
-    )
-
-    # --- a word that opens with kana, with okurigana in the middle too ---------------------
-    # Taking the match from the kanji alone left the opening kana outside the group, where it
-    # spelled itself a second time: すり下ろす[すりおろす] became すり 下[すりお]ろす.
-    test(
-        test_name="opening kana is not handed to the kanji",
-        text="すり下ろす[すりおろす]",
-        expected="すり下[お]ろす",
-    )
-    test(
-        test_name="opening kana before a kanji with long okurigana",
-        text="かも知れない[かもしれない]",
-        expected="かも知[し]れない",
-    )
-    test(
-        test_name="opening kana of more than one mora",
-        text="にも拘らず[にもかかわらず]",
-        expected="にも拘[かかわ]らず",
-    )
-    test(
-        test_name="opening kana before a two kanji reading",
-        text="か如何か[かどうか]",
-        expected="か如何[どう]か",
-    )
-    test(
-        test_name="opening kana with two kanji runs after it",
-        text="お問い合わせ[おといあわせ]",
-        expected="お問[と]い合[あ]わせ",
-    )
-
-    # --- a word that opens with kana and has no okurigana before the bracket ---------------
-    test(
-        test_name="honorific prefix is not handed to the kanji",
-        text="お前[おまえ]",
-        expected="お前[まえ]",
-    )
-    test(
-        test_name="opening kana before a compound",
-        text="いい加減[いいかげん]",
-        expected="いい加減[かげん]",
-    )
-    test(
-        test_name="a whole phrase of opening kana",
-        text="いざという時[いざというとき]",
-        expected="いざという時[とき]",
-    )
-    test(
-        test_name="katakana opening a word whose reading is hiragana",
-        text="スペイン語[すぺいんご]",
-        expected="スペイン語[ご]",
-    )
-    test(
-        test_name="katakana opening a word whose kanji takes rendaku",
-        text="ゴミ箱[ごみばこ]",
-        expected="ゴミ箱[ばこ]",
-    )
-
-    # --- the okurigana also occurs inside the reading --------------------------------------
-    # The okurigana is the kana *after* the kanji, so it is the last place that run can sit in
-    # the reading. Taking the first い of もったいない split 勿体無い into 勿体無[もった]い[ない],
-    # and the reading left over became a bracket with no word in front of it.
-    test(
-        test_name="okurigana that also occurs inside the reading",
-        text="勿体無い[もったいない]",
-        expected="勿体無[もったいな]い",
-    )
-    test(
-        test_name="okurigana occurring twice in a short reading",
-        text="無理遣り[むりやり]",
-        expected="無理遣[むりや]り",
-    )
-    test(
-        test_name="okurigana whose kana ends the reading as well",
-        text="羽搏く[はばたく]",
-        expected="羽搏[はばた]く",
-    )
-
-    # --- a second kanji still gets a reading of its own ------------------------------------
-    # The greedy first reading must not swallow the lot: 行き来[いきき] became 行[いき]き来[].
-    test(
-        test_name="second kanji keeps a reading",
-        text="行き来[いきき]",
-        expected="行[い]き来[き]",
-    )
-    test(
-        test_name="second kanji keeps a reading when the okurigana repeats",
-        text="其の物[そのもの]",
-        expected="其[そ]の物[もの]",
-    )
-    test(
-        test_name="second kanji keeps a reading with rendaku",
-        text="包み紙[つつみがみ]",
-        expected="包[つつ]み紙[がみ]",
-    )
-    test(
-        test_name="opening kana and a second kanji together",
-        text="良い塩梅[いいあんばい]",
-        expected="良[い]い塩梅[あんばい]",
-    )
-
-    # --- left alone -------------------------------------------------------------------------
-    test(
-        test_name="a reading that omits the word's honorific is not raided",
-        text="お金[かね]",
-        expected="お金[かね]",
-    )
-    test(
-        test_name="a particle before a word is not taken for part of it",
-        text=" 私[わたし]は 元気[げんき]です",
-        expected=" 私[わたし]は 元気[げんき]です",
-    )
-    # A particle at the start of the text, of a line or after a tag has no space in front of it
-    # to mark where the word begins, so only the kanji's readings tell it from a prefix. Taking
-    # its kana cost the word its first mora: か家族[かぞく] became か家族[ぞく], leaving 家 unread.
-    test(
-        test_name="a particle opening the text is not taken for part of the word",
-        text="か家族[かぞく]と",
-        expected="か家族[かぞく]と",
-    )
-    test(
-        test_name="a particle opening the text whose kanji takes a sound change",
-        text="が学校[がっこう]に",
-        expected="が学校[がっこう]に",
-    )
-    test(
-        test_name="a particle opening the text before a jukujikun word",
-        text="も紅葉[もみじ]が",
-        expected="も紅葉[もみじ]が",
-    )
-    # The honorific is still given back when the kanji can account for neither spelling: 土産
-    # reads みやげ as jukujikun either way, so the prefix itself has to decide.
-    test(
-        test_name="honorific prefix before a jukujikun word",
-        text="お土産[おみやげ]",
-        expected="お土産[みやげ]",
-    )
-    # A reading that spells a particle out belongs to the particle, not to the kanji.
-    test(
-        test_name="a particle spelled out in the reading is given back",
-        text="と時間[とじかん]",
-        expected="と時間[じかん]",
-    )
-    test(
-        test_name="an already cleaned word is not cleaned again",
-        text="消[き]え去[さ]る",
-        expected="消[き]え去[さ]る",
-    )
-
-    # --- the probe behind the leading-kana decision keeps its complaints to itself ----------
-    # 土産/みやげ reaches the godan-ending lookup, which used to log on the package logger because
-    # its caller never took the silent one; 紅葉/もみじ stops before it and was quiet either way.
-    test_probe_says_nothing(test_name="土産 probe is silent", kanji="土産", furigana="みやげ")
-    test_probe_says_nothing(test_name="紅葉 probe is silent", kanji="紅葉", furigana="もみじ")
-
-    # --- the property all of it exists to keep ----------------------------------------------
-    for word, reading in [
-        ("気持ち", "きもち"),
-        ("見付ける", "みつける"),
-        ("其の儘", "そのまま"),
-        ("すり下ろす", "すりおろす"),
-        ("かも知れない", "かもしれない"),
-        ("にも拘らず", "にもかかわらず"),
-        ("か如何か", "かどうか"),
-        ("お問い合わせ", "おといあわせ"),
-        ("お前", "おまえ"),
-        ("いい加減", "いいかげん"),
-        ("いざという時", "いざというとき"),
-        ("スペイン語", "すぺいんご"),
-        ("ゴミ箱", "ごみばこ"),
-        ("勿体無い", "もったいない"),
-        ("無理遣り", "むりやり"),
-        ("羽搏く", "はばたく"),
-        ("行き来", "いきき"),
-        ("其の物", "そのもの"),
-        ("包み紙", "つつみがみ"),
-        ("良い塩梅", "いいあんばい"),
-        ("土産", "みやげ"),
-        ("紅葉", "もみじ"),
-    ]:
-        test_reads_back(f"{word} reads back", word, reading)
-
-    if failed_tests:
-        print(f"{RED}{len(failed_tests)} tests failed{RESET}")
-        sys.exit(1)
-    print(f"\n{GREEN}All tests passed{RESET}")
+    assert (got_word, got_reading) == (word, to_hiragana(reading)), furigana
 
 
 if __name__ == "__main__":
-    main()
+    # Habit, and the `-m` form the other suites still use, keeps working.
+    raise SystemExit(pytest.main([__file__]))

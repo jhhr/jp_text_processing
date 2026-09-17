@@ -6,6 +6,5 @@ to parametrised cases, drop its line here; when the list is empty, delete this f
 """
 
 collect_ignore = [
-    "okuri/okurigana_mix_cleaning_tests.py",
     "word/word_highlight_tests.py",
 ]

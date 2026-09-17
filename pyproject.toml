@@ -30,6 +30,13 @@ ignore_errors = true
 # `anki_shared/` has to be the working directory for `jp_text_processing` to be importable,
 # and it holds an `anki/` package of its own that shadows the real one; pytest-anki's plugin
 # is autoloaded and imports `aqt`, which then dies on `anki.lang`. Nothing here needs Anki.
+#
+# Case names are Japanese words as often as not, and pytest escapes non-ASCII in a test id to
+# `\uXXXX` unless told otherwise, which leaves a case unrecognisable in the failure line and
+# un-selectable with `-k`. The opt-out's name is a warning that ids then depend on the
+# terminal's encoding; `PYTHONIOENCODING=utf-8` is already required here for anything that
+# prints Japanese.
 [tool.pytest.ini_options]
 python_files = ["*_tests.py"]
 addopts = "-p no:anki"
+disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true
