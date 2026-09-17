@@ -12,3 +12,12 @@ requires-python = ">=3.10"
 [tool.mypy]
 python_version = "3.10"
 explicit_package_bases = true
+
+# `mecab_controller/` is a nested submodule vendored from an upstream fork; this repo does not
+# edit it. Its import block is a deliberate reversed try/except so the package works both
+# standalone and vendored, and mypy reports every arm of it as a redefinition of a module it
+# cannot find — 32 of its 35 errors are that one scheme. Ignoring errors inside it (rather than
+# `follow_imports = "skip"`) keeps mypy reading it, so our calls into it still get real types.
+[[tool.mypy.overrides]]
+module = "jp_text_processing.mecab_controller.*"
+ignore_errors = true
