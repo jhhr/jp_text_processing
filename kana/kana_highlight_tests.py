@@ -2332,6 +2332,83 @@ Return type: {return_type}
             "<kun>あか</kun><juk>ゆ</juk><b><juk>り</juk></b><on>カダン</on>"
         ),
     )
+    # The next three lock in the property that a partial alignment may not reorder the reading:
+    # with onyomi_to_katakana off, the kana_only output has to be the furigana the user wrote,
+    # character for character (plus the <b> tags, when a kanji is highlighted). 保 matches ほ in
+    # all of them, so the jukujikun mora on either side of it must stay on their own side.
+    test(
+        test_name="jukujikun runs on both sides of a matched kanji keep the reading order",
+        kanji="",
+        # Made up word; the point is that 保[ほ] matches while nothing around it does
+        sentence="山川保田[ぱぴぷほぺぽ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="ぱぴぷほぺぽ",
+        expected_kana_only_with_tags_split="<juk>ぱぴ</juk><juk>ぷ</juk><on>ほ</on><juk>ぺぽ</juk>",
+        expected_kana_only_with_tags_merged="<juk>ぱぴぷ</juk><on>ほ</on><juk>ぺぽ</juk>",
+        expected_furigana=" 山川保田[ぱぴぷほぺぽ]",
+        expected_furigana_with_tags_split=(
+            "<juk> 山[ぱぴ]</juk><juk> 川[ぷ]</juk><on> 保[ほ]</on><juk> 田[ぺぽ]</juk>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<juk> 山川[ぱぴぷ]</juk><on> 保[ほ]</on><juk> 田[ぺぽ]</juk>"
+        ),
+        expected_furikanji=" ぱぴぷほぺぽ[山川保田]",
+        expected_furikanji_with_tags_split=(
+            "<juk> ぱぴ[山]</juk><juk> ぷ[川]</juk><on> ほ[保]</on><juk> ぺぽ[田]</juk>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> ぱぴぷ[山川]</juk><on> ほ[保]</on><juk> ぺぽ[田]</juk>"
+        ),
+    )
+    test(
+        test_name="jukujikun runs on both sides of a matched kanji keep the order with highlight",
+        kanji="保",
+        sentence="山川保田[ぱぴぷほぺぽ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="ぱぴぷ<b>ほ</b>ぺぽ",
+        expected_kana_only_with_tags_split=(
+            "<juk>ぱぴ</juk><juk>ぷ</juk><b><on>ほ</on></b><juk>ぺぽ</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ぱぴぷ</juk><b><on>ほ</on></b><juk>ぺぽ</juk>",
+        expected_furigana=" 山川[ぱぴぷ]<b> 保[ほ]</b> 田[ぺぽ]",
+        expected_furigana_with_tags_split=(
+            "<juk> 山[ぱぴ]</juk><juk> 川[ぷ]</juk><b><on> 保[ほ]</on></b><juk> 田[ぺぽ]</juk>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<juk> 山川[ぱぴぷ]</juk><b><on> 保[ほ]</on></b><juk> 田[ぺぽ]</juk>"
+        ),
+        expected_furikanji=" ぱぴぷ[山川]<b> ほ[保]</b> ぺぽ[田]",
+        expected_furikanji_with_tags_split=(
+            "<juk> ぱぴ[山]</juk><juk> ぷ[川]</juk><b><on> ほ[保]</on></b><juk> ぺぽ[田]</juk>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> ぱぴぷ[山川]</juk><b><on> ほ[保]</on></b><juk> ぺぽ[田]</juk>"
+        ),
+    )
+    test(
+        test_name="jukujikun runs of uneven length around a matched kanji keep the reading order",
+        kanji="",
+        # Same, with the match early on so the runs around it have different lengths
+        sentence="山保川田[ぱほぴぷぺ]",
+        onyomi_to_katakana=False,
+        expected_kana_only="ぱほぴぷぺ",
+        expected_kana_only_with_tags_split="<juk>ぱ</juk><on>ほ</on><juk>ぴぷ</juk><juk>ぺ</juk>",
+        expected_kana_only_with_tags_merged="<juk>ぱ</juk><on>ほ</on><juk>ぴぷぺ</juk>",
+        expected_furigana=" 山保川田[ぱほぴぷぺ]",
+        expected_furigana_with_tags_split=(
+            "<juk> 山[ぱ]</juk><on> 保[ほ]</on><juk> 川[ぴぷ]</juk><juk> 田[ぺ]</juk>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<juk> 山[ぱ]</juk><on> 保[ほ]</on><juk> 川田[ぴぷぺ]</juk>"
+        ),
+        expected_furikanji=" ぱほぴぷぺ[山保川田]",
+        expected_furikanji_with_tags_split=(
+            "<juk> ぱ[山]</juk><on> ほ[保]</on><juk> ぴぷ[川]</juk><juk> ぺ[田]</juk>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<juk> ぱ[山]</juk><on> ほ[保]</on><juk> ぴぷぺ[川田]</juk>"
+        ),
+    )
     test(
         test_name="jukujikun test 蕎麦 not matched",
         kanji="屋",

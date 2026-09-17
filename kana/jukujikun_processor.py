@@ -199,66 +199,53 @@ def process_jukujikun_positions(
 
     # If exception mapping did not set any juku parts, fall back to redistributing
     if not jukujikun_parts:
-        # The mora_split from alignment was based on a trial split where some
-        # positions matched and others didn't. The mora allocated to jukujikun positions in that
-        # split may be incorrect. Instead, we should:
-        # 1. Calculate total mora used by MATCHED positions (from their matched_mora field)
-        # 2. Calculate remaining mora (total - matched)
-        # 3. Redistribute remaining mora among jukujikun positions
+        # The trial split that produced the alignment may have handed the wrong mora to each
+        # jukujikun position, so re-split and deal them out evenly. Do this one contiguous run of
+        # jukujikun positions at a time: a matched kanji between two runs keeps its own mora and
+        # separates what comes before it from what comes after, so pooling the mora of every
+        # unmatched position would deal mora from after the match to positions before it and
+        # reorder the reading.
+        mora_split = alignment["mora_split"]
+        runs: list[list[int]] = []
+        for pos in sorted(alignment["jukujikun_positions"]):
+            if runs and pos == runs[-1][-1] + 1:
+                runs[-1].append(pos)
+            else:
+                runs.append([pos])
 
-        # Mark mora consumed by matched positions using the split indices
-        consumed_indices = set()
-        for i in range(len(alignment["kanji_matches"])):
-            if alignment["kanji_matches"][i]:
-                consumed_indices.add(i)
-
-        # Get remaining mora (not consumed), merge the lists back into a single string and then
-        # split into mora again with split_to_mora_list
-        try:
-            unconsumed_mora = [
-                "".join(moras)
-                for idx, moras in enumerate(alignment["mora_split"])
-                if idx not in consumed_indices
-            ]
-            juku_mora_str = "".join(unconsumed_mora)
-        except Exception:
-            logger.error(
-                "process_jukujikun_positions - Error building juku_mora_str, alignment:"
-                f" {alignment}, consumed_indices: {consumed_indices}, word: {word}"
+        for run in runs:
+            # Only the mora the alignment assigned to this run's own slots. They are already in
+            # order and already bounded by the neighbouring matched kanji.
+            run_mora_str = "".join("".join(mora_split[pos]) for pos in run if pos < len(mora_split))
+            run_mora = split_to_mora_list(
+                furigana=run_mora_str,
+                kanji_count=len(run),
+            )["mora_list"]
+            logger.debug(
+                f"process_jukujikun_positions - jukujikun run {run} gets mora {run_mora_str},"
+                f" alignment.mora_split: {mora_split}"
             )
-        logger.debug(
-            f"process_jukujikun_positions - remaining mora for jukujikun: {juku_mora_str},"
-            f" consumed_indices: {consumed_indices}, alignment.mora_split:"
-            f" {alignment['mora_split']}"
-        )
-        juku_count = len(alignment["jukujikun_positions"])
-        juku_mora = split_to_mora_list(
-            furigana=juku_mora_str,
-            kanji_count=juku_count,
-        )["mora_list"]
+            if not run_mora:
+                continue
 
-        # Redistribute these mora evenly among jukujikun positions
-        if juku_count == 0 or len(juku_mora) == 0:
-            return jukujikun_parts, extracted_okurigana, extracted_rest_kana
+            run_kanji = [word[pos] for pos in run]
+            redistributed_mora = split_mora_for_jukujikun(run_mora, run_kanji, logger=logger)
 
-        juku_kanji = [word[pos] for pos in alignment["jukujikun_positions"]]
-        redistributed_mora = split_mora_for_jukujikun(juku_mora, juku_kanji, logger=logger)
-
-        # Assign redistributed mora to jukujikun positions
-        for idx, pos in enumerate(alignment["jukujikun_positions"]):
-            kanji = word[pos]
-            mora_portion = redistributed_mora[idx]
-            # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
-            # 為 with readings し/さ is the irregular verb する
-            is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
-            tag = "kun" if (kanji.isdigit() or is_suru_verb) else "juk"
-            jukujikun_parts[pos] = {
-                "kanji": kanji,
-                "tag": tag,
-                "highlight": False,
-                "furigana": mora_portion,
-                "is_num": kanji.isdigit(),
-            }
+            # Assign redistributed mora to this run's jukujikun positions
+            for idx, pos in enumerate(run):
+                kanji = word[pos]
+                mora_portion = redistributed_mora[idx]
+                # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
+                # 為 with readings し/さ is the irregular verb する
+                is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
+                tag = "kun" if (kanji.isdigit() or is_suru_verb) else "juk"
+                jukujikun_parts[pos] = {
+                    "kanji": kanji,
+                    "tag": tag,
+                    "highlight": False,
+                    "furigana": mora_portion,
+                    "is_num": kanji.isdigit(),
+                }
 
     # Handle okurigana extraction if last kanji is jukujikun
     last_kanji_index = len(word) - 1
