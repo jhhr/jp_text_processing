@@ -6,7 +6,7 @@ from .kana_highlight import kana_highlight, FuriReconstruct
 
 from ..all_types.main_types import WithTagsDef
 
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, package_logger, set_level
 
 
 RED = "\033[91m"
@@ -16,6 +16,7 @@ RESET = "\033[0m"
 
 
 def main(test_nums: Optional[list[str]] = None) -> int:
+    console_logging("error")
     failed_test_keys: list[str] = []
     # (case number, reason) for cases marked expected_failure
     expected_failure_keys: list[Tuple[str, str]] = []
@@ -161,22 +162,21 @@ def main(test_nums: Optional[list[str]] = None) -> int:
                         continue
                 run_test_cases += 1
                 cur_test_num = f"{cur_test_index + 1}.{case_idx + 1}"
-                logger = Logger("debug") if debug else Logger("error")
-                rerun_args = (kanji, sentence, return_type, with_tags_def, Logger("debug"))
+                set_level("debug" if debug else "error")
+                rerun_args = (kanji, sentence, return_type, with_tags_def)
                 try:
-                    result = kana_highlight(
-                        kanji, sentence, return_type, with_tags_def, logger=logger
-                    )
+                    result = kana_highlight(kanji, sentence, return_type, with_tags_def)
                     print_progress(GREEN)
                 except Exception:
                     # Uncaught exception, rerun with debug logging. The rerun outlives this
-                    # iteration, which rebinds rerun_args and logger, so bind them here.
+                    # iteration, which rebinds rerun_args, so bind them here.
 
-                    def rerun(args=rerun_args, case_logger=logger):
+                    def rerun(args=rerun_args):
+                        set_level("debug")
                         try:
                             kana_highlight(*args)
                         except Exception as e:
-                            case_logger.error(f"Error during rerun with debug logging: {e}")
+                            package_logger.error(f"Error during rerun with debug logging: {e}")
                             raise e
 
                     record_failure(cur_test_num, rerun)
@@ -203,6 +203,7 @@ Return type: {return_type}
                     # wrong. diff and rerun_args are bound here because the loop rebinds
                     # them before the stored rerun is ever called.
                     def rerun(args=rerun_args, case_diff=diff):
+                        set_level("debug")
                         kana_highlight(*args)
                         print(case_diff)
 

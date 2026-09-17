@@ -6,6 +6,7 @@ splitting mora evenly among consecutive jukujikun positions and extracting okuri
 when the last kanji is jukujikun.
 """
 
+import logging
 from typing import Tuple
 
 from ..all_types.main_types import ReadingMatchInfo, WrapMatchEntry
@@ -13,7 +14,7 @@ from .mora_splitter import split_to_mora_list
 from .mora_alignment import MoraAlignment
 from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 
 def should_reject_lexicalized_na_suffix(
@@ -50,7 +51,7 @@ def should_reject_lexicalized_na_suffix(
 
 
 def split_mora_for_jukujikun(
-    mora_list: list[str], kanji: list[str], logger: Logger = Logger("error")
+    mora_list: list[str], kanji: list[str], logger: logging.Logger = package_logger
 ) -> list[str]:
     """
     Split mora evenly for jukujikun kanji using arithmetic division.
@@ -100,7 +101,7 @@ def process_jukujikun_positions(
     furigana: str,
     alignment: MoraAlignment,
     remaining_kana: str,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> Tuple[dict[int, WrapMatchEntry], str, str]:
     """
     Process jukujikun (unmatched) positions in the alignment.

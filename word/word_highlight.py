@@ -1,4 +1,6 @@
+import logging
 import re
+from typing import Union
 
 from ..kana.reading_matcher import check_reading_match
 from ..all_types.main_types import OkuriResults
@@ -11,7 +13,7 @@ from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertio
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 from ..kana.kana_highlight import kana_highlight, WithTagsDef
 from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-from ..utils.logger import Logger
+from ..utils.logger import LegacyLogger, as_logger
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
@@ -72,7 +74,7 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
 def furigana_captures_match_readings(
     match: re.Match,
     expected_readings: list[str],
-    logger: Logger,
+    logger: logging.Logger,
 ) -> bool:
     """Validate captured furigana readings against expected readings with variants."""
     for idx, expected in enumerate(expected_readings):
@@ -141,7 +143,9 @@ def merge_consecutive_furigana(split_furi_text: str) -> str:
     return split_furi_text
 
 
-def word_highlight(text: str, word: str, logger: Logger) -> str:
+def word_highlight(
+    text: str, word: str, logger: Union[logging.Logger, LegacyLogger, None] = None
+) -> str:
     """
     Takes a japanese word or phrase in dictionary form and finds any inflected occurrences of
     it in the given text. The word and text is expected to be in furigana syntax; with brackets
@@ -179,6 +183,7 @@ def word_highlight(text: str, word: str, logger: Logger) -> str:
         list[tuple[int,int]]: A list of tuples containing the start and end indices of the
         word occurrences in the text.
     """
+    logger = as_logger(logger)
     logger.debug(f"word_highlight: text='{text}', word='{word}'")
     if not text or not word or not word.strip():
         return text

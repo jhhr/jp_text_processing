@@ -1,8 +1,9 @@
+import logging
 from typing import Optional, Union, Tuple
 
 from ..all_types.main_types import PartOfSpeech
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
@@ -134,7 +135,7 @@ def get_part_of_speech(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> Optional[PartOfSpeech]:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
@@ -199,14 +200,14 @@ def get_okuri_dict_for_okurigana(
     kanji: str,
     kanji_reading: str,
     part_of_speech: Optional[PartOfSpeech] = None,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> tuple[Union[dict, None], Optional[PartOfSpeech]]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.
     :param kanji: The kanji.
     :param kanji_reading: The reading of the kanji.
-    :param logger: Logger to use for debug messages.
+    :param logger: the logger to use
     :param part_of_speech: Optional override for the part of speech.
     :return: The okurigana progression dict for the word.
         None if the word is not conjugatable.

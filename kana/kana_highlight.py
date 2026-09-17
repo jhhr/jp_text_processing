@@ -1,6 +1,7 @@
+import logging
 from functools import partial
 import re
-from typing import Optional
+from typing import Optional, Union
 
 from .construct_wrapped_furi_word import (
     construct_wrapped_furi_word,
@@ -13,7 +14,7 @@ from .orphaned_repeater_cleaning import (
     ORPHANED_REPEATER_CLEANING_REC,
     orphaned_repeater_cleaning_replacer,
 )
-from ..utils.logger import Logger
+from ..utils.logger import LegacyLogger, as_logger, package_logger
 from ..kanji.number_to_kanji import number_to_kanji
 from ..okuri.okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
@@ -84,7 +85,7 @@ def reconstruct_furigana(
     with_tags_def: WithTagsDef,
     reconstruct_type: FuriReconstruct = "furigana",
     force_merge: bool = False,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> str:
     """
     Reconstruct the furigana from the replace result
@@ -251,7 +252,7 @@ def reconstruct_from_alignment(
     original_furigana: str,
     reconstruct_type: FuriReconstruct,
     furigana_prefix: str = "",
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> str:
     """
     Build furigana string from mora alignment and jukujikun parts.
@@ -272,7 +273,7 @@ def reconstruct_from_alignment(
     :param original_furigana: The original furigana before hiragana conversion
     :param furigana_prefix: Kana taken off the front of the furigana before matching, given back to
         the first kanji's reading here
-    :param logger: Logger for debugging
+    :param logger: the logger to use
     :return: FinalResult with complete furigana and word parts
     """
     alignment_len = len(alignment["kanji_matches"])
@@ -496,8 +497,9 @@ def kana_highlight(
     text: str,
     return_type: FuriReconstruct = "kana_only",
     with_tags_def: Optional[WithTagsDef] = None,
-    logger: Logger = Logger("error"),
+    logger: Union[logging.Logger, LegacyLogger, None] = None,
 ) -> str:
+    logger = as_logger(logger)
     if with_tags_def is None:
         with_tags_def = WithTagsDef(
             True,  # with_tags
@@ -516,7 +518,7 @@ def kana_highlight(
         remove the kanji and return only the kana
     :param with_tags_def: tuple, with_tags and merge_consecutive keys. Whether to wrap the readings
         with tags and whether to merge consecutive tags
-    :param logger: Logger instance to log errors
+    :param logger: the logger to use; `None` is the package logger
     :return: The text cleaned from any previous<b> tags and<b> added around the furigana
         when the furigana corresponds to the kanji_to_highlight
     """

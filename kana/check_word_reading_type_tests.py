@@ -3,7 +3,7 @@ from typing import Optional
 
 from .check_word_reading_type import WordReadingType, check_word_reading_type
 
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, set_level
 
 
 def test(
@@ -19,8 +19,8 @@ def test(
         expected_failure: reason this case is known to fail. It is reported instead of
             failing the run, and an unexpected pass is reported so the reason gets dropped.
     """
-    logger = Logger("debug") if debug else Logger("error")
-    result = check_word_reading_type(word, logger=logger)
+    set_level("debug" if debug else "error")
+    result = check_word_reading_type(word)
     if debug:
         print("\n\n")
     try:
@@ -30,7 +30,8 @@ def test(
             print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
             return
         # Re-run with logging enabled to see what went wrong
-        check_word_reading_type(word, logger=Logger("debug"))
+        set_level("debug")
+        check_word_reading_type(word)
         print(f"""\033[91m{test_name}
 \033[93mExpected: {expected}
 \033[92mGot:      {result}
@@ -45,6 +46,7 @@ def test(
 
 
 def main():
+    console_logging("error")
     # test each tag type, on/kun/juk with 1) single and 2) multiple tags, with a) no ending kana,
     # b) okurigana, c) with non-okuri ending kana and d) both okurigana and non-okuri ending kana
     # for a total of 6 tests per tag type

@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from ..all_types.main_types import PartOfSpeech
@@ -22,11 +23,11 @@ from ..okuri.okurigana_dict import (
     GODAN_FORM_VERB_STARTINGS,
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 
 def highlight_inflected_words_with_mecab(
-    text: str, base_form_word: str, logger: Logger = Logger("error"), depth: int = 0
+    text: str, base_form_word: str, logger: logging.Logger = package_logger, depth: int = 0
 ) -> str:
     """
     Find inflected words in the given text using MeCab.

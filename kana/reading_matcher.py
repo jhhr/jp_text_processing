@@ -5,6 +5,7 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
+import logging
 from typing import Optional
 
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
@@ -15,7 +16,7 @@ from .mora_splitter import long_vowel_variants
 from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
 from ..okuri.okurigana_dict import get_verb_noun_form_okuri
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 # Small tsu conversion possible endings
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
@@ -45,7 +46,7 @@ def check_reading_match(
     reading: str,
     mora_string: str,
     okurigana: str = "",
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> tuple[str, ReadingType]:
     """
     Core function to check if a reading matches a mora string, trying various phonetic changes.
@@ -165,7 +166,7 @@ def match_onyomi_to_mora(
     kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> Optional[ReadingMatchInfo]:
     """
     Try to match onyomi readings to a mora sequence.
@@ -236,7 +237,7 @@ def match_kunyomi_to_mora(
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> Optional[ReadingMatchInfo]:
     """
     Try to match kunyomi readings to a mora sequence.
@@ -446,7 +447,7 @@ def match_reading_to_mora(
     maybe_okuri: str,
     is_last_kanji: bool,
     repeater_mora_sequence: Optional[str] = None,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
     """
     Try to match any reading (onyomi or kunyomi) to a mora sequence.

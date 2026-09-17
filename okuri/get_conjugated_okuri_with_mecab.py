@@ -1,3 +1,4 @@
+import logging
 import sys
 
 from .mecab_common import (
@@ -10,7 +11,7 @@ from ..all_types.main_types import (
     OkuriResults,
     OkuriType,
 )
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, package_logger, set_level
 
 from ..mecab_controller.basic_types import (
     MecabParsedToken,
@@ -23,7 +24,7 @@ def get_conjugated_okuri_with_mecab(
     maybe_okuri: str,
     okuri_prefix: OkuriPrefix = "word",
     strict_inflection: bool = False,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> tuple[OkuriResults, bool]:
     """
     Determines the portion of text that is the conjugated okurigana for a kanji reading.
@@ -32,7 +33,7 @@ def get_conjugated_okuri_with_mecab(
     :param reading: The reading of the kanji or word occurring before the okurigana
     :param okuri_prefix: Whether the maybe_okuri is attached to the "word" (kanji) or "reading" (kana) portion
     :param strict_inflection: Whether to enforce strict inflection rules
-    :param logger: Logger instance for debugging
+    :param logger: the logger to use
     :return: A tuple of the okurigana that is part of the conjugation for threading
             and the rest of the okurigana, along with a boolean indicating if it is a suru verb
     """
@@ -207,12 +208,9 @@ def get_conjugated_okuri_with_mecab(
 
 # Tests
 def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug: bool = False):
+    set_level("debug" if debug else "error")
     result, is_suru_verb = get_conjugated_okuri_with_mecab(
-        kanji,
-        kanji_reading,
-        maybe_okuri,
-        okuri_prefix,
-        logger=Logger("debug" if debug else "error"),
+        kanji, kanji_reading, maybe_okuri, okuri_prefix
     )
     try:
         assert result.okurigana == expected[0]
@@ -220,7 +218,8 @@ def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug
         assert is_suru_verb == expected[2]
     except AssertionError:
         # Re-run with logging enabled
-        get_conjugated_okuri_with_mecab(kanji, kanji_reading, maybe_okuri, logger=Logger("debug"))
+        set_level("debug")
+        get_conjugated_okuri_with_mecab(kanji, kanji_reading, maybe_okuri)
         print(f"""\033[91mget_conjugated_okuri_with_mecab({maybe_okuri}, {kanji}, {kanji_reading})
 \033[93mExpected: {expected}
 \033[92mGot:      {(result.okurigana, result.rest_kana, is_suru_verb)}
@@ -230,6 +229,7 @@ def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug
 
 
 def main():
+    console_logging("error")
     # Test cases
     test("逆上", "のぼ", "せたので", ("せた", "ので", False))
     test("悔", "くや", "しいくらい", ("しい", "くらい", False))

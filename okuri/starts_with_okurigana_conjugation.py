@@ -1,9 +1,10 @@
+import logging
 import sys
 from typing import Optional
 
 from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, package_logger
 
 
 def starts_with_okurigana_conjugation(
@@ -12,7 +13,7 @@ def starts_with_okurigana_conjugation(
     kanji: str,
     kanji_reading: str,
     part_of_speech: Optional[PartOfSpeech] = None,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> OkuriResults:
     """
     Determine if a kana text starts with okurigana and return that portion and the rest of the text.
@@ -21,7 +22,7 @@ def starts_with_okurigana_conjugation(
     :param kanji_okurigana: okurigana of the kanji.
     :param kanji: kanji whose okurigana is being checked in kana_text.
     :param kanji_reading: reading of the kanji.
-    :param logger: Logger to use for debug messages.
+    :param logger: the logger to use
     :param part_of_speech: Optional override for the part of speech.
     :return: tuple of the okurigana (if any) and the rest of the text
     """
@@ -98,9 +99,8 @@ def test(text, okurigana, kanji, kanji_reading, expected):
             ), f"part_of_speech: '{result_part_of_speech}' != '{expected[3]}'"
     except AssertionError as e:
         # Re-run with logging enabled
-        starts_with_okurigana_conjugation(
-            text, okurigana, kanji, kanji_reading, logger=Logger("debug")
-        )
+        console_logging("debug")
+        starts_with_okurigana_conjugation(text, okurigana, kanji, kanji_reading)
         print(f"\033[91mTest failed for '{text}' -- {e}\033[0m")
         # Stop the testing here
         sys.exit(1)

@@ -5,6 +5,7 @@ This module implements the combinatorial mora alignment algorithm that tries
 all possible ways to split mora among kanji, returning the first complete match.
 """
 
+import logging
 from typing import Optional, Sequence
 
 from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
@@ -14,7 +15,7 @@ from .reading_matcher import (
 )
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..kanji.all_kanji_data import KanjiData, all_kanji_data
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 
 def contains_repeated_kanji(word: str) -> bool:
@@ -47,7 +48,7 @@ def find_first_complete_alignment(
     maybe_okuri: str,
     mora_list: Optional[list[str]] = None,
     possible_splits: Optional[Sequence[Sequence[Sequence[str]]]] = None,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> MoraAlignment:
     """
     Find the first complete alignment of mora to kanji with early exit.

@@ -1,7 +1,8 @@
+import logging
 import re
 from typing import Callable
 
-from ..utils.logger import Logger
+from ..utils.logger import package_logger
 
 SplitterIndexes = list[tuple[int, int, str]]
 OffsetIndexes = list[tuple[int, int]]
@@ -15,7 +16,7 @@ SPLITTER_DOT_RE = r"・\s*"
 def use_splitter_dot_cleaning_with_b_insertion(
     text: str,
     splitter_regex: str = SPLITTER_DOT_RE,
-    logger: Logger = Logger("error"),
+    logger: logging.Logger = package_logger,
 ) -> tuple[
     str,
     SplitterIndexIncrementer,

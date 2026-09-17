@@ -1,7 +1,8 @@
+import logging
 import re
 import sys
 
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, package_logger
 
 JPN_NUMBER_TO_NUM = {
     "１": 1,
@@ -57,7 +58,7 @@ for jpn_num, num in JPN_NUMBER_TO_NUM.items():
 
 
 def recursive_number_to_kanji(
-    num: int, result: list[str], digit_mult=1, logger: Logger = Logger("error")
+    num: int, result: list[str], digit_mult=1, logger: logging.Logger = package_logger
 ) -> None:
     """
     Recursively converts a number to its kanji representation.
@@ -126,7 +127,7 @@ def recursive_number_to_kanji(
         unit *= 10
 
 
-def number_to_kanji(num_str: str, logger: Logger = Logger("error")) -> str:
+def number_to_kanji(num_str: str, logger: logging.Logger = package_logger) -> str:
     """
     Converts a string representation of a number into its kanji representation.
 
@@ -266,8 +267,8 @@ if __name__ == "__main__":
         except AssertionError:
             # Re-run with logging enabled to see what went wrong
             print("\n")
-            logger = Logger("debug")
-            result = number_to_kanji(input, logger=logger)
+            console_logging("debug")
+            result = number_to_kanji(input)
             print(f"""\033[91mTest failed
 \033[93mInput: {input}
 \033[92mExpected: {expected}

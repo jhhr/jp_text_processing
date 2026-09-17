@@ -3,7 +3,7 @@ from typing import Optional
 
 from .word_highlight import word_highlight
 
-from ..utils.logger import Logger
+from ..utils.logger import console_logging, set_level
 
 
 def test(
@@ -21,9 +21,9 @@ def test(
             of failing the run, and an unexpected pass is reported so the reason
             gets dropped.
     """
-    logger = Logger("debug") if debug else Logger("error")
+    set_level("debug" if debug else "error")
     try:
-        result = word_highlight(text, word, logger=logger)
+        result = word_highlight(text, word)
         if debug:
             print("\n\n")
         assert result == expected
@@ -32,7 +32,8 @@ def test(
             print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
             return
         # Re-run with logging enabled to see what went wrong
-        word_highlight(text, word, logger=Logger("debug"))
+        set_level("debug")
+        word_highlight(text, word)
         # Highlight the diff between the expected and the result
         print(f"""\033[91m{test_name}
 \033[93mExpected: {expected}
@@ -46,8 +47,9 @@ def test(
             return
         # rerun test with logger enabled to see what went wrong
         print(f"""\033[91mTest "{test_name}" raised an exception.\033[0m""")
+        set_level("debug")
         try:
-            word_highlight(text, word, logger=Logger("debug"))
+            word_highlight(text, word)
         except Exception as e:
             raise e
         # The rerun did not raise, so the failure is not reproducible, but the
@@ -61,6 +63,7 @@ def test(
 
 
 def main():
+    console_logging("error")
     test(
         test_name="Crash test - empty text",
         word="何[なに]",
