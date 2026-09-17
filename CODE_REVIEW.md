@@ -168,16 +168,19 @@ kana_highlight("京", "東京[とーきょー]", "furigana") -> correct, because
 normalised candidate with that map (せー → せえ, and also try せい for the え row, since えい is
 usually written ー) instead of a blanket replace.
 
-### M2. `verb_conjugation_conditions` finds the wrong neighbours for repeated tokens
+### M2. `verb_conjugation_conditions` looks up neighbours by value, not position (latent)
 
 `okuri/mecab_common.py:62` uses `all_tokens.index(token)`. `MecabParsedToken` is a frozen
-dataclass with value equality, so a second identical token resolves to the first one's index and
-`prev_token`/`next_token` are taken from the wrong place. Verified on 食べていて見ていて: every
-later て resolves to index 1 and every later い to index 2. Any sentence with a repeated
-auxiliary (…ていて…ていて, …てて) gets its conjugation window decided from the first occurrence.
+dataclass with value equality, so a repeated token resolves to its first occurrence: on
+食べていて見ていて every later て resolves to index 1 and every later い to index 2.
 
-Fix: pass the index in explicitly (`enumerate` in `get_conjugated_okuri_with_mecab` and
-`highlight_inflected_words_with_mecab`) and drop the `index()` lookup.
+Downgraded after testing. The callers (`get_conjugated_okuri_with_mecab.py:183`,
+`highlight_inflected_words_with_mecab.py:132`) stop at the first token that is not accepted, so a
+later duplicate is only examined when every earlier token was accepted, and the neighbour-dependent
+conditions then give the same answer for the first occurrence as for the real one. An identity-based
+lookup was compared against the current code on 24 inputs built to have repeated て/で/いる/ない
+tokens in one parse; no output differed. Treat it as a correctness hazard for future conditions,
+not a current bug. Fix is still one line: pass the index in from the callers' loops.
 
 ### M3. Existing `<b>` tags in the input produce nested `<b>`
 
@@ -502,7 +505,7 @@ free copy of the input reading plus okurigana).
 
 ## Suggested order of work
 
-1. H3, H4, H5, M2: small, local fixes with clear tests. One afternoon.
+1. H3, H4, H5: small, local fixes with clear tests. One afternoon.
 2. H1 and H2: alignment logic changes; add reads-back property tests first so regressions show.
 3. M5 and D1: package definition, pytest conversion, CI. Everything after this is safer.
 4. M8 and L3: delete the dual imports and the dead code once tests run under pytest.
