@@ -4,15 +4,9 @@ from typing import Optional, Tuple, Callable
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
-try:
-    from all_types.main_types import WithTagsDef
-except ImportError:
-    from ..all_types.main_types import WithTagsDef
+from ..all_types.main_types import WithTagsDef
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
 
 RED = "\033[91m"

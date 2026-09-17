@@ -2,25 +2,13 @@ import re
 import sys
 from typing import NamedTuple, Tuple, Union, Optional, Literal
 
-try:
-    from mecab_controller.kana_conv import to_katakana, to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana, to_hiragana
+from ..mecab_controller.kana_conv import to_katakana, to_hiragana
 
-try:
-    from all_types.main_types import WrapMatchEntry
-except ImportError:
-    from ..all_types.main_types import WrapMatchEntry
+from ..all_types.main_types import WrapMatchEntry
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
-try:
-    from kanji.number_to_kanji import number_to_kanji
-except ImportError:
-    from ..kanji.number_to_kanji import number_to_kanji
+from ..kanji.number_to_kanji import number_to_kanji
 
 TAG_WRAPPED_FURIGANA_RE = re.compile(r"(?:<(b)>)?<(on|kun|juk)>(.*?)<\/\2>(?:<\/\1>)?")
 

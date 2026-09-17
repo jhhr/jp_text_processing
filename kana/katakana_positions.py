@@ -1,13 +1,7 @@
-try:
-    from mecab_controller.kana_conv import (
-        to_katakana,
-        is_katakana_char,
-    )
-except ImportError:
-    from ..mecab_controller.kana_conv import (
-        to_katakana,
-        is_katakana_char,
-    )
+from ..mecab_controller.kana_conv import (
+    to_katakana,
+    is_katakana_char,
+)
 
 
 def get_katakana_positions(text: str) -> list[int]:

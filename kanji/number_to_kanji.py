@@ -1,10 +1,7 @@
 import re
 import sys
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger  # type: ignore[no-redef]
+from ..utils.logger import Logger  # type: ignore[no-redef]
 
 JPN_NUMBER_TO_NUM = {
     "１": 1,

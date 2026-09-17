@@ -1,10 +1,7 @@
 import re
 from typing import Callable
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
 TextPartIndexes = list[tuple[int, int, str]]
 OffsetIndexes = list[tuple[int, int]]

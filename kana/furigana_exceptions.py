@@ -9,18 +9,9 @@ and word edge splitting.
 
 from typing import TypedDict, Optional, List, Dict
 
-try:
-    from kana.mora_alignment import MoraAlignment
-except ImportError:
-    from .mora_alignment import MoraAlignment
-try:
-    from all_types.main_types import ReadingMatchInfo
-except ImportError:
-    from ..all_types.main_types import ReadingMatchInfo
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from .mora_alignment import MoraAlignment
+from ..all_types.main_types import ReadingMatchInfo
+from ..utils.logger import Logger
 
 
 class ExceptionAlignmentEntry(TypedDict):

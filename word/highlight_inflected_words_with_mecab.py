@@ -1,68 +1,28 @@
 from typing import Optional
 
-try:
-    from all_types.main_types import PartOfSpeech
-except ImportError:
-    from ..all_types.main_types import PartOfSpeech
-try:
-    from mecab_controller.basic_types import MecabParsedToken
-except ImportError:
-    from ..mecab_controller.basic_types import MecabParsedToken
-try:
-    from okuri.mecab_common import (
-        get_all_conjugation_conditions,
-        get_word_type_from_mecab_token,
-        mecab,
-        MecabWordType,
-    )
-except ImportError:
-    from ..okuri.mecab_common import (
-        get_all_conjugation_conditions,
-        get_word_type_from_mecab_token,
-        mecab,
-        MecabWordType,
-    )
-try:
-    from mecab_controller.kana_conv import (
-        to_hiragana,
-        to_katakana,
-        is_hiragana_str,
-        is_katakana_str,
-    )
-except ImportError:
-    from ..mecab_controller.kana_conv import (
-        to_hiragana,
-        to_katakana,
-        is_hiragana_str,
-        is_katakana_str,
-    )
-try:
-    from use_text_part_storage import use_text_part_storage
-except ImportError:
-    from .use_text_part_storage import use_text_part_storage
+from ..all_types.main_types import PartOfSpeech
+from ..mecab_controller.basic_types import MecabParsedToken
+from ..okuri.mecab_common import (
+    get_all_conjugation_conditions,
+    get_word_type_from_mecab_token,
+    mecab,
+    MecabWordType,
+)
+from ..mecab_controller.kana_conv import (
+    to_hiragana,
+    to_katakana,
+    is_hiragana_str,
+    is_katakana_str,
+)
+from .use_text_part_storage import use_text_part_storage
 
-try:
-    from use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
-except ImportError:
-    from .use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
-try:
-    from okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
-except ImportError:
-    from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
-try:
-    from okuri.okurigana_dict import (
-        GODAN_FORM_VERB_STARTINGS,
-        POSSIBLE_OKURIGANA_PROGRESSION_DICT,
-    )
-except ImportError:
-    from ..okuri.okurigana_dict import (
-        GODAN_FORM_VERB_STARTINGS,
-        POSSIBLE_OKURIGANA_PROGRESSION_DICT,
-    )
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from .use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
+from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
+from ..okuri.okurigana_dict import (
+    GODAN_FORM_VERB_STARTINGS,
+    POSSIBLE_OKURIGANA_PROGRESSION_DICT,
+)
+from ..utils.logger import Logger
 
 
 def highlight_inflected_words_with_mecab(

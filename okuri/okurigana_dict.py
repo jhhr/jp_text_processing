@@ -1,17 +1,8 @@
 from typing import Optional, Union, Tuple
 
-try:
-    from all_types.main_types import PartOfSpeech
-except ImportError:
-    from ..all_types.main_types import PartOfSpeech
-try:
-    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-except ImportError:
-    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..all_types.main_types import PartOfSpeech
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from ..utils.logger import Logger
 
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv

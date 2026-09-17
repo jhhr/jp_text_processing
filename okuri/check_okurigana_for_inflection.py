@@ -8,18 +8,10 @@ from .starts_with_okurigana_conjugation import (
     starts_with_okurigana_conjugation,
 )
 
-try:
-    from all_types.main_types import (
-        PartOfSpeech,
-    )
-except ImportError:
-    from ..all_types.main_types import (
-        PartOfSpeech,
-    )
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..all_types.main_types import (
+    PartOfSpeech,
+)
+from ..utils.logger import Logger
 
 
 def check_okurigana_for_inflection(

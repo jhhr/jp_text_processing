@@ -1,9 +1,6 @@
 import re
 
-try:
-    from mecab_controller.kana_conv import to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana
+from ..mecab_controller.kana_conv import to_hiragana
 
 # All possible onyomi readings in katakana
 ALL_ONYOMI_KATAKANA = [

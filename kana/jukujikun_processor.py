@@ -8,30 +8,12 @@ when the last kanji is jukujikun.
 
 from typing import Tuple
 
-try:
-    from all_types.main_types import WrapMatchEntry
-except ImportError:
-    from ..all_types.main_types import WrapMatchEntry
-try:
-    from kana.mora_splitter import split_to_mora_list
-except ImportError:
-    from .mora_splitter import split_to_mora_list
-try:
-    from kana.mora_alignment import MoraAlignment
-except ImportError:
-    from .mora_alignment import MoraAlignment
-try:
-    from kana.furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
-except ImportError:
-    from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
-try:
-    from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-except ImportError:
-    from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..all_types.main_types import WrapMatchEntry
+from .mora_splitter import split_to_mora_list
+from .mora_alignment import MoraAlignment
+from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
+from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..utils.logger import Logger
 
 
 def should_reject_lexicalized_na_suffix(

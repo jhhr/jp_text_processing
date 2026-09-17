@@ -1,10 +1,7 @@
 import re
 from typing import Literal
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
 WordReadingType = Literal["on", "kun", "juk", "mix", ""]
 

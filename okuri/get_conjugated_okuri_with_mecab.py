@@ -1,40 +1,19 @@
 import sys
 
-try:
-    from mecab_common import (
-        OkuriPrefix,
-        get_all_conjugation_conditions,
-        get_word_type_from_mecab_token,
-        mecab,
-    )
-except ImportError:
-    from .mecab_common import (
-        OkuriPrefix,
-        get_all_conjugation_conditions,
-        get_word_type_from_mecab_token,
-        mecab,
-    )
-try:
-    from all_types.main_types import (
-        OkuriResults,
-    )
-except ImportError:
-    from ..all_types.main_types import (
-        OkuriResults,
-    )
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from .mecab_common import (
+    OkuriPrefix,
+    get_all_conjugation_conditions,
+    get_word_type_from_mecab_token,
+    mecab,
+)
+from ..all_types.main_types import (
+    OkuriResults,
+)
+from ..utils.logger import Logger
 
-try:
-    from mecab_controller.basic_types import (
-        MecabParsedToken,
-    )
-except ImportError:
-    from ..mecab_controller.basic_types import (
-        MecabParsedToken,
-    )
+from ..mecab_controller.basic_types import (
+    MecabParsedToken,
+)
 
 
 def get_conjugated_okuri_with_mecab(

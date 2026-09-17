@@ -1,18 +1,9 @@
 import sys
 from typing import Optional
 
-try:
-    from okuri.okurigana_dict import get_okuri_dict_for_okurigana
-except ImportError:
-    from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
-try:
-    from all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
-except ImportError:
-    from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
+from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
+from ..utils.logger import Logger
 
 
 def starts_with_okurigana_conjugation(

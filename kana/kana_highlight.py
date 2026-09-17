@@ -7,106 +7,42 @@ from .construct_wrapped_furi_word import (
     FuriReconstruct,
 )
 
-try:
-    from mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-try:
-    from kana.katakana_positions import get_katakana_positions
-except ImportError:
-    from .katakana_positions import get_katakana_positions
-try:
-    from kana.orphaned_repeater_cleaning import (
-        ORPHANED_REPEATER_CLEANING_REC,
-        orphaned_repeater_cleaning_replacer,
-    )
-except ImportError:
-    from .orphaned_repeater_cleaning import (
-        ORPHANED_REPEATER_CLEANING_REC,
-        orphaned_repeater_cleaning_replacer,
-    )
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
-try:
-    from kanji.number_to_kanji import number_to_kanji
-except ImportError:
-    from ..kanji.number_to_kanji import number_to_kanji
-try:
-    from okuri.okurigana_mix_cleaning_replacer import (
-        LEADING_KANA_CLEANING_REC,
-        OKURIGANA_MIX_CLEANING_REC,
-        leading_kana_cleaning_replacer,
-        okurigana_mix_cleaning_replacer,
-    )
-except ImportError:
-    from ..okuri.okurigana_mix_cleaning_replacer import (
-        LEADING_KANA_CLEANING_REC,
-        OKURIGANA_MIX_CLEANING_REC,
-        leading_kana_cleaning_replacer,
-        okurigana_mix_cleaning_replacer,
-    )
-try:
-    from regex.kanji_furi import (
-        KANJI_RE,
-        DOUBLE_KANJI_REC,
-        KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
-        FURIGANA_REC,
-        NON_KANA_REC,
-    )
-except ImportError:
-    from ..regex.kanji_furi import (
-        KANJI_RE,
-        DOUBLE_KANJI_REC,
-        KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
-        FURIGANA_REC,
-        NON_KANA_REC,
-    )
-try:
-    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
-except ImportError:
-    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
-try:
-    from all_types.main_types import (
-        Edge,
-        WithTagsDef,
-        YomiMatchResult,
-        FinalResult,
-        MoraAlignment,
-        ReadingType,
-        WrapMatchEntry,
-    )
-except ImportError:
-    from ..all_types.main_types import (
-        Edge,
-        WithTagsDef,
-        YomiMatchResult,
-        FinalResult,
-        MoraAlignment,
-        ReadingType,
-        WrapMatchEntry,
-    )
-try:
-    from kana.furigana_exceptions import check_exception
-except ImportError:
-    from .furigana_exceptions import check_exception
-try:
-    from kana.mora_splitter import split_to_mora_list, normalize_long_vowel_marks
-except ImportError:
-    from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
-try:
-    from kana.furigana_normalizer import normalize_furigana_for_matching
-except ImportError:
-    from .furigana_normalizer import normalize_furigana_for_matching
-try:
-    from kana.mora_alignment import find_first_complete_alignment
-except ImportError:
-    from .mora_alignment import find_first_complete_alignment
-try:
-    from kana.jukujikun_processor import process_jukujikun_positions
-except ImportError:
-    from .jukujikun_processor import process_jukujikun_positions
+from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
+from .katakana_positions import get_katakana_positions
+from .orphaned_repeater_cleaning import (
+    ORPHANED_REPEATER_CLEANING_REC,
+    orphaned_repeater_cleaning_replacer,
+)
+from ..utils.logger import Logger
+from ..kanji.number_to_kanji import number_to_kanji
+from ..okuri.okurigana_mix_cleaning_replacer import (
+    LEADING_KANA_CLEANING_REC,
+    OKURIGANA_MIX_CLEANING_REC,
+    leading_kana_cleaning_replacer,
+    okurigana_mix_cleaning_replacer,
+)
+from ..regex.kanji_furi import (
+    KANJI_RE,
+    DOUBLE_KANJI_REC,
+    KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+    FURIGANA_REC,
+    NON_KANA_REC,
+)
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA, RENDAKU_CONVERSION_DICT_KATAKANA
+from ..all_types.main_types import (
+    Edge,
+    WithTagsDef,
+    YomiMatchResult,
+    FinalResult,
+    MoraAlignment,
+    ReadingType,
+    WrapMatchEntry,
+)
+from .furigana_exceptions import check_exception
+from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
+from .furigana_normalizer import normalize_furigana_for_matching
+from .mora_alignment import find_first_complete_alignment
+from .jukujikun_processor import process_jukujikun_positions
 
 
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]

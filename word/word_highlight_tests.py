@@ -2,10 +2,7 @@ import sys
 
 from .word_highlight import word_highlight
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger  # type: ignore[no-redef]
+from ..utils.logger import Logger  # type: ignore[no-redef]
 
 
 def test(

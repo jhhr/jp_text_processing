@@ -1,10 +1,7 @@
 import re
 from .kana_highlight import kana_highlight, WithTagsDef
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
 KANJI_RE = r"[\d々\u4e00-\u9faf\u3400-\u4dbf]"
 

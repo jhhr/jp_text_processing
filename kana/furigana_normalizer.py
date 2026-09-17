@@ -15,18 +15,9 @@ and put back afterwards from the recorded positions, the same way a long vowel m
 
 from typing import TypedDict
 
-try:
-    from mecab_controller.kana_conv import to_hiragana, to_katakana, is_katakana_char
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana, to_katakana, is_katakana_char
-try:
-    from regex.mora import ALL_MORA_REC, ORPHAN_KANA, SMALL_TSU
-except ImportError:
-    from ..regex.mora import ALL_MORA_REC, ORPHAN_KANA, SMALL_TSU
-try:
-    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-except ImportError:
-    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from ..mecab_controller.kana_conv import to_hiragana, to_katakana, is_katakana_char
+from ..regex.mora import ALL_MORA_REC, ORPHAN_KANA, SMALL_TSU
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 
 
 # The full-size kana a small one drawls out. ゕ and ゖ are here for completeness, they only ever

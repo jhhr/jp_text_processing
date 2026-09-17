@@ -1,7 +1,4 @@
-try:
-    from mecab_controller.kana_conv import to_katakana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana
+from ..mecab_controller.kana_conv import to_katakana
 
 RENDAKU_CONVERSION_DICT_HIRAGANA: dict[str, list[str]] = {
     "か": ["が"],

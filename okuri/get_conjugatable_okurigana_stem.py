@@ -1,9 +1,6 @@
 from typing import Union
 
-try:
-    from all_types.main_types import PartOfSpeech
-except ImportError:
-    from ..all_types.main_types import PartOfSpeech
+from ..all_types.main_types import PartOfSpeech
 
 CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH: dict[str, list[PartOfSpeech]] = {
     # Godan verbs

@@ -7,38 +7,14 @@ including special cases like rendaku, small tsu conversion, and vowel changes.
 
 from typing import Optional
 
-try:
-    from all_types.main_types import ReadingMatchInfo, ReadingType
-except ImportError:
-    from ..all_types.main_types import ReadingMatchInfo, ReadingType
-try:
-    from mecab_controller.kana_conv import to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana
-try:
-    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-except ImportError:
-    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-try:
-    from kana.mora_splitter import long_vowel_variants
-except ImportError:
-    from .mora_splitter import long_vowel_variants
-try:
-    from okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
-except ImportError:
-    from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
-try:
-    from okuri.okurigana_dict import get_verb_noun_form_okuri
-except ImportError:
-    from ..okuri.okurigana_dict import get_verb_noun_form_okuri
-try:
-    from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-except ImportError:
-    from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..all_types.main_types import ReadingMatchInfo, ReadingType
+from ..mecab_controller.kana_conv import to_hiragana
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from .mora_splitter import long_vowel_variants
+from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
+from ..okuri.okurigana_dict import get_verb_noun_form_okuri
+from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..utils.logger import Logger
 
 # Small tsu conversion possible endings
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]

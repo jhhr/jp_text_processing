@@ -7,34 +7,14 @@ all possible ways to split mora among kanji, returning the first complete match.
 
 from typing import Optional
 
-try:
-    from all_types.main_types import ReadingMatchInfo, MoraAlignment
-except ImportError:
-    from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
-try:
-    from kana.get_ordered_sublists import get_ordered_sublists
-except ImportError:
-    from .get_ordered_sublists import get_ordered_sublists
-try:
-    from kana.reading_matcher import (
-        match_reading_to_mora,
-    )
-except ImportError:
-    from .reading_matcher import (
-        match_reading_to_mora,
-    )
-try:
-    from regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-except ImportError:
-    from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-try:
-    from kanji.all_kanji_data import all_kanji_data
-except ImportError:
-    from ..kanji.all_kanji_data import all_kanji_data
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
+from .get_ordered_sublists import get_ordered_sublists
+from .reading_matcher import (
+    match_reading_to_mora,
+)
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from ..kanji.all_kanji_data import all_kanji_data
+from ..utils.logger import Logger
 
 
 def contains_repeated_kanji(word: str) -> bool:

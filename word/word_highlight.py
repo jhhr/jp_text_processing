@@ -1,44 +1,17 @@
 import re
 
-try:
-    from kana.reading_matcher import check_reading_match
-except ImportError:
-    from ..kana.reading_matcher import check_reading_match
-try:
-    from all_types.main_types import OkuriResults
-except ImportError:
-    from ..all_types.main_types import OkuriResults
+from ..kana.reading_matcher import check_reading_match
+from ..all_types.main_types import OkuriResults
 
-try:
-    from highlight_inflected_words_with_mecab import highlight_inflected_words_with_mecab
-except ImportError:
-    from .highlight_inflected_words_with_mecab import (
-        highlight_inflected_words_with_mecab,
-    )
-try:
-    from use_tag_cleaning import use_tag_cleaning_with_b_insertion
-except ImportError:
-    from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
-try:
-    from use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
-except ImportError:
-    from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
-try:
-    from okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-except ImportError:
-    from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-try:
-    from kana.kana_highlight import kana_highlight, WithTagsDef
-except ImportError:
-    from ..kana.kana_highlight import kana_highlight, WithTagsDef
-try:
-    from mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-except ImportError:
-    from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from .highlight_inflected_words_with_mecab import (
+    highlight_inflected_words_with_mecab,
+)
+from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
+from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
+from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..kana.kana_highlight import kana_highlight, WithTagsDef
+from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
+from ..utils.logger import Logger
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"

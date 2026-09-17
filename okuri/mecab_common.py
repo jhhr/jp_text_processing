@@ -1,25 +1,12 @@
 from typing import Literal
 
-try:
-    from mecab_controller.basic_types import (
-        Inflection,
-        MecabParsedToken,
-        PartOfSpeech,
-    )
-except ImportError:
-    from ..mecab_controller.basic_types import (
-        Inflection,
-        MecabParsedToken,
-        PartOfSpeech,
-    )
-try:
-    from mecab_controller.mecab_controller import MecabController
-except ImportError:
-    from ..mecab_controller.mecab_controller import MecabController
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..mecab_controller.basic_types import (
+    Inflection,
+    MecabParsedToken,
+    PartOfSpeech,
+)
+from ..mecab_controller.mecab_controller import MecabController
+from ..utils.logger import Logger
 
 MecabWordType = Literal[
     "i_adjective",

@@ -1,0 +1,14 @@
+﻿# This directory is the `jp_text_processing` package itself, not a distribution root: the
+# add-ons vendor it via `build.py` and import it as `<addon>.shared.jp_text_processing`.
+# Nothing here is ever pip-installed, so this file only declares what the package is and
+# gives the tooling a home.
+
+[project]
+name = "jp_text_processing"
+version = "0.1.0"
+description = "Japanese furigana, reading and word-highlighting processing shared by the Anki add-ons"
+requires-python = ">=3.10"
+
+[tool.mypy]
+python_version = "3.10"
+explicit_package_bases = true

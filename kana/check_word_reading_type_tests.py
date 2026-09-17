@@ -1,9 +1,6 @@
 from .check_word_reading_type import WordReadingType, check_word_reading_type
 
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from ..utils.logger import Logger
 
 
 def test(

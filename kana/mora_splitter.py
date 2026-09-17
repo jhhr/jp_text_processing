@@ -8,18 +8,9 @@ the mora count exceeds the kanji count.
 
 from typing import TypedDict
 
-try:
-    from mecab_controller.kana_conv import to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana
-try:
-    from kana.katakana_positions import get_katakana_positions
-except ImportError:
-    from .katakana_positions import get_katakana_positions
-try:
-    from regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP, ORPHAN_KANA, SMALL_TSU
-except ImportError:
-    from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP, ORPHAN_KANA, SMALL_TSU
+from ..mecab_controller.kana_conv import to_hiragana
+from .katakana_positions import get_katakana_positions
+from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP, ORPHAN_KANA, SMALL_TSU
 
 
 class MoraSplitResult(TypedDict):

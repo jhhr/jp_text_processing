@@ -8,14 +8,8 @@ from .okurigana_mix_cleaning_replacer import (
     okurigana_mix_cleaning_replacer,
 )
 
-try:
-    from kana.make_furigana_from_reading import make_furigana_from_reading
-except ImportError:
-    from ..kana.make_furigana_from_reading import make_furigana_from_reading
-try:
-    from mecab_controller.kana_conv import to_hiragana
-except ImportError:
-    from ..mecab_controller.kana_conv import to_hiragana
+from ..kana.make_furigana_from_reading import make_furigana_from_reading
+from ..mecab_controller.kana_conv import to_hiragana
 
 
 RED = "\033[91m"

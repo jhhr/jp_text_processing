@@ -1,24 +1,13 @@
 import re
 import sys
 
-try:
-    from use_text_part_storage import (
-        use_text_part_storage,
-        IndexIncrementer,
-        TextPartIndexes,
-        TextPartRestorer,
-    )
-except ImportError:
-    from .use_text_part_storage import (
-        use_text_part_storage,
-        IndexIncrementer,
-        TextPartIndexes,
-        TextPartRestorer,
-    )
-try:
-    from utils.logger import Logger
-except ImportError:
-    from ..utils.logger import Logger
+from .use_text_part_storage import (
+    use_text_part_storage,
+    IndexIncrementer,
+    TextPartIndexes,
+    TextPartRestorer,
+)
+from ..utils.logger import Logger
 
 
 def increment_for_b_tag_insertion(
