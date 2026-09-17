@@ -98,6 +98,68 @@ def split_mora_for_jukujikun(mora_list: list[str], kanji: list[str]) -> list[str
     return result
 
 
+def recut_mora_around_exceptions(
+    word: str,
+    alignment: MoraAlignment,
+    full_furigana: str,
+    exception_parts: dict[int, WrapMatchEntry],
+) -> None:
+    """
+    Re-cut ``mora_split`` around the positions a furigana exception claimed.
+
+    The exception mapping states exactly which mora its own positions take, which rarely agrees
+    with the trial split that produced the alignment. Everything the exception did not claim
+    still belongs to the positions around it, so walk the word once, locate each claimed reading
+    in the furigana and hand every gap the text left between its neighbours' readings. Without
+    this the fallback below would deal out the trial split's stale mora - or, for a gap the trial
+    split gave nothing, no mora at all.
+
+    :param word: The full word
+    :param alignment: The mora alignment, whose ``mora_split`` is rewritten in place
+    :param full_furigana: The word's full reading, as ``mora_split`` spelled it before this runs
+    :param exception_parts: The entries the exception mapping claimed, by kanji index
+    """
+    mora_split = alignment["mora_split"]
+    if len(mora_split) != len(word):
+        return
+    jukujikun_positions = set(alignment["jukujikun_positions"])
+
+    def fill_gap(gap: list[int], text: str) -> None:
+        # Only the positions the fallback redistributes may be re-cut; one that found a real
+        # reading match keeps the mora that match was made against.
+        if not gap or any(pos not in jukujikun_positions for pos in gap):
+            return
+        gap_mora = split_to_mora_list(furigana=text, kanji_count=len(gap))["mora_list"]
+        for offset, mora_portion in enumerate(
+            split_mora_for_jukujikun(gap_mora, [word[pos] for pos in gap])
+        ):
+            mora_split[gap[offset]] = mora_portion
+
+    cursor = 0
+    gap: list[int] = []
+    for pos in range(len(word)):
+        if pos not in exception_parts:
+            gap.append(pos)
+            continue
+        claimed_mora = exception_parts[pos]["furigana"]
+        found = full_furigana.find(claimed_mora, cursor) if claimed_mora else cursor
+        if found == -1:
+            # The exception's reading is not where the furigana says it is; the rest of the
+            # split cannot be trusted to line up either, so leave it as the alignment made it.
+            logger.debug(
+                "recut_mora_around_exceptions - %s not found in %s from %s",
+                claimed_mora,
+                full_furigana,
+                cursor,
+            )
+            return
+        fill_gap(gap, full_furigana[cursor:found])
+        gap = []
+        mora_split[pos] = claimed_mora
+        cursor = found + len(claimed_mora)
+    fill_gap(gap, full_furigana[cursor:])
+
+
 def process_jukujikun_positions(
     word: str,
     furigana: str,
@@ -180,57 +242,65 @@ def process_jukujikun_positions(
                         )
                 start_search = start + len(ex_word)
 
-    # If exception mapping did not set any juku parts, fall back to redistributing
-    if not jukujikun_parts:
-        # The trial split that produced the alignment may have handed the wrong mora to each
-        # jukujikun position, so re-split and deal them out evenly. Do this one contiguous run of
-        # jukujikun positions at a time: a matched kanji between two runs keeps its own mora and
-        # separates what comes before it from what comes after, so pooling the mora of every
-        # unmatched position would deal mora from after the match to positions before it and
-        # reorder the reading.
-        mora_split = alignment["mora_split"]
-        runs: list[list[int]] = []
-        for pos in sorted(alignment["jukujikun_positions"]):
-            if runs and pos == runs[-1][-1] + 1:
-                runs[-1].append(pos)
-            else:
-                runs.append([pos])
+    # Redistribute over whatever the exception mapping left unclaimed. Claiming some positions
+    # is not claiming them all: skipping the fallback whenever the loop above filled anything
+    # left every other jukujikun position with no entry at all, and so with an empty reading.
+    if jukujikun_parts:
+        recut_mora_around_exceptions(word, alignment, full_furigana, jukujikun_parts)
+    unclaimed = [
+        pos for pos in sorted(alignment["jukujikun_positions"]) if pos not in jukujikun_parts
+    ]
 
-        for run in runs:
-            # Only the mora the alignment assigned to this run's own slots. They are already in
-            # order and already bounded by the neighbouring matched kanji.
-            run_mora_str = "".join(mora_split[pos] for pos in run if pos < len(mora_split))
-            run_mora = split_to_mora_list(
-                furigana=run_mora_str,
-                kanji_count=len(run),
-            )["mora_list"]
-            logger.debug(
-                "process_jukujikun_positions - jukujikun run %s gets mora %s,"
-                " alignment.mora_split: %s",
-                run,
-                run_mora_str,
-                mora_split,
-            )
-            if not run_mora:
-                continue
+    # The trial split that produced the alignment may have handed the wrong mora to each
+    # jukujikun position, so re-split and deal them out evenly. Do this one contiguous run of
+    # jukujikun positions at a time: a matched or exception-claimed kanji between two runs keeps
+    # its own mora and separates what comes before it from what comes after, so pooling the mora
+    # of every unmatched position would deal mora from after it to positions before it and
+    # reorder the reading.
+    mora_split = alignment["mora_split"]
+    runs: list[list[int]] = []
+    for pos in unclaimed:
+        if runs and pos == runs[-1][-1] + 1:
+            runs[-1].append(pos)
+        else:
+            runs.append([pos])
 
-            run_kanji = [word[pos] for pos in run]
-            redistributed_mora = split_mora_for_jukujikun(run_mora, run_kanji)
+    for run in runs:
+        # Only the mora the alignment assigned to this run's own slots. They are already in
+        # order and already bounded by the neighbouring matched kanji.
+        run_mora_str = "".join(mora_split[pos] for pos in run if pos < len(mora_split))
+        run_mora = split_to_mora_list(
+            furigana=run_mora_str,
+            kanji_count=len(run),
+        )["mora_list"]
+        logger.debug(
+            "process_jukujikun_positions - jukujikun run %s gets mora %s,"
+            " alignment.mora_split: %s",
+            run,
+            run_mora_str,
+            mora_split,
+        )
 
-            # Assign redistributed mora to this run's jukujikun positions
-            for idx, pos in enumerate(run):
-                kanji = word[pos]
-                mora_portion = redistributed_mora[idx]
-                # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
-                # 為 with readings し/さ is the irregular verb する
-                is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
-                jukujikun_parts[pos] = {
-                    "kanji": kanji,
-                    "tag": "kun" if (kanji.isdigit() or is_suru_verb) else "juk",
-                    "highlight": False,
-                    "furigana": mora_portion,
-                    "is_num": kanji.isdigit(),
-                }
+        run_kanji = [word[pos] for pos in run]
+        # With no mora to deal out this gives every position in the run an empty reading. That
+        # is still an entry: dropping the run instead left the same hole the exception mapping
+        # used to leave, and reconstruction has no reading to fall back on either way.
+        redistributed_mora = split_mora_for_jukujikun(run_mora, run_kanji)
+
+        # Assign redistributed mora to this run's jukujikun positions
+        for idx, pos in enumerate(run):
+            kanji = word[pos]
+            mora_portion = redistributed_mora[idx]
+            # Tag numbers and 為 (する verb) as kunyomi instead of jukujikun
+            # 為 with readings し/さ is the irregular verb する
+            is_suru_verb = kanji == "為" and mora_portion in ["し", "さ"]
+            jukujikun_parts[pos] = {
+                "kanji": kanji,
+                "tag": "kun" if (kanji.isdigit() or is_suru_verb) else "juk",
+                "highlight": False,
+                "furigana": mora_portion,
+                "is_num": kanji.isdigit(),
+            }
 
     # Handle okurigana extraction if last kanji is jukujikun
     last_kanji_index = len(word) - 1

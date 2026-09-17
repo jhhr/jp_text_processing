@@ -341,39 +341,69 @@ Return type: {return_type}
         ),
     )
     test(
-        # An exception word (薔薇) covers its own positions in juku_parts, so the redistribution
-        # that would have covered the rest is skipped and the kanji before it end up with neither
-        # a reading match nor a juku part. The first such kanji used to raise UnboundLocalError.
-        test_name="Should not crash when a kanji has neither a reading match nor a juku part",
-        expected_log_errors=True,
+        # An exception word (薔薇) covers its own positions in juku_parts; the kanji before it
+        # get theirs from the redistribution, which used to be skipped whenever the exception
+        # had filled anything. ぽぽぽぽ was then dropped from the reading entirely.
+        test_name="Should keep the mora of the kanji before an exception word",
         kanji="",
         sentence="栗栗薔薇[ぽぽぽぽばら]",
-        expected_furigana=" 栗栗薔薇[ばら]",
-        expected_furigana_with_tags_split="<mix> 栗栗[]</mix><juk> 薔[ば]</juk><juk> 薇[ら]</juk>",
-        expected_furigana_with_tags_merged="<mix> 栗栗[]</mix><juk> 薔薇[ばら]</juk>",
-        expected_furikanji=" ばら[栗栗薔薇]",
-        expected_furikanji_with_tags_split="<mix> [栗栗]</mix><juk> ば[薔]</juk><juk> ら[薇]</juk>",
-        expected_furikanji_with_tags_merged="<mix> [栗栗]</mix><juk> ばら[薔薇]</juk>",
-        expected_kana_only="ばら",
-        expected_kana_only_with_tags_split="<mix></mix><juk>ば</juk><juk>ら</juk>",
-        expected_kana_only_with_tags_merged="<mix></mix><juk>ばら</juk>",
+        expected_furigana=" 栗栗薔薇[ぽぽぽぽばら]",
+        expected_furigana_with_tags_split=(
+            "<juk> 栗[ぽぽ]</juk><juk> 栗[ぽぽ]</juk><juk> 薔[ば]</juk><juk> 薇[ら]</juk>"
+        ),
+        expected_furigana_with_tags_merged="<juk> 栗栗薔薇[ぽぽぽぽばら]</juk>",
+        expected_furikanji=" ぽぽぽぽばら[栗栗薔薇]",
+        expected_furikanji_with_tags_split=(
+            "<juk> ぽぽ[栗]</juk><juk> ぽぽ[栗]</juk><juk> ば[薔]</juk><juk> ら[薇]</juk>"
+        ),
+        expected_furikanji_with_tags_merged="<juk> ぽぽぽぽばら[栗栗薔薇]</juk>",
+        expected_kana_only="ぽぽぽぽばら",
+        expected_kana_only_with_tags_split=(
+            "<juk>ぽぽ</juk><juk>ぽぽ</juk><juk>ば</juk><juk>ら</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ぽぽぽぽばら</juk>",
     )
     test(
-        # Same gap, but after the exception instead of before it, so the unmatched kanji is not
-        # the first one. That position used to take whatever the previous kanji had been given.
-        test_name="Should not inherit the previous kanji's values when a kanji has no match",
-        expected_log_errors=True,
+        # Same gap, but after the exception instead of before it, so the leftover mora are the
+        # tail of the reading rather than its head.
+        test_name="Should keep the mora of the kanji after an exception word",
         kanji="薔",
         sentence="薔薇栗[ばらぽぽ]",
-        expected_furigana="<b> 薔[ば]</b> 薇栗[ら]",
-        expected_furigana_with_tags_split="<b><juk> 薔[ば]</juk></b><juk> 薇栗[ら]</juk>",
-        expected_furigana_with_tags_merged="<b><juk> 薔[ば]</juk></b><juk> 薇栗[ら]</juk>",
-        expected_furikanji="<b> ば[薔]</b> ら[薇栗]",
-        expected_furikanji_with_tags_split="<b><juk> ば[薔]</juk></b><juk> ら[薇栗]</juk>",
-        expected_furikanji_with_tags_merged="<b><juk> ば[薔]</juk></b><juk> ら[薇栗]</juk>",
-        expected_kana_only="<b>ば</b>ら",
-        expected_kana_only_with_tags_split="<b><juk>ば</juk></b><juk>ら</juk>",
-        expected_kana_only_with_tags_merged="<b><juk>ば</juk></b><juk>ら</juk>",
+        expected_furigana="<b> 薔[ば]</b> 薇栗[らぽぽ]",
+        expected_furigana_with_tags_split=(
+            "<b><juk> 薔[ば]</juk></b><juk> 薇[ら]</juk><juk> 栗[ぽぽ]</juk>"
+        ),
+        expected_furigana_with_tags_merged="<b><juk> 薔[ば]</juk></b><juk> 薇栗[らぽぽ]</juk>",
+        expected_furikanji="<b> ば[薔]</b> らぽぽ[薇栗]",
+        expected_furikanji_with_tags_split=(
+            "<b><juk> ば[薔]</juk></b><juk> ら[薇]</juk><juk> ぽぽ[栗]</juk>"
+        ),
+        expected_furikanji_with_tags_merged="<b><juk> ば[薔]</juk></b><juk> らぽぽ[薇栗]</juk>",
+        expected_kana_only="<b>ば</b>らぽぽ",
+        expected_kana_only_with_tags_split="<b><juk>ば</juk></b><juk>ら</juk><juk>ぽぽ</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>ば</juk></b><juk>らぽぽ</juk>",
+    )
+    test(
+        # Both gaps at once: the exception sits in the middle, so its reading bounds an
+        # unclaimed run on either side and neither may be dealt the other's mora.
+        test_name="Should keep the mora on both sides of an exception word",
+        kanji="",
+        sentence="栗薔薇栗[ぽぽばらぽぽ]",
+        expected_furigana=" 栗薔薇栗[ぽぽばらぽぽ]",
+        expected_furigana_with_tags_split=(
+            "<juk> 栗[ぽぽ]</juk><juk> 薔[ば]</juk><juk> 薇[ら]</juk><juk> 栗[ぽぽ]</juk>"
+        ),
+        expected_furigana_with_tags_merged="<juk> 栗薔薇栗[ぽぽばらぽぽ]</juk>",
+        expected_furikanji=" ぽぽばらぽぽ[栗薔薇栗]",
+        expected_furikanji_with_tags_split=(
+            "<juk> ぽぽ[栗]</juk><juk> ば[薔]</juk><juk> ら[薇]</juk><juk> ぽぽ[栗]</juk>"
+        ),
+        expected_furikanji_with_tags_merged="<juk> ぽぽばらぽぽ[栗薔薇栗]</juk>",
+        expected_kana_only="ぽぽばらぽぽ",
+        expected_kana_only_with_tags_split=(
+            "<juk>ぽぽ</juk><juk>ば</juk><juk>ら</juk><juk>ぽぽ</juk>"
+        ),
+        expected_kana_only_with_tags_merged="<juk>ぽぽばらぽぽ</juk>",
     )
     test(
         test_name="Should gracefully handle empty furigana - no highlight",
