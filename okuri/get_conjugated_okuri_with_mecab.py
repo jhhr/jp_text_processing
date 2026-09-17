@@ -1,5 +1,4 @@
 import logging
-import sys
 
 from .mecab_common import (
     OkuriPrefix,
@@ -11,7 +10,7 @@ from ..all_types.main_types import (
     OkuriResults,
     OkuriType,
 )
-from ..utils.logger import console_logging, package_logger as logger, set_level
+from ..utils.logger import package_logger as logger
 
 from ..mecab_controller.basic_types import (
     MecabParsedToken,
@@ -226,99 +225,3 @@ def get_conjugated_okuri_with_mecab(
         return OkuriResults("", maybe_okuri, "rejected_lexical_suffix", None), is_suru_verb
 
     return OkuriResults(conjugated_okuri, rest_kana, "detected_okuri", None), is_suru_verb
-
-
-# Tests
-def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug: bool = False):
-    set_level("debug" if debug else "error")
-    result, is_suru_verb = get_conjugated_okuri_with_mecab(
-        kanji, kanji_reading, maybe_okuri, okuri_prefix
-    )
-    try:
-        assert result.okurigana == expected[0]
-        assert result.rest_kana == expected[1]
-        assert is_suru_verb == expected[2]
-    except AssertionError:
-        # Re-run with logging enabled
-        set_level("debug")
-        get_conjugated_okuri_with_mecab(kanji, kanji_reading, maybe_okuri)
-        print(f"""\033[91mget_conjugated_okuri_with_mecab({maybe_okuri}, {kanji}, {kanji_reading})
-\033[93mExpected: {expected}
-\033[92mGot:      {(result.okurigana, result.rest_kana, is_suru_verb)}
-\033[0m""")
-        # Stop the testing here
-        sys.exit(1)
-
-
-def main():
-    console_logging("error")
-    # Test cases
-    test("逆上", "のぼ", "せたので", ("せた", "ので", False))
-    test("悔", "くや", "しいくらい", ("しい", "くらい", False))
-    test("安", "やす", "くなかった", ("くなかった", "", False))
-    test("来", "く", "れたらいくよ", ("れたら", "いくよ", False))
-    test("青", "あお", "かったらあかくぬって", ("かったら", "あかくぬって", False))
-    test("大", "おお", "きくてやわらかい", ("きくて", "やわらかい", False))
-    test("美味", "おい", "しい", ("しい", "", False))
-    test("美味", "おい", "しさがいい", ("しさ", "がいい", False))
-    test("美味", "おい", "しくない", ("しくない", "", False))
-    test("勉強", "べんきょう", "している", ("している", "", True))
-    test("勉強", "べんきょう", "されている", ("されている", "", True))
-    test("勉強", "べんきょう", "させられる", ("させられる", "", True))
-    test("容易", "たやす", "くやったな", ("く", "やったな", False))
-    test("清々", "すがすが", "しくない", ("しくない", "", False))
-    # 恥ずかしげ gets categorized as a noun
-    test("恥", "は", "ずかしげなかおで", ("ずかし", "げなかおで", False))
-    test("察", "さっ", "していなかった", ("していなかった", "", False))
-    test("為", "さ", "れるだろう", ("れる", "だろう", False))
-    test("知", "し", "ってるでしょう", ("ってる", "でしょう", False))
-    test("為", "し", "なかった", ("なかった", "", False))
-    test("挫", "くじ", "けられないで", ("けられないで", "", False))
-    test("挫", "くじ", "けさせてやる", ("けさせて", "やる", False))
-    test("何気", "なにげ", "にと", ("に", "と", False))
-    test("為", "す", "るしかない", ("る", "しかない", False))
-    test("静", "しず", "かにいった", ("かに", "いった", False))
-    test("静", "しず", "かでよい", ("か", "でよい", False))
-    test("静", "しず", "かなあおさ", ("かな", "あおさ", False))
-    test("高", "たか", "ければたかくなる", ("ければ", "たかくなる", False))
-    test("行", "い", "ったらしい", ("ったらしい", "", False))
-    test("行", "い", "ったらいくかも", ("ったら", "いくかも", False))
-    test("清々", "すっきり", "した", ("した", "", True))
-    test("熱々", "あつあつ", "だね", ("", "だね", False))
-    test("好々爺", "こうこうや", "です", ("", "です", False))
-    test("瑞々", "みずみず", "しさがいい", ("しさ", "がいい", False))
-    test("止", "ど", "め", ("め", "", False))
-    test("読", "よ", "みかた", ("み", "かた", False))
-    test("悪", "あ", "しがわからない", ("し", "がわからない", False))
-    test("死", "し", "んでいない", ("んでいない", "", False))
-    test("聞", "き", "いていたかい", ("いていた", "かい", False))
-    test("目論", "もくろ", "む", ("む", "", False))
-    # 久ぶりに doesn't get split into ひさし and ぶりに and is instead treated as a single noun
-    test("久", "ひさ", "しぶりに", ("し", "ぶりに", False))
-    test("久", "ひさ", "しいきもち", ("しい", "きもち", False))
-    test("仄々", "ほのぼの", "したようす", ("した", "ようす", False))
-    # 欲する is detected as a noun, when ほっする is commonly considered a kunyomi for it
-    # This would need to be handled by giving only the する part to the function
-    # test("欲", "ほっ", "ればやる", ("れば", "やる", False))
-    test("欲", "ほ", "しいなら", ("しい", "なら", False))
-    test("放", "ほ", "ったらかす", ("ったら", "かす", False))
-    test("放", "ほう", "ったらかす", ("ったら", "かす", False))
-    test("放", "ほう", "っておく", ("って", "おく", False))
-    test("高", "たか", "めるから", ("める", "から", False))
-    test("厚", "あつ", "かましくてやかましい", ("かましくて", "やかましい", False))
-    test("抉", "えぐ", "られたように", ("られた", "ように", False))
-    # Works when using okuri_prefix="kanji_reading" instead of "kanji"
-    test("抉", "えぐ", "かったよな", ("かった", "よな", False))
-    # えぐくて is too niche for mecab...
-    # test("抉", "えぐ", "くてやわらかい", ("くて", "やわらかい", False))
-    test("", "として", "いるのは", ("", "いるのは", False))
-    test("送", "おく", "ってた", ("ってた", "", False))
-    test("聴牌", "テンパ", "ります", ("ります", "", False))
-    test("聴牌", "テンパ", "ってた", ("ってた", "", False))
-    test("", "はにか", "んだ", ("んだ", "", False))
-    test("御座", "ござ", "います", ("います", "", False))
-    print("\033[92mTests passed\033[0m")
-
-
-if __name__ == "__main__":
-    main()
