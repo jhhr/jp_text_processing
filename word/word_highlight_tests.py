@@ -607,6 +607,30 @@ def main():
         expected="「<k>彼の</k><b>はにかんだ</b>笑顔が<k>如何</k>にも頭に残る」",
     )
     test(
+        test_name="Kana only - noun spelling the word's stem is not the word",
+        word="はしる",
+        text="はしをわたる",
+        expected="はしをわたる",
+    )
+    test(
+        test_name="Kana only - noun spelling the word's stem is not the word /2",
+        word="あめる",
+        text="あめがふる",
+        expected="あめがふる",
+    )
+    test(
+        test_name="Kana only - the word itself still highlights when MeCab knows it",
+        word="はしる",
+        text="はしらないで歩く",
+        expected="<b>はしらないで</b>歩く",
+    )
+    test(
+        test_name="Kana only - stem MeCab parsed as a noun highlights when a conjugation follows",
+        word="バズる",
+        text="それはバズったね",
+        expected="それは<b>バズ</b>ったね",
+    )
+    test(
         test_name="Kana only - kanji only & tags in text, inflectable word /1",
         word="めげる",
         text=(

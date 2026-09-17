@@ -50,9 +50,15 @@ try:
 except ImportError:
     from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 try:
-    from okuri.okurigana_dict import GODAN_FORM_VERB_STARTINGS
+    from okuri.okurigana_dict import (
+        GODAN_FORM_VERB_STARTINGS,
+        POSSIBLE_OKURIGANA_PROGRESSION_DICT,
+    )
 except ImportError:
-    from ..okuri.okurigana_dict import GODAN_FORM_VERB_STARTINGS
+    from ..okuri.okurigana_dict import (
+        GODAN_FORM_VERB_STARTINGS,
+        POSSIBLE_OKURIGANA_PROGRESSION_DICT,
+    )
 try:
     from utils.logger import Logger
 except ImportError:
@@ -105,6 +111,29 @@ def highlight_inflected_words_with_mecab(
         f" possible_parts_of_speech: {possible_parts_of_speech}"
     )
 
+    def is_inflected_stem(tokens: list[MecabParsedToken], index: int) -> bool:
+        """
+        Check whether a token spelling the word's stem really is an inflected occurrence of it.
+
+        MeCab does not know every verb; for an unknown one it splits the word into a noun-ish
+        stem plus the conjugation, so the stem token's headword is the word's stem. The stem
+        alone is no evidence though - はし is the noun 橋 as much as it is the stem of はしる -
+        so require that the text following the token continues as one of the conjugations
+        possible for this word.
+        """
+        if tokens[index].headword != word_stem:
+            return False
+        following_text = "".join(t.word for t in tokens[index + 1 :])
+        for pos in possible_parts_of_speech:
+            progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(pos)
+            for char in following_text:
+                progression = progression.get(char) if progression else None
+                if not progression:
+                    break
+                if progression.get("is_last"):
+                    return True
+        return False
+
     # Store indexes of all whitespace as mecab wipes them out
     space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
         text, part_regex=r"\s+", logger=logger
@@ -126,7 +155,7 @@ def highlight_inflected_words_with_mecab(
     opened_bold = False
     text_char_idx = 0
     open_bold_idx = -1
-    for token in all_tokens:
+    for token_idx, token in enumerate(all_tokens):
         logger.debug(f"token.word: '{token.word}', cur result: \33[32m'{result}'\033[0m")
         if found_word:
             add_to_conjugated_okuri, _ = get_all_conjugation_conditions(
@@ -153,7 +182,7 @@ def highlight_inflected_words_with_mecab(
                 found_word = False
         elif (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
-        ) or token.headword == word_stem:
+        ) or is_inflected_stem(all_tokens, token_idx):
             logger.debug(f"Found beginning of word to highlight: {token.word}")
             found_word = True
             result += "<b>" + token.word
