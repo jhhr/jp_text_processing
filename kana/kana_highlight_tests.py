@@ -629,7 +629,7 @@ CASES = [
             "furigana": " 見逃[みのが]した 映画[エイガ]をみる",
             "furikanji": " みのが[見逃]した エイガ[映画]をみる",
         },
-        id="Should be able to clean furigana that bridges over some okurigana 3/",
+        id="Generates furigana for a whole phrase from its full reading in brackets",
     ),
     # A word opening with kana only gives that kana back when the kanji's own readings say it is
     # part of the word. A prefix test on its own could not tell お前[おまえ] from a particle at the
@@ -1383,7 +1383,7 @@ CASES = [
             "furigana merged": "<kun> 歯[は]</kun><b><kun> 止[ど]</kun><oku>め</oku></b>",
             "furikanji merged": "<kun> は[歯]</kun><b><kun> ど[止]</kun><oku>め</oku></b>",
         },
-        id="Should be able to clean furigana that bridges over some okurigana 3/",
+        id="Should be able to clean furigana whose okurigana is only at the end",
     ),
     pytest.param(
         "閣",
