@@ -175,8 +175,18 @@ ALL_MORA = (
         "ん",
     ]
 )
-# Add the small tsu versions of all mora to be matched first
-ALL_MORA_RE = "|".join([m + "っ" for m in ALL_MORA] + ALL_MORA)
+# Kana that are never a mora by themselves: a small vowel or small ya-row kana belongs to the mora
+# before it (煩[うるせぇ]), as do an iteration mark standing in for a repeat (儘[まゝ]) and the
+# combining handakuten of か゚. A small tsu is the same, except word-initially, where it belongs to
+# the mora after it (振[っぷり]).
+ORPHAN_KANA = "ぁぃぅぇぉゃゅょゎゕゖゝゞ゚"
+SMALL_TSU = "っ"
+
+# Add the small tsu versions of all mora to be matched first. The trailing catch-all branch makes
+# the match lossless: a character that is not part of any mora above - an orphan small kana, or
+# anything unexpected - comes back as its own single-character token instead of being silently
+# dropped by findall. split_to_mora_list is what re-attaches those to a neighbouring mora.
+ALL_MORA_RE = "|".join([m + SMALL_TSU for m in ALL_MORA] + ALL_MORA + [r"[\s\S]"])
 ALL_MORA_REC = re.compile(rf"({ALL_MORA_RE})")
 
 # When converting a long vowel mark ー back to a vowel,

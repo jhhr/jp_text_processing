@@ -86,6 +86,10 @@ try:
 except ImportError:
     from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
 try:
+    from kana.furigana_normalizer import normalize_furigana_for_matching
+except ImportError:
+    from .furigana_normalizer import normalize_furigana_for_matching
+try:
     from kana.mora_alignment import find_first_complete_alignment
 except ImportError:
     from .mora_alignment import find_first_complete_alignment
@@ -266,7 +270,7 @@ def reconstruct_furigana(
     original_furigana: str = furi_okuri_result.get("original_furigana", "")
     original_hiragana = to_hiragana(original_furigana) if original_furigana else ""
     katakana_positions: list[int] = furi_okuri_result.get("katakana_positions", [])
-    long_vowel_positions: list[int] = furi_okuri_result.get("long_vowel_positions", [])
+    restored_chars: dict[int, str] = furi_okuri_result.get("restored_chars", {})
 
     if okurigana and with_tags_def.with_tags:
         okurigana = f"<oku>{okurigana}</oku>"
@@ -281,16 +285,18 @@ def reconstruct_furigana(
             segment_word = "".join([entry["kanji"] for entry in segment if entry["kanji"]])
             segment_furi = "".join([entry["furigana"] for entry in segment])
 
-            # Apply long-vowel and katakana restoration based on original positions.
-            if segment_furi and original_furigana and (katakana_positions or long_vowel_positions):
+            # Put back the rewritten characters and the katakana, by position in the original.
+            if segment_furi and original_furigana and (katakana_positions or restored_chars):
                 furi_chars = list(segment_furi)
                 for i in range(len(furi_chars)):
                     original_pos = render_cursor + i
-                    if original_pos in long_vowel_positions:
-                        furi_chars[i] = "ー"
-                    if (
+                    if original_pos in restored_chars:
+                        furi_chars[i] = restored_chars[original_pos]
+                    elif (
                         original_pos in katakana_positions
                         and original_pos < len(original_hiragana)
+                        # A ー that was spread out into a vowel instead of being restored is not
+                        # that vowel's script to decide, leave it as the hiragana it became
                         and original_hiragana[original_pos] != "ー"
                     ):
                         furi_chars[i] = to_katakana(furi_chars[i])
@@ -317,7 +323,7 @@ def reconstruct_furigana(
             apply_highlight=False,
             original_furigana=original_furigana,
             katakana_positions=katakana_positions,
-            long_vowel_positions=long_vowel_positions,
+            restored_chars=restored_chars,
             original_start_index=render_cursor,
             logger=logger,
         )
@@ -602,9 +608,10 @@ def reconstruct_from_alignment(
     okurigana: str,
     rest_kana: str,
     katakana_positions: list[int],
-    long_vowel_positions: list[int],
+    restored_chars: dict[int, str],
     original_furigana: str,
     reconstruct_type: FuriReconstruct,
+    furigana_prefix: str = "",
     logger: Logger = Logger("error"),
 ) -> str:
     """
@@ -621,8 +628,11 @@ def reconstruct_from_alignment(
     :param okurigana: The okurigana portion (from alignment or jukujikun extraction)
     :param rest_kana: The remaining kana after okurigana
     :param katakana_positions: List of indices in original furigana that were katakana
-    :param long_vowel_positions: List of indices in original furigana that were long vowel marks
+    :param restored_chars: Index in original furigana → the character to write back there, for the
+        kana that were rewritten before matching
     :param original_furigana: The original furigana before hiragana conversion
+    :param furigana_prefix: Kana taken off the front of the furigana before matching, given back to
+        the first kanji's reading here
     :param logger: Logger for debugging
     :return: FinalResult with complete furigana and word parts
     """
@@ -703,6 +713,12 @@ def reconstruct_from_alignment(
             "is_num": is_num,
             "is_noun_suru_verb": is_noun_suru_verb,
         })
+    # Give back the kana that was taken off the front of the furigana for matching. The first
+    # kanji's reading is what it sat in front of, so that is where it goes, and from here on the
+    # readings line up with the original furigana again.
+    if furigana_prefix and entries:
+        entries[0]["furigana"] = f"{furigana_prefix}{entries[0]['furigana']}"
+
     logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
 
     # Mark every position the kanji occupies, not just the first: the point is to show the kanji
@@ -798,7 +814,7 @@ def reconstruct_from_alignment(
         "okurigana": okurigana,
         "rest_kana": rest_kana,
         "katakana_positions": katakana_positions,
-        "long_vowel_positions": long_vowel_positions,
+        "restored_chars": restored_chars,
         "original_furigana": original_furigana,
     }
     logger.debug(f"reconstruct_from_alignment - final_result: {final_result}")
@@ -929,6 +945,38 @@ def kana_highlight(
             # (what is it doing there next to a sound tag?) so we'll just leave it out anyway
             return full_furigana + maybe_okuri
 
+        # Take the kana that carry no reading of their own out of the way, so that what is left can
+        # be matched against the kanji's listed readings. They are written back in at the end from
+        # the positions recorded here.
+        original_furigana = full_furigana
+        normalized = normalize_furigana_for_matching(full_furigana)
+        full_furigana = normalized["furigana"]
+        furigana_prefix = to_hiragana(normalized["prefix"])
+        if original_furigana != full_furigana or furigana_prefix:
+            logger.debug(
+                f"furigana_replacer - normalized furigana for matching: {full_furigana}, prefix:"
+                f" {normalized['prefix']}, restored_chars: {normalized['restored_chars']}"
+            )
+
+        def build_restored_chars(long_vowel_positions: list[int]) -> dict[int, str]:
+            """
+            Index the characters to write back by their position in the original furigana.
+
+            Everything upstream of this works on the normalized furigana, which is the original
+            minus the prefix, so the positions shift by the prefix's length. The prefix itself is
+            restored the same way, which is also what puts it back in its original script.
+            """
+            offset = len(furigana_prefix)
+            restored = {pos + offset: char for pos, char in normalized["restored_chars"].items()}
+            for pos in long_vowel_positions:
+                restored[pos + offset] = "ー"
+            if normalized["prefix"]:
+                restored[0] = normalized["prefix"]
+            return restored
+
+        def shift_katakana_positions(positions: list[int]) -> list[int]:
+            return [pos + len(furigana_prefix) for pos in positions]
+
         highlight_kanji_is_whole_word = kanji_to_highlight is not None and (
             full_word == kanji_to_highlight
             or f"{kanji_to_highlight}々" == full_word
@@ -974,9 +1022,10 @@ def kana_highlight(
                 okurigana=use_okurigana,
                 rest_kana=use_rest_kana,
                 katakana_positions=[],
-                long_vowel_positions=[],
-                original_furigana=full_furigana,
+                restored_chars=build_restored_chars([]),
+                original_furigana=original_furigana,
                 reconstruct_type=return_type,
+                furigana_prefix=furigana_prefix,
                 logger=logger,
             )
             return final_result
@@ -1060,10 +1109,11 @@ def kana_highlight(
             with_tags_def=with_tags_def,
             okurigana=final_okurigana,
             rest_kana=final_rest_kana,
-            katakana_positions=katakana_positions,
-            long_vowel_positions=long_vowel_positions,
-            original_furigana=full_furigana,
+            katakana_positions=shift_katakana_positions(katakana_positions),
+            restored_chars=build_restored_chars(long_vowel_positions),
+            original_furigana=original_furigana,
             reconstruct_type=return_type,
+            furigana_prefix=furigana_prefix,
             logger=logger,
         )
         logger.debug(f"furigana_replacer - final_result: {final_result}\n")

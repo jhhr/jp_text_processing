@@ -17,9 +17,9 @@ try:
 except ImportError:
     from .katakana_positions import get_katakana_positions
 try:
-    from regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
+    from regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP, ORPHAN_KANA, SMALL_TSU
 except ImportError:
-    from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP
+    from ..regex.mora import ALL_MORA_REC, LONG_VOWEL_MAP, ORPHAN_KANA, SMALL_TSU
 
 
 class MoraSplitResult(TypedDict):
@@ -50,6 +50,37 @@ def normalize_long_vowel_marks(furigana: str) -> tuple[str, list[int]]:
     return furigana, [i for i, char in enumerate(furigana) if char == "ー"]
 
 
+def attach_small_tsu(mora_list: list[str]) -> list[str]:
+    """
+    Attach a っ that stands alone to a neighbouring mora.
+
+    ALL_MORA_REC already captures っ as the tail of the mora before it ("きゃっ"), so a lone っ
+    can only come from a reading that starts with one, like 振[っぷり] or 丈[ったけ]. There is no
+    mora before it to be the tail of, so it becomes the head of the one after it instead.
+
+    :param mora_list: Mora as tokenized by ALL_MORA_REC
+    :return: The same mora with every lone っ attached to a neighbour
+    """
+    if SMALL_TSU not in mora_list:
+        return mora_list
+
+    new_list: list[str] = []
+    pending_small_tsu = ""
+    for mora in mora_list:
+        if mora == SMALL_TSU:
+            if new_list:
+                new_list[-1] += mora
+            else:
+                pending_small_tsu += mora
+            continue
+        new_list.append(f"{pending_small_tsu}{mora}")
+        pending_small_tsu = ""
+    if pending_small_tsu:
+        # Nothing followed it after all, keep it rather than lose it
+        new_list.append(pending_small_tsu)
+    return new_list
+
+
 def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
     """
     Split furigana string into a list of mora units.
@@ -58,8 +89,11 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
     mora count exceeds kanji_count, merge ん with the previous mora. This handles
     cases like 本[ほん] where ん should be part of the same mora as ほ.
 
+    ORPHAN_KANA - small vowels and iteration marks - are merged the same way and under the same
+    condition, so that 煩[うるせぇ] keeps its ぇ while 嗚呼[あぁ] still has a mora for each kanji.
+
     Note: っ (small tsu) is already captured in ALL_MORA_REC as compound mora like
-    "きゃっ", so no separate っ merging is needed.
+    "きゃっ", so only a reading-initial っ needs attaching, see attach_small_tsu.
 
     :param furigana: The furigana reading (can be hiragana or katakana)
     :param kanji_count: Number of kanji in the word (used for ん merging logic)
@@ -75,15 +109,20 @@ def split_to_mora_list(furigana: str, kanji_count: int) -> MoraSplitResult:
     # Track long-vowel positions for later reconstruction.
     _, long_vowel_positions = normalize_long_vowel_marks(furigana)
 
-    # Extract all mora using the comprehensive regex
+    # Extract all mora using the comprehensive regex. This is lossless, anything the regex doesn't
+    # know as a mora comes back as a single-character token to be attached below.
     mora_list = ALL_MORA_REC.findall(furigana)
 
-    # Merge ん with previous mora only when len(mora_list) > kanji_count
-    if "ん" in mora_list and len(mora_list) > kanji_count:
+    # A reading-initial っ has no mora before it to attach to, give it the one after it
+    mora_list = attach_small_tsu(mora_list)
+
+    # Merge ん and orphan small kana with the previous mora, only when len(mora_list) > kanji_count
+    mergeable = frozenset(f"ん{ORPHAN_KANA}")
+    if not mergeable.isdisjoint(mora_list) and len(mora_list) > kanji_count:
         new_list: list[str] = []
         for mora in mora_list:
-            if mora == "ん" and len(new_list) > 0:
-                # Merge ん with previous mora
+            if mora in mergeable and len(new_list) > 0:
+                # Merge with previous mora
                 new_list[-1] += mora
             else:
                 new_list.append(mora)

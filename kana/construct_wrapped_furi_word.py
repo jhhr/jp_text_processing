@@ -224,7 +224,7 @@ def construct_wrapped_furi_word(
     apply_highlight: bool = True,
     original_furigana: str = "",
     katakana_positions: list[int] | None = None,
-    long_vowel_positions: list[int] | None = None,
+    restored_chars: dict[int, str] | None = None,
     original_start_index: int = 0,
     logger=Logger("error"),
 ) -> str:
@@ -238,8 +238,8 @@ def construct_wrapped_furi_word(
     :param apply_highlight: Whether to apply highlighting
     :param original_furigana: The original furigana before hiragana conversion
     :param katakana_positions: List of indices in original_furigana that were katakana
-    :param long_vowel_positions: List of indices in original_furigana that were long vowel marks
-        (ー)
+    :param restored_chars: Index in original_furigana → the character to write back there, for the
+        kana that were rewritten before matching (ー, an iteration mark, a small vowel)
     :param original_start_index: Offset into original_furigana for the first character of this
         segment, used when reconstructing per-segment output
     :param logger: Logger instance
@@ -247,8 +247,8 @@ def construct_wrapped_furi_word(
     """
     if katakana_positions is None:
         katakana_positions = []
-    if long_vowel_positions is None:
-        long_vowel_positions = []
+    if restored_chars is None:
+        restored_chars = {}
 
     # Convert original furigana to hiragana for matching
     original_hiragana = to_hiragana(original_furigana) if original_furigana else ""
@@ -374,16 +374,20 @@ def construct_wrapped_furi_word(
         kana = cur_tag_res["furigana"]
         is_num = cur_tag_res["is_num"]
 
-        # Convert kana back to long-vowel marks / katakana based on original character positions.
-        if kana and original_hiragana and (katakana_positions or long_vowel_positions):
+        # Put back the characters that were rewritten for matching, and the katakana, by their
+        # position in the original furigana. A restored character is written as it originally was,
+        # so it doesn't need the katakana conversion.
+        if kana and original_hiragana and (katakana_positions or restored_chars):
             kana_chars = list(kana)
             for i in range(len(kana_chars)):
                 original_pos = original_cursor + i
-                if original_pos in long_vowel_positions:
-                    kana_chars[i] = "ー"
-                if (
+                if original_pos in restored_chars:
+                    kana_chars[i] = restored_chars[original_pos]
+                elif (
                     original_pos in katakana_positions
                     and original_pos < len(original_hiragana)
+                    # A ー that was spread out into a vowel instead of being restored is not that
+                    # vowel's script to decide, leave it as the hiragana it became
                     and original_hiragana[original_pos] != "ー"
                 ):
                     kana_chars[i] = to_katakana(kana_chars[i])

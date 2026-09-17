@@ -73,7 +73,8 @@ class FinalResult(TypedDict):
     :param rest_kana
     :param was_katakana: Whether the original furigana was in katakana
     :param katakana_positions: List of character indices in original furigana that were katakana
-    :param long_vowel_positions: List of character indices in original furigana that were ー
+    :param restored_chars: Index in the matched furigana → the character the original had there,
+        for the kana that were rewritten or dropped before matching, ー among them
     :param original_furigana: The original furigana before hiragana conversion
     """
 
@@ -86,7 +87,7 @@ class FinalResult(TypedDict):
     rest_kana: str
     was_katakana: bool
     katakana_positions: list[int]
-    long_vowel_positions: list[int]
+    restored_chars: dict[int, str]
     original_furigana: str
 
 

@@ -4394,6 +4394,169 @@ Return type: {return_type}
         ),
     )
 
+    # Kana that carry no reading of their own - a leading っ, a small vowel on its own, an
+    # iteration mark - are taken out of the way before the reading is matched and written back
+    # afterwards. Every case below asserts that the furigana comes back out with the characters it
+    # went in with, and the tag says whether taking them out let the reading be recognised.
+    test(
+        test_name="furigana starting with small tsu - no highlight",
+        kanji="",
+        sentence="振[っぷり]",
+        expected_furigana=" 振[っぷり]",
+        expected_furigana_with_tags_split="<kun> 振[っぷり]</kun>",
+        expected_furigana_with_tags_merged="<kun> 振[っぷり]</kun>",
+        expected_furikanji=" っぷり[振]",
+        expected_furikanji_with_tags_split="<kun> っぷり[振]</kun>",
+        expected_furikanji_with_tags_merged="<kun> っぷり[振]</kun>",
+        expected_kana_only="っぷり",
+        expected_kana_only_with_tags_split="<kun>っぷり</kun>",
+        expected_kana_only_with_tags_merged="<kun>っぷり</kun>",
+    )
+    test(
+        test_name="furigana starting with small tsu - with highlight",
+        kanji="振",
+        sentence="振[っぷり]",
+        expected_furigana="<b> 振[っぷり]</b>",
+        expected_furigana_with_tags_split="<b><kun> 振[っぷり]</kun></b>",
+        expected_furigana_with_tags_merged="<b><kun> 振[っぷり]</kun></b>",
+        expected_furikanji="<b> っぷり[振]</b>",
+        expected_furikanji_with_tags_split="<b><kun> っぷり[振]</kun></b>",
+        expected_furikanji_with_tags_merged="<b><kun> っぷり[振]</kun></b>",
+        expected_kana_only="<b>っぷり</b>",
+        expected_kana_only_with_tags_split="<b><kun>っぷり</kun></b>",
+        expected_kana_only_with_tags_merged="<b><kun>っぷり</kun></b>",
+    )
+    test(
+        test_name="furigana starting with small tsu, with okurigana",
+        kanji="",
+        sentence="全[った]く",
+        expected_furigana=" 全[った]く",
+        expected_furigana_with_tags_split="<juk> 全[った]</juk>く",
+        expected_furigana_with_tags_merged="<juk> 全[った]</juk>く",
+        expected_furikanji=" った[全]く",
+        expected_furikanji_with_tags_split="<juk> った[全]</juk>く",
+        expected_furikanji_with_tags_merged="<juk> った[全]</juk>く",
+        expected_kana_only="ったく",
+        expected_kana_only_with_tags_split="<juk>った</juk>く",
+        expected_kana_only_with_tags_merged="<juk>った</juk>く",
+    )
+    test(
+        test_name="furigana starting with small tsu, three mora",
+        kanji="",
+        sentence="丈[ったけ]",
+        expected_furigana=" 丈[ったけ]",
+        expected_furigana_with_tags_split="<kun> 丈[ったけ]</kun>",
+        expected_furigana_with_tags_merged="<kun> 丈[ったけ]</kun>",
+        expected_furikanji=" ったけ[丈]",
+        expected_furikanji_with_tags_split="<kun> ったけ[丈]</kun>",
+        expected_furikanji_with_tags_merged="<kun> ったけ[丈]</kun>",
+        expected_kana_only="ったけ",
+        expected_kana_only_with_tags_split="<kun>ったけ</kun>",
+        expected_kana_only_with_tags_merged="<kun>ったけ</kun>",
+    )
+    test(
+        test_name="furigana ending in a small vowel",
+        kanji="",
+        sentence="煩[うるせぇ]",
+        expected_furigana=" 煩[うるせぇ]",
+        expected_furigana_with_tags_split="<juk> 煩[うるせぇ]</juk>",
+        expected_furigana_with_tags_merged="<juk> 煩[うるせぇ]</juk>",
+        expected_furikanji=" うるせぇ[煩]",
+        expected_furikanji_with_tags_split="<juk> うるせぇ[煩]</juk>",
+        expected_furikanji_with_tags_merged="<juk> うるせぇ[煩]</juk>",
+        expected_kana_only="うるせぇ",
+        expected_kana_only_with_tags_split="<juk>うるせぇ</juk>",
+        expected_kana_only_with_tags_merged="<juk>うるせぇ</juk>",
+    )
+    test(
+        # The small vowel is only folded into the mora before it when there are mora to spare,
+        # so both kanji here still get one rather than 呼 being left with empty furigana
+        test_name="furigana ending in a small vowel, one mora per kanji",
+        kanji="",
+        sentence="嗚呼[あぁ]",
+        expected_furigana=" 嗚呼[あぁ]",
+        expected_furigana_with_tags_split="<juk> 嗚[あ]</juk><juk> 呼[ぁ]</juk>",
+        expected_furigana_with_tags_merged="<juk> 嗚呼[あぁ]</juk>",
+        expected_furikanji=" あぁ[嗚呼]",
+        expected_furikanji_with_tags_split="<juk> あ[嗚]</juk><juk> ぁ[呼]</juk>",
+        expected_furikanji_with_tags_merged="<juk> あぁ[嗚呼]</juk>",
+        expected_kana_only="あぁ",
+        expected_kana_only_with_tags_split="<juk>あ</juk><juk>ぁ</juk>",
+        expected_kana_only_with_tags_merged="<juk>あぁ</juk>",
+    )
+    test(
+        test_name="furigana with a hiragana iteration mark",
+        kanji="",
+        sentence="儘[まゝ]",
+        expected_furigana=" 儘[まゝ]",
+        expected_furigana_with_tags_split="<kun> 儘[まゝ]</kun>",
+        expected_furigana_with_tags_merged="<kun> 儘[まゝ]</kun>",
+        expected_furikanji=" まゝ[儘]",
+        expected_furikanji_with_tags_split="<kun> まゝ[儘]</kun>",
+        expected_furikanji_with_tags_merged="<kun> まゝ[儘]</kun>",
+        expected_kana_only="まゝ",
+        expected_kana_only_with_tags_split="<kun>まゝ</kun>",
+        expected_kana_only_with_tags_merged="<kun>まゝ</kun>",
+    )
+    test(
+        test_name="furigana with a katakana iteration mark",
+        kanji="",
+        sentence="儘[マヽ]",
+        expected_furigana=" 儘[マヽ]",
+        expected_furigana_with_tags_split="<kun> 儘[マヽ]</kun>",
+        expected_furigana_with_tags_merged="<kun> 儘[マヽ]</kun>",
+        expected_furikanji=" マヽ[儘]",
+        expected_furikanji_with_tags_split="<kun> マヽ[儘]</kun>",
+        expected_furikanji_with_tags_merged="<kun> マヽ[儘]</kun>",
+        expected_kana_only="マヽ",
+        expected_kana_only_with_tags_split="<kun>マヽ</kun>",
+        expected_kana_only_with_tags_merged="<kun>マヽ</kun>",
+    )
+    test(
+        test_name="furigana with a voiced iteration mark",
+        kanji="",
+        sentence="続[つゞ]く",
+        expected_furigana=" 続[つゞ]く",
+        expected_furigana_with_tags_split="<kun> 続[つゞ]</kun><oku>く</oku>",
+        expected_furigana_with_tags_merged="<kun> 続[つゞ]</kun><oku>く</oku>",
+        expected_furikanji=" つゞ[続]く",
+        expected_furikanji_with_tags_split="<kun> つゞ[続]</kun><oku>く</oku>",
+        expected_furikanji_with_tags_merged="<kun> つゞ[続]</kun><oku>く</oku>",
+        expected_kana_only="つゞく",
+        expected_kana_only_with_tags_split="<kun>つゞ</kun><oku>く</oku>",
+        expected_kana_only_with_tags_merged="<kun>つゞ</kun><oku>く</oku>",
+    )
+    test(
+        test_name="furigana with a voiced katakana iteration mark",
+        kanji="",
+        sentence="続[ツヾ]く",
+        expected_furigana=" 続[ツヾ]く",
+        expected_furigana_with_tags_split="<kun> 続[ツヾ]</kun><oku>く</oku>",
+        expected_furigana_with_tags_merged="<kun> 続[ツヾ]</kun><oku>く</oku>",
+        expected_furikanji=" ツヾ[続]く",
+        expected_furikanji_with_tags_split="<kun> ツヾ[続]</kun><oku>く</oku>",
+        expected_furikanji_with_tags_merged="<kun> ツヾ[続]</kun><oku>く</oku>",
+        expected_kana_only="ツヾく",
+        expected_kana_only_with_tags_split="<kun>ツヾ</kun><oku>く</oku>",
+        expected_kana_only_with_tags_merged="<kun>ツヾ</kun><oku>く</oku>",
+    )
+    test(
+        # The ゃ of きゃ belongs to that mora, so it is not one of the lone small kana that get
+        # rewritten, and neither is the っ that ends a mora rather than starting the reading
+        test_name="small kana of a palatalized mora is not a lone one",
+        kanji="",
+        sentence="却[きゃっ]て",
+        expected_furigana=" 却[キャッ]て",
+        expected_furigana_with_tags_split="<on> 却[キャッ]</on>て",
+        expected_furigana_with_tags_merged="<on> 却[キャッ]</on>て",
+        expected_furikanji=" キャッ[却]て",
+        expected_furikanji_with_tags_split="<on> キャッ[却]</on>て",
+        expected_furikanji_with_tags_merged="<on> キャッ[却]</on>て",
+        expected_kana_only="キャッて",
+        expected_kana_only_with_tags_split="<on>キャッ</on>て",
+        expected_kana_only_with_tags_merged="<on>キャッ</on>て",
+    )
+
     start_time = time.time()
     total_test_count = len(test_list)
     try:

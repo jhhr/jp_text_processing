@@ -33,5 +33,11 @@ HIRAGANA_RE = "([ぁ-ん])"
 KATAKANA_RE = "([ァ-ン])"
 KATAKANA_REC = re.compile(KATAKANA_RE)
 
-KANA_REC = re.compile(r"[ぁ-んァ-ンー]")
-NON_KANA_REC = re.compile(r"[^ぁ-んァ-ンー]")
+# The kana a furigana reading may consist of. ぁ-ん / ァ-ン stop short of the kana that live above
+# ん and ン in the block, so spell those out: ゔゕゖ / ヴ, the iteration marks ゝゞ / ヽヾ which stand
+# in for a repeated kana (儘[まゝ]), and the combining handakuten of か゚ き゚. ヵ and ヶ are
+# deliberately left out, KANJI_CHAR_RE claims those as kanji.
+KANA_CHARS = "ぁ-ゖゝゞァ-ヴヽヾー゚"  # the last one is U+309A
+KANA_CHAR_RE = rf"[{KANA_CHARS}]"
+KANA_REC = re.compile(KANA_CHAR_RE)
+NON_KANA_REC = re.compile(rf"[^{KANA_CHARS}]")
