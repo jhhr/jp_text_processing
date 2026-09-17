@@ -439,6 +439,80 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="消え去[sound:test.mp3]る",
     )
     test(
+        test_name="A <b> tag the text came in with does not nest with the highlight",
+        # The highlighter adds its own <b>; a previous one - the user's emphasis, or the output
+        # of an earlier run fed back in - has to be dropped or the two end up nested.
+        kanji="字",
+        sentence="<b>漢字[かんじ]</b>",
+        expected_furigana=" 漢[カン]<b> 字[ジ]</b>",
+        expected_furigana_with_tags_split="<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
+        expected_furigana_with_tags_merged="<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
+        expected_furikanji=" カン[漢]<b> ジ[字]</b>",
+        expected_furikanji_with_tags_split="<on> カン[漢]</on><b><on> ジ[字]</on></b>",
+        expected_furikanji_with_tags_merged="<on> カン[漢]</on><b><on> ジ[字]</on></b>",
+        expected_kana_only="カン<b>ジ</b>",
+        expected_kana_only_with_tags_split="<on>カン</on><b><on>ジ</on></b>",
+        expected_kana_only_with_tags_merged="<on>カン</on><b><on>ジ</on></b>",
+    )
+    test(
+        test_name="A <b> tag in the middle of a word does not hide the word",
+        # The tag splits 漢字 in two, leaving nothing the furigana regex can match; the word only
+        # gets read at all because the tag is gone before any of the processing starts.
+        kanji="字",
+        sentence="漢<b>字</b>[かんじ]",
+        expected_furigana=" 漢[カン]<b> 字[ジ]</b>",
+        expected_furigana_with_tags_split="<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
+        expected_furigana_with_tags_merged="<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
+        expected_furikanji=" カン[漢]<b> ジ[字]</b>",
+        expected_furikanji_with_tags_split="<on> カン[漢]</on><b><on> ジ[字]</on></b>",
+        expected_furikanji_with_tags_merged="<on> カン[漢]</on><b><on> ジ[字]</on></b>",
+        expected_kana_only="カン<b>ジ</b>",
+        expected_kana_only_with_tags_split="<on>カン</on><b><on>ジ</on></b>",
+        expected_kana_only_with_tags_merged="<on>カン</on><b><on>ジ</on></b>",
+    )
+    test(
+        test_name="A <b> tag around text with no furigana is simply removed",
+        kanji="気",
+        sentence="<b>これは</b>天気[てんき]だ",
+        expected_furigana="これは 天[テン]<b> 気[キ]</b>だ",
+        expected_furigana_with_tags_split="これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furigana_with_tags_merged="これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furikanji="これは テン[天]<b> キ[気]</b>だ",
+        expected_furikanji_with_tags_split="これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+        expected_furikanji_with_tags_merged="これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+        expected_kana_only="これはテン<b>キ</b>だ",
+        expected_kana_only_with_tags_split="これは<on>テン</on><b><on>キ</on></b>だ",
+        expected_kana_only_with_tags_merged="これは<on>テン</on><b><on>キ</on></b>だ",
+    )
+    test(
+        test_name="An upper case <B> tag is dropped like a lower case one",
+        # HTML tag names are case-insensitive and pasted content can carry either spelling.
+        kanji="気",
+        sentence="<B>天気[てんき]</B>だ",
+        expected_furigana=" 天[テン]<b> 気[キ]</b>だ",
+        expected_furigana_with_tags_split="<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furigana_with_tags_merged="<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furikanji=" テン[天]<b> キ[気]</b>だ",
+        expected_furikanji_with_tags_split="<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+        expected_furikanji_with_tags_merged="<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+        expected_kana_only="テン<b>キ</b>だ",
+        expected_kana_only_with_tags_split="<on>テン</on><b><on>キ</on></b>だ",
+        expected_kana_only_with_tags_merged="<on>テン</on><b><on>キ</on></b>だ",
+    )
+    test(
+        test_name="Re-running the highlighter over its own furigana output changes nothing",
+        # The sentence here is the untagged furigana output for 天気[てんき]だ with 気 highlighted;
+        # feeding it back in is a common Anki workflow and must not compound the <b> tags.
+        kanji="気",
+        sentence=" 天[テン]<b> 気[キ]</b>だ",
+        expected_furigana=" 天[テン]<b> 気[キ]</b>だ",
+        expected_furigana_with_tags_split="<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furigana_with_tags_merged="<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+        expected_furikanji=" テン[天]<b> キ[気]</b>だ",
+        expected_furikanji_with_tags_split="<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+        expected_furikanji_with_tags_merged="<on> テン[天]</on><b><on> キ[気]</on></b>だ",
+    )
+    test(
         test_name=(
             "Should ignore non-kana characters in furigana if there are also kana - no highlight"
         ),

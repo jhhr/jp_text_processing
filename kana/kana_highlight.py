@@ -167,6 +167,11 @@ def kunyomi_replacer(match, wrap_readings_with_tags=True):
     return f"{match.group(1)}<b>{kunyomi_kana}</b>{match.group(3)}"
 
 
+# Bold tags the text already carries: the caller's own emphasis, or what a previous run of the
+# highlighter left behind when its output is fed back in. Highlighting adds its own <b> tags, so
+# these have to go before any of it or the two nest.
+EXISTING_BOLD_TAGS_REC = re.compile(r"</?b>", re.IGNORECASE)
+
 # Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
 # before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
 KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[(.+?)\]")
@@ -1129,9 +1134,13 @@ def kana_highlight(
         logger.debug(f"furigana_replacer - final_result: {final_result}\n")
         return final_result
 
+    # Drop any <b> tags the text came in with, so the ones added below are the only ones in the
+    # output. Left in place they would nest, and one sitting inside a word would also hide that
+    # word from the cleaning passes and the furigana replacer below.
+    clean_text = EXISTING_BOLD_TAGS_REC.sub("", text)
     # Put a 々 that got separated from its word back into the same furigana group, so that what
     # follows sees one word rather than a 々 with no kanji in front of it to repeat
-    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, text)
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, clean_text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
     clean_text = LEADING_KANA_CLEANING_REC.sub(
         partial(leading_kana_cleaning_replacer, logger=logger), clean_text
