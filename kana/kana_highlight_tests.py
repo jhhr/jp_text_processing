@@ -1,12 +1,13 @@
 import sys
 import time
-from typing import Optional, Tuple, Callable
+from contextlib import nullcontext
+from typing import ContextManager, Optional, Tuple, Callable
 
 from .kana_highlight import kana_highlight, FuriReconstruct
 
 from ..all_types.main_types import WithTagsDef
 
-from ..utils.logger import console_logging, package_logger, set_level
+from ..utils.logger import console_logging, package_logger, set_level, silenced
 
 
 RED = "\033[91m"
@@ -50,6 +51,7 @@ def main(test_nums: Optional[list[str]] = None) -> int:
         expected_failure: Optional[str] = None,
         onyomi_to_katakana: bool = True,
         include_suru_okuri: bool = False,
+        expected_log_errors: bool = False,
         debug: bool = False,
         expected_furigana: Optional[str] = None,
         expected_furigana_with_tags_split: Optional[str] = None,
@@ -68,6 +70,11 @@ def main(test_nums: Optional[list[str]] = None) -> int:
         expected_failure: reason every case of this test is known to fail. Such a case is
         reported as an expected failure instead of failing the run, and a case that passes
         anyway is reported so the stale reason gets dropped.
+
+        expected_log_errors: this test drives the package into a path that logs an error on
+        purpose, and the line says nothing the expectations do not already assert. The run
+        is silenced so the suite's output stays readable and an error from any other test
+        still stands out. A failure lifts the silence: the debug rerun logs everything.
         """
         nonlocal total_test_cases
         cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
@@ -164,8 +171,15 @@ def main(test_nums: Optional[list[str]] = None) -> int:
                 cur_test_num = f"{cur_test_index + 1}.{case_idx + 1}"
                 set_level("debug" if debug else "error")
                 rerun_args = (kanji, sentence, return_type, with_tags_def)
+                # Only the run itself is quietened, and only while it is going well. Both
+                # reruns below sit outside this block, so a failure is always diagnosed with
+                # the full log. An explicit debug=True is the caller asking to see it anyway.
+                quiet: ContextManager[None] = (
+                    silenced() if expected_log_errors and not debug else nullcontext()
+                )
                 try:
-                    result = kana_highlight(kanji, sentence, return_type, with_tags_def)
+                    with quiet:
+                        result = kana_highlight(kanji, sentence, return_type, with_tags_def)
                     print_progress(GREEN)
                 except Exception:
                     # Uncaught exception, rerun with debug logging. The rerun outlives this
@@ -338,6 +352,7 @@ Return type: {return_type}
         # that would have covered the rest is skipped and the kanji before it end up with neither
         # a reading match nor a juku part. The first such kanji used to raise UnboundLocalError.
         test_name="Should not crash when a kanji has neither a reading match nor a juku part",
+        expected_log_errors=True,
         kanji="",
         sentence="栗栗薔薇[ぽぽぽぽばら]",
         expected_furigana=" 栗栗薔薇[ばら]",
@@ -354,6 +369,7 @@ Return type: {return_type}
         # Same gap, but after the exception instead of before it, so the unmatched kanji is not
         # the first one. That position used to take whatever the previous kanji had been given.
         test_name="Should not inherit the previous kanji's values when a kanji has no match",
+        expected_log_errors=True,
         kanji="薔",
         sentence="薔薇栗[ばらぽぽ]",
         expected_furigana="<b> 薔[ば]</b> 薇栗[ら]",
