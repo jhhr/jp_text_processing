@@ -16,6 +16,16 @@ try:
 except ImportError:
     from .katakana_positions import get_katakana_positions
 try:
+    from kana.orphaned_repeater_cleaning import (
+        ORPHANED_REPEATER_CLEANING_REC,
+        orphaned_repeater_cleaning_replacer,
+    )
+except ImportError:
+    from .orphaned_repeater_cleaning import (
+        ORPHANED_REPEATER_CLEANING_REC,
+        orphaned_repeater_cleaning_replacer,
+    )
+try:
     from utils.logger import Logger
 except ImportError:
     from ..utils.logger import Logger
@@ -1119,8 +1129,11 @@ def kana_highlight(
         logger.debug(f"furigana_replacer - final_result: {final_result}\n")
         return final_result
 
+    # Put a 々 that got separated from its word back into the same furigana group, so that what
+    # follows sees one word rather than a 々 with no kanji in front of it to repeat
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
-    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, text)
+    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)

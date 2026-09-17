@@ -1087,6 +1087,88 @@ Return type: {return_type}
         expected_furikanji_with_tags_merged="<kun> われわれ[我我]</kun>",
     )
     test(
+        # The baseline the three tests below have to match: 々 and the kanji it stands in for
+        # written as the one furigana group they belong in
+        test_name="Reads a repeater word written as a single furigana group",
+        kanji="",
+        sentence="其々[それぞれ]",
+        expected_kana_only="それぞれ",
+        expected_furigana=" 其々[それぞれ]",
+        expected_furikanji=" それぞれ[其々]",
+        expected_kana_only_with_tags_split="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_split="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_split="<kun> それぞれ[其々]</kun>",
+        expected_kana_only_with_tags_merged="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_merged="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> それぞれ[其々]</kun>",
+    )
+    test(
+        # A space between the word and its 々 ends the run of kanji the furigana regex reads as
+        # one word, leaving the 々 as a word of its own with no kanji in front of it to repeat.
+        # It has no readings to match either, so it used to come out read as jukujikun, with the
+        # kanji it belongs to stranded outside the tag: 其<juk> 々[それぞれ]</juk>
+        test_name="Reads a repeater separated from its word by a space",
+        kanji="",
+        sentence="其 々[それぞれ]",
+        expected_kana_only="それぞれ",
+        expected_furigana=" 其々[それぞれ]",
+        expected_furikanji=" それぞれ[其々]",
+        expected_kana_only_with_tags_split="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_split="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_split="<kun> それぞれ[其々]</kun>",
+        expected_kana_only_with_tags_merged="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_merged="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> それぞれ[其々]</kun>",
+    )
+    test(
+        # The same split, made by giving each of the two its own half of the reading rather than
+        # by a space. The halves are put back together in the order they were written.
+        test_name="Reads a repeater given its own half of the word's reading",
+        kanji="",
+        sentence="其[それ]々[ぞれ]",
+        expected_kana_only="それぞれ",
+        expected_furigana=" 其々[それぞれ]",
+        expected_furikanji=" それぞれ[其々]",
+        expected_kana_only_with_tags_split="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_split="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_split="<kun> それぞれ[其々]</kun>",
+        expected_kana_only_with_tags_merged="<kun>それぞれ</kun>",
+        expected_furigana_with_tags_merged="<kun> 其々[それぞれ]</kun>",
+        expected_furikanji_with_tags_merged="<kun> それぞれ[其々]</kun>",
+    )
+    test(
+        # Highlighting reaches the 々 as well as the kanji, the same as it does when the word
+        # was written as one group to begin with
+        test_name="Highlights a repeater word that was separated from its word",
+        kanji="其",
+        sentence="其 々[それぞれ]",
+        expected_kana_only="<b>それぞれ</b>",
+        expected_furigana="<b> 其々[それぞれ]</b>",
+        expected_furikanji="<b> それぞれ[其々]</b>",
+        expected_kana_only_with_tags_split="<b><kun>それぞれ</kun></b>",
+        expected_furigana_with_tags_split="<b><kun> 其々[それぞれ]</kun></b>",
+        expected_furikanji_with_tags_split="<b><kun> それぞれ[其々]</kun></b>",
+        expected_kana_only_with_tags_merged="<b><kun>それぞれ</kun></b>",
+        expected_furigana_with_tags_merged="<b><kun> 其々[それぞれ]</kun></b>",
+        expected_furikanji_with_tags_merged="<b><kun> それぞれ[其々]</kun></b>",
+    )
+    test(
+        # The whole kanji run has to survive the repair, not just the kanji the 々 repeats:
+        # taking 物 alone would drop 生 and the reading it was given along with it
+        test_name="Keeps the rest of the word when reuniting it with its repeater",
+        kanji="",
+        sentence="生物[せいぶつ]々[ぶつ]",
+        expected_kana_only="セイブツブツ",
+        expected_furigana=" 生物々[セイブツブツ]",
+        expected_furikanji=" セイブツブツ[生物々]",
+        expected_kana_only_with_tags_split="<on>セイ</on><on>ブツブツ</on>",
+        expected_furigana_with_tags_split="<on> 生[セイ]</on><on> 物々[ブツブツ]</on>",
+        expected_furikanji_with_tags_split="<on> セイ[生]</on><on> ブツブツ[物々]</on>",
+        expected_kana_only_with_tags_merged="<on>セイブツブツ</on>",
+        expected_furigana_with_tags_merged="<on> 生物々[セイブツブツ]</on>",
+        expected_furikanji_with_tags_merged="<on> セイブツブツ[生物々]</on>",
+    )
+    test(
         test_name="Handles repeater with non repeating furigana 1/",
         kanji="",
         # An edge case: the furigana does not repeat completely, for example 蝶々 can sometimes
