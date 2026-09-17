@@ -4340,6 +4340,85 @@ Return type: {return_type}
         ),
     )
     test(
+        test_name="Myriad numbers keep the 一 - with highlight",
+        kanji="円",
+        sentence="10000円[いちまんえん]",
+        expected_furigana=" 10000[イチマン]<b> 円[エン]</b>",
+        expected_furigana_with_tags_split=(
+            "<mix> 10000[イチマン]</mix><b><on> 円[エン]</on></b>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 10000[イチマン]</on><b><on> 円[エン]</on></b>"
+        ),
+        expected_furikanji=" イチマン[10000]<b> エン[円]</b>",
+        expected_furikanji_with_tags_split=(
+            "<mix> イチマン[10000]</mix><b><on> エン[円]</on></b>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> イチマン[10000]</on><b><on> エン[円]</on></b>"
+        ),
+        expected_kana_only="イチマン<b>エン</b>",
+        expected_kana_only_with_tags_split="<on>イチ</on><on>マン</on><b><on>エン</on></b>",
+        expected_kana_only_with_tags_merged="<on>イチマン</on><b><on>エン</on></b>",
+    )
+    test(
+        test_name="Myriad numbers keep the 一 - 一千万, 一億, 一兆",
+        kanji="",
+        sentence="10000000[いっせんまん] 100000000[いちおく] 1000000000000[いっちょう]",
+        expected_furigana=(
+            " 10000000[イッセンマン] 100000000[イチオク] 1000000000000[イッチョウ]"
+        ),
+        expected_furigana_with_tags_split=(
+            "<mix> 10000000[イッセンマン]</mix><mix> 100000000[イチオク]</mix>"
+            "<mix> 1000000000000[イッチョウ]</mix>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 10000000[イッセンマン]</on><on> 100000000[イチオク]</on>"
+            "<on> 1000000000000[イッチョウ]</on>"
+        ),
+        expected_furikanji=(
+            " イッセンマン[10000000] イチオク[100000000] イッチョウ[1000000000000]"
+        ),
+        expected_furikanji_with_tags_split=(
+            "<mix> イッセンマン[10000000]</mix><mix> イチオク[100000000]</mix>"
+            "<mix> イッチョウ[1000000000000]</mix>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> イッセンマン[10000000]</on><on> イチオク[100000000]</on>"
+            "<on> イッチョウ[1000000000000]</on>"
+        ),
+        expected_kana_only="イッセンマン イチオク イッチョウ",
+        expected_kana_only_with_tags_split=(
+            "<on>イッ</on><on>セン</on><on>マン</on> <on>イチ</on><on>オク</on>"
+            " <on>イッ</on><on>チョウ</on>"
+        ),
+        expected_kana_only_with_tags_merged=(
+            "<on>イッセンマン</on> <on>イチオク</on> <on>イッチョウ</on>"
+        ),
+    )
+    test(
+        test_name="十, 百 and a lone 千 still drop the 一",
+        kanji="",
+        sentence="1000[せん] 1000000[ひゃくまん]",
+        expected_furigana=" 1000[セン] 1000000[ヒャクマン]",
+        expected_furigana_with_tags_split=(
+            "<on> 1000[セン]</on><mix> 1000000[ヒャクマン]</mix>"
+        ),
+        expected_furigana_with_tags_merged=(
+            "<on> 1000[セン]</on><on> 1000000[ヒャクマン]</on>"
+        ),
+        expected_furikanji=" セン[1000] ヒャクマン[1000000]",
+        expected_furikanji_with_tags_split=(
+            "<on> セン[1000]</on><mix> ヒャクマン[1000000]</mix>"
+        ),
+        expected_furikanji_with_tags_merged=(
+            "<on> セン[1000]</on><on> ヒャクマン[1000000]</on>"
+        ),
+        expected_kana_only="セン ヒャクマン",
+        expected_kana_only_with_tags_split="<on>セン</on> <on>ヒャク</on><on>マン</on>",
+        expected_kana_only_with_tags_merged="<on>セン</on> <on>ヒャクマン</on>",
+    )
+    test(
         test_name="為る conjugations /1",
         kanji="",
         sentence="為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",

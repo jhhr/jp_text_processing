@@ -1,3 +1,4 @@
+import re
 import sys
 
 try:
@@ -46,6 +47,11 @@ KANJI_UNITS = {
     10000000000000000: "京",
 }
 
+# 十/百/千 vs the myriad units 万/億/兆/京: a leading 一 is dropped before the former but kept
+# before the latter.
+SUB_MYRIAD_UNITS = "".join(kanji for unit, kanji in KANJI_UNITS.items() if 1 < unit < 10000)
+MYRIAD_UNITS = "".join(kanji for unit, kanji in KANJI_UNITS.items() if unit >= 10000)
+
 NUMBER_TO_KANJI = {}
 for num, kanji in KANJI_NUMERALS.items():
     NUMBER_TO_KANJI[str(num)] = kanji
@@ -76,13 +82,11 @@ def recursive_number_to_kanji(
                 return
             if unit in KANJI_UNITS:
                 logger.debug(f"Adding kanji digit {kanji_digit} with unit {KANJI_UNITS[unit]}")
-                # if the digit_mult is 1, we just use the kanji digit
-                if digit_mult > 1:
-                    # If the digit is not 1, we add the kanji digit with the unit
-                    if digit == 1 and digit_mult in KANJI_UNITS:
-                        kanji_digit = KANJI_UNITS[digit_mult]
-                    elif digit_mult in KANJI_UNITS:
-                        kanji_digit += KANJI_UNITS[digit_mult]
+                # digit_mult > 1 means the recursion split off a 十/百/千 of this unit, so
+                # the digit carries that sub-unit with it: 1000万 -> 一千 + 万. The 一 in front of the
+                # sub-unit is always written here; number_to_kanji decides whether to drop it.
+                if digit_mult > 1 and digit_mult in KANJI_UNITS:
+                    kanji_digit += KANJI_UNITS[digit_mult]
                 partial_num = kanji_digit
                 cur_unit = KANJI_UNITS[unit]
                 # If previous units is the same, omit it from this append
@@ -157,11 +161,11 @@ def number_to_kanji(num_str: str, logger: Logger = Logger("error")) -> str:
     # Reverse the result to get the correct order
     result.reverse()
     kanji_result = "".join(result)
-    # Remove leading ones in front of 十, 百, 千, 万, 億
-    for unit_kanji in KANJI_UNITS.values():
-        if unit_kanji and unit_kanji in kanji_result:
-            logger.debug(f"Removing leading '一' before {unit_kanji}")
-            kanji_result = kanji_result.replace("一" + unit_kanji, unit_kanji)
+    # Remove the 一 in front of 十, 百 and 千 (十, 二百, 千二百) but never in front of 万 and
+    # above, which always keep it (一万, 一億). A 千 that tops a 万-group keeps it too, so
+    # 10000000 is 一千万 and not 千万.
+    kanji_result = re.sub(rf"一(?=[{SUB_MYRIAD_UNITS}])(?!千[{MYRIAD_UNITS}])", "", kanji_result)
+    logger.debug(f"Stripped leading '一' where droppable, result: {kanji_result}")
 
     return kanji_result
 
@@ -230,16 +234,31 @@ if __name__ == "__main__":
         ("４５６７", "四千五百六十七"),
         ("89012", "八万九千十二"),
         ("８９０１２", "八万九千十二"),
+        ("1000", "千"),
+        ("１０００", "千"),
+        ("1200", "千二百"),
+        # 一 is kept in front of 万 and above, dropped in front of 十/百/千
+        ("10000", "一万"),
+        ("１００００", "一万"),
+        ("10001", "一万一"),
+        ("１０００１", "一万一"),
+        ("100000", "十万"),
         ("1000000", "百万"),
         ("１００００００", "百万"),
-        ("100000000", "億"),
-        ("１００００００００", "億"),
+        # a 千 that tops a 万-group keeps its 一: 一千万, not 千万
+        ("10000000", "一千万"),
+        ("１０００００００", "一千万"),
+        ("100000000", "一億"),
+        ("１００００００００", "一億"),
+        ("100000000000", "一千億"),
+        ("1000000000000", "一兆"),
+        ("10000000000000000", "一京"),
         ("1234000000", "十二億三千四百万"),
         ("１２３４００００００", "十二億三千四百万"),
         ("1234567890", "十二億三千四百五十六万七千八百九十"),
         ("１２３４５６７８９０", "十二億三千四百五十六万七千八百九十"),
-        ("10000400000060000003", "千京四百兆六千万三"),
-        ("１００００４００００００６００００００３", "千京四百兆六千万三"),
+        ("10000400000060000003", "一千京四百兆六千万三"),
+        ("１００００４００００００６００００００３", "一千京四百兆六千万三"),
         ("一二三四五六七八九", "一二三四五六七八九"),
     ]
 
