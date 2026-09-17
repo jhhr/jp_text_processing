@@ -536,7 +536,6 @@ def kana_highlight(
         :param match: re.Match, the match object
         :return: string, the modified furigana
         """
-        nonlocal kanji_to_highlight
         full_word = match.group(1)
         full_furigana = match.group(2)
         maybe_okuri = match.group(3)

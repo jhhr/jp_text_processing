@@ -122,7 +122,7 @@ def find_first_complete_alignment(
     youon_mora_splits = []
 
     def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
-        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count, youon_mora_splits
+        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
         logger.debug("find_first_complete_alignment - trying mora_split: %s", mora_split)
         kanji_matches: list[Optional[ReadingMatchInfo]] = []
         jukujikun_positions: list[int] = []
