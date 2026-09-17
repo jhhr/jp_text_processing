@@ -1,728 +1,680 @@
-import sys
-from typing import Optional
+"""Cases for `word_highlight`, run with pytest from `anki_shared/`:
+
+    python -m pytest jp_text_processing/word/word_highlight_tests.py
+
+Pass `--log-cli-level=debug` to see what a case logged; pytest captures the package logger on
+its own, so nothing here has to turn logging on.
+
+A case that is known to fail gets `marks=pytest.mark.xfail(reason="...", strict=True)` in its
+`pytest.param`: strict so an unexpected pass fails the run and the reason gets dropped.
+"""
+
+import pytest
 
 from .word_highlight import word_highlight
 
-from ..utils.logger import console_logging, set_level
 
-
-def test(
-    test_name: str,
-    text: str,
-    word: str,
-    expected: Optional[str] = None,
-    expected_failure: Optional[str] = None,
-    debug: bool = False,
-):
-    """Run tests for the word_highlight function.
-    Args:
-        test_name: Name of the test case.
-        expected_failure: reason this case is known to fail. It is reported instead
-            of failing the run, and an unexpected pass is reported so the reason
-            gets dropped.
-    """
-    set_level("debug" if debug else "error")
-    try:
-        result = word_highlight(text, word)
-        if debug:
-            print("\n\n")
-        assert result == expected
-    except AssertionError:
-        if expected_failure is not None:
-            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
-            return
-        # Re-run with logging enabled to see what went wrong
-        set_level("debug")
-        word_highlight(text, word)
-        # Highlight the diff between the expected and the result
-        print(f"""\033[91m{test_name}
-\033[93mExpected: {expected}
-\033[92mGot:      {result}
-\033[0m""")
-        # Stop testing here
-        sys.exit(1)
-    except Exception:
-        if expected_failure is not None:
-            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
-            return
-        # rerun test with logger enabled to see what went wrong
-        print(f"""\033[91mTest "{test_name}" raised an exception.\033[0m""")
-        set_level("debug")
-        try:
-            word_highlight(text, word)
-        except Exception as e:
-            raise e
-        # The rerun did not raise, so the failure is not reproducible, but the
-        # first run still failed: do not let it pass silently.
-        sys.exit(1)
-    if expected_failure is not None:
-        print(
-            f"\033[93m{test_name} unexpectedly passed, remove its"
-            f" expected_failure reason: {expected_failure}\033[0m"
-        )
-
-
-def main():
-    console_logging("error")
-    test(
-        test_name="Crash test - empty text",
-        word="何[なに]",
-        text="",
-        expected="",
-    )
-    test(
-        test_name="Crash test - None text",
-        word="何[なに]",
-        text=None,
-        expected=None,
-    )
-    test(
-        test_name="Crash test - empty word",
-        word="",
-        text="何[なに]を しています か？",
-        expected="何[なに]を しています か？",
-    )
-    test(
-        test_name="Crash test - None word",
-        word=None,
-        text="何[なに]を しています か？",
-        expected="何[なに]を しています か？",
-    )
-    test(
-        test_name="Crash test - word is just whitespace",
-        word="   ",
-        text="何[なに]を しています か？",
-        expected="何[なに]を しています か？",
-    )
-    test(
-        test_name="Furigana - non-inflected noun in middle of text",
-        word="日本語[にほんご]",
-        text="私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
-        expected="私[わたし]は<b> 日本語[にほんご]</b>を 勉強[べんきょう]しています。",
-    )
-    test(
-        test_name="Furigana - non-inflected single-kanji noun",
-        word="家[いえ]",
-        text="家[いえ]で 居[い]る",
-        expected="<b>家[いえ]</b>で 居[い]る",
-    )
-    test(
-        test_name="Furigana - non-inflected multi-kanji noun",
-        word="魚市場[うおいちば]",
-        text="この 魚[さかな]は 魚市場[うおいちば]で 買[か]った",
-        expected="この 魚[さかな]は<b> 魚市場[うおいちば]</b>で 買[か]った",
-    )
-    test(
-        test_name="Furigana - non-inflected repeater noun",
+CASES = [
+    pytest.param(
+        "",
+        "何[なに]",
+        "",
+        id="Crash test - empty text",
+    ),
+    pytest.param(
+        None,
+        "何[なに]",
+        None,
+        id="Crash test - None text",
+    ),
+    pytest.param(
+        "何[なに]を しています か？",
+        "",
+        "何[なに]を しています か？",
+        id="Crash test - empty word",
+    ),
+    pytest.param(
+        "何[なに]を しています か？",
+        None,
+        "何[なに]を しています か？",
+        id="Crash test - None word",
+    ),
+    pytest.param(
+        "何[なに]を しています か？",
+        "   ",
+        "何[なに]を しています か？",
+        id="Crash test - word is just whitespace",
+    ),
+    pytest.param(
+        "私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
+        "日本語[にほんご]",
+        "私[わたし]は<b> 日本語[にほんご]</b>を 勉強[べんきょう]しています。",
+        id="Furigana - non-inflected noun in middle of text",
+    ),
+    pytest.param(
+        "家[いえ]で 居[い]る",
+        "家[いえ]",
+        "<b>家[いえ]</b>で 居[い]る",
+        id="Furigana - non-inflected single-kanji noun",
+    ),
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で 買[か]った",
+        "魚市場[うおいちば]",
+        "この 魚[さかな]は<b> 魚市場[うおいちば]</b>で 買[か]った",
+        id="Furigana - non-inflected multi-kanji noun",
+    ),
+    pytest.param(
+        "彼[かれ]は 人々[ひとびと]の 中で 目立[めだ]つ",
         # Also missing furigana for one word to test that it still works
-        word="人々[ひとびと]",
-        text="彼[かれ]は 人々[ひとびと]の 中で 目立[めだ]つ",
-        expected="彼[かれ]は<b> 人々[ひとびと]</b>の 中で 目立[めだ]つ",
-    )
-    test(
-        test_name="Furigana - non-inflected multi-kanji noun where word is split in text",
-        word="魚市場[うおいちば]",
-        text="<k> 此[こ]の</k> 魚[さかな]は 魚[うお]市場[いちば]で 買[か]いました。",
+        "人々[ひとびと]",
+        "彼[かれ]は<b> 人々[ひとびと]</b>の 中で 目立[めだ]つ",
+        id="Furigana - non-inflected repeater noun",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 魚[さかな]は 魚[うお]市場[いちば]で 買[か]いました。",
+        "魚市場[うおいちば]",
         # Will change the original text structure slightly by merging the furigana parts
-        expected="<k> 此[こ]の</k> 魚[さかな]は<b> 魚市場[うおいちば]</b>で 買[か]いました。",
-    )
-    test(
-        test_name=(
-            "Furigana - non-inflected single-kanji noun as part of larger word in text, left side"
-        ),
-        word="魚[うお]",
-        text="この 魚[さかな]は 魚市場[うおいちば]で 買[か]った",
-        expected="この 魚[さかな]は<b> 魚[うお]</b> 市場[いちば]で 買[か]った",
-    )
-    test(
-        test_name=(
-            "Furigana - non-inflected multi-kanji noun as part of larger word in text, right side"
-        ),
-        word="時間[じかん]",
-        text="労働時間[ろうどうじかん]を 減[へ]らしたい",
-        expected="労働[ろうどう]<b> 時間[じかん]</b>を 減[へ]らしたい",
-    )
-    test(
-        test_name=(
-            "Furigana - non-inflected multi-kanji noun as part of larger word in text, middle"
-        ),
-        word="専用[せんよう]",
-        text="バイクを 自転車専用道路[じてんしゃせんようどうろ]で 走[はし]らせる",
-        expected="バイクを 自転車[じてんしゃ]<b> 専用[せんよう]</b> 道路[どうろ]で 走[はし]らせる",
-    )
-    test(
-        test_name="Furigana - inflected verb as part of larger verb in text",
-        word="付[つ]ける",
-        text="彼女[かのじょ]への 伝言[でんごん]を 言付[ことづ]けたの。",
-        expected="彼女[かのじょ]への 伝言[でんごん]を 言[こと]<b> 付[づ]けた</b>の。",
-    )
-    test(
-        test_name="Furigana - inflected verb occurring in noun form and verb form in text",
-        word="引[ひ]く",
-        text="<k> 此[こ]の</k> 漢字[かんじ]を 字引[じびき]で 引[ひ]いてみて。",
-        expected="<k> 此[こ]の</k> 漢字[かんじ]を 字[じ]<b> 引[びき]</b>で<b> 引[ひ]いて</b>みて。",
-    )
-    test(
-        test_name="Furigana - verb inflection ている /1",
-        word="食[た]べる",
-        text="私は 食[た]べている",
-        expected="私は<b> 食[た]べている</b>",
-    )
-    test(
-        test_name="Furigana - verb inflection させる /1",
-        word="食[た]べる",
-        text="食[た]べさせるな!",
-        expected="<b>食[た]べさせる</b>な!",
-    )
-    test(
-        test_name="Furigana - verb inflection juku word /1",
-        word="聴牌[テンパ]る",
-        text="聴牌[テンパ]ってた",
-        expected="<b>聴牌[テンパ]ってた</b>",
-    )
-    test(
-        test_name="Furigana - adjective inflection /1",
-        word="大[おお]きい",
-        text="これ、 大[おお]きすぎない？",
-        expected="これ、<b> 大[おお]き</b>すぎない？",
-    )
-    test(
-        test_name="Furigana - adjective inflection /2",
-        word="安[やす]い",
-        text="安[やす]くて 良[い]いな～",
-        expected="<b>安[やす]くて</b> 良[い]いな～",
-    )
-    test(
-        test_name="Furigana - adjective inflection /3",
-        word="良[よ]い",
-        text="高[たか]いでも 良[よ]かろう",
-        expected="高[たか]いでも<b> 良[よ]かろう</b>",
-    )
-    test(
-        test_name="Furigana - adjective inflection with な /1",
-        word="早[はや]い",
-        text="早読[はやよ]みするぜ",
-        expected="<b>早[はや]</b> 読[よ]みするぜ",
-    )
-    test(
-        test_name="Furigana is in katakana in text, word in hiragana",
-        word="垂[た]れ 込[こ]み",
-        text="垂[タ]レ 込[コ]ミがあった、オイ！",
-        expected="<b>垂[タ]レ 込[コ]ミ</b>があった、オイ！",
-    )
-    test(
-        test_name="Furigana is in hiragana in text, word in katakana",
-        word="垂[タ]レ 込[コ]ミ",
-        text="垂[た]れ 込[こ]みがあった",
-        expected="<b>垂[た]れ 込[こ]み</b>があった",
-    )
-    test(
-        test_name="Furigana - multi-kanji noun with okuri in middle /1",
-        word="髪[かみ]の 毛[け]",
-        text="彼女[かのじょ]の 髪[かみ]の 毛[け]は 長[なが]い",
-        expected="彼女[かのじょ]の<b> 髪[かみ]の 毛[け]</b>は 長[なが]い",
-    )
-    test(
-        test_name="Furigana - multi-kanji noun with okuri in middle /2",
-        word="飲[の]ん 兵衛[べえ]",
-        text="彼[かれ]は 飲[の]ん 兵衛[べえ]だ",
-        expected="彼[かれ]は<b> 飲[の]ん 兵衛[べえ]</b>だ",
-    )
-    test(
-        test_name="Furigana - word occurs more than once, simple match",
-        word="彼[かれ]",
-        text="彼[かれ]は 走[はし]った。彼[かれ]は 速[はや]い。",
-        expected="<b>彼[かれ]</b>は 走[はし]った。<b> 彼[かれ]</b>は 速[はや]い。",
-    )
-    test(
-        test_name="Furigana - word occurs more than once, inflected match",
-        word="走[はし]る",
-        text="彼[かれ]は 走[はし]った。 彼[かれ]の 走[はし]り 方[かた]は 速[はや]い。",
-        expected="彼[かれ]は<b> 走[はし]った</b>。 彼[かれ]の<b> 走[はし]り</b> 方[かた]は 速[はや]い。",
-    )
-    test(
-        test_name="Furigana - word is split by html tags in text /1",
-        word="何[なん]でも 無[な]い",
-        text=(
+        "<k> 此[こ]の</k> 魚[さかな]は<b> 魚市場[うおいちば]</b>で 買[か]いました。",
+        id="Furigana - non-inflected multi-kanji noun where word is split in text",
+    ),
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で 買[か]った",
+        "魚[うお]",
+        "この 魚[さかな]は<b> 魚[うお]</b> 市場[いちば]で 買[か]った",
+        id="Furigana - non-inflected single-kanji noun as part of larger word in text, left side",
+    ),
+    pytest.param(
+        "労働時間[ろうどうじかん]を 減[へ]らしたい",
+        "時間[じかん]",
+        "労働[ろうどう]<b> 時間[じかん]</b>を 減[へ]らしたい",
+        id="Furigana - non-inflected multi-kanji noun as part of larger word in text, right side",
+    ),
+    pytest.param(
+        "バイクを 自転車専用道路[じてんしゃせんようどうろ]で 走[はし]らせる",
+        "専用[せんよう]",
+        "バイクを 自転車[じてんしゃ]<b> 専用[せんよう]</b> 道路[どうろ]で 走[はし]らせる",
+        id="Furigana - non-inflected multi-kanji noun as part of larger word in text, middle",
+    ),
+    pytest.param(
+        "彼女[かのじょ]への 伝言[でんごん]を 言付[ことづ]けたの。",
+        "付[つ]ける",
+        "彼女[かのじょ]への 伝言[でんごん]を 言[こと]<b> 付[づ]けた</b>の。",
+        id="Furigana - inflected verb as part of larger verb in text",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 漢字[かんじ]を 字引[じびき]で 引[ひ]いてみて。",
+        "引[ひ]く",
+        "<k> 此[こ]の</k> 漢字[かんじ]を 字[じ]<b> 引[びき]</b>で<b> 引[ひ]いて</b>みて。",
+        id="Furigana - inflected verb occurring in noun form and verb form in text",
+    ),
+    pytest.param(
+        "私は 食[た]べている",
+        "食[た]べる",
+        "私は<b> 食[た]べている</b>",
+        id="Furigana - verb inflection ている /1",
+    ),
+    pytest.param(
+        "食[た]べさせるな!",
+        "食[た]べる",
+        "<b>食[た]べさせる</b>な!",
+        id="Furigana - verb inflection させる /1",
+    ),
+    pytest.param(
+        "聴牌[テンパ]ってた",
+        "聴牌[テンパ]る",
+        "<b>聴牌[テンパ]ってた</b>",
+        id="Furigana - verb inflection juku word /1",
+    ),
+    pytest.param(
+        "これ、 大[おお]きすぎない？",
+        "大[おお]きい",
+        "これ、<b> 大[おお]き</b>すぎない？",
+        id="Furigana - adjective inflection /1",
+    ),
+    pytest.param(
+        "安[やす]くて 良[い]いな～",
+        "安[やす]い",
+        "<b>安[やす]くて</b> 良[い]いな～",
+        id="Furigana - adjective inflection /2",
+    ),
+    pytest.param(
+        "高[たか]いでも 良[よ]かろう",
+        "良[よ]い",
+        "高[たか]いでも<b> 良[よ]かろう</b>",
+        id="Furigana - adjective inflection /3",
+    ),
+    pytest.param(
+        "早読[はやよ]みするぜ",
+        "早[はや]い",
+        "<b>早[はや]</b> 読[よ]みするぜ",
+        id="Furigana - adjective inflection with な /1",
+    ),
+    pytest.param(
+        "垂[タ]レ 込[コ]ミがあった、オイ！",
+        "垂[た]れ 込[こ]み",
+        "<b>垂[タ]レ 込[コ]ミ</b>があった、オイ！",
+        id="Furigana is in katakana in text, word in hiragana",
+    ),
+    pytest.param(
+        "垂[た]れ 込[こ]みがあった",
+        "垂[タ]レ 込[コ]ミ",
+        "<b>垂[た]れ 込[こ]み</b>があった",
+        id="Furigana is in hiragana in text, word in katakana",
+    ),
+    pytest.param(
+        "彼女[かのじょ]の 髪[かみ]の 毛[け]は 長[なが]い",
+        "髪[かみ]の 毛[け]",
+        "彼女[かのじょ]の<b> 髪[かみ]の 毛[け]</b>は 長[なが]い",
+        id="Furigana - multi-kanji noun with okuri in middle /1",
+    ),
+    pytest.param(
+        "彼[かれ]は 飲[の]ん 兵衛[べえ]だ",
+        "飲[の]ん 兵衛[べえ]",
+        "彼[かれ]は<b> 飲[の]ん 兵衛[べえ]</b>だ",
+        id="Furigana - multi-kanji noun with okuri in middle /2",
+    ),
+    pytest.param(
+        "彼[かれ]は 走[はし]った。彼[かれ]は 速[はや]い。",
+        "彼[かれ]",
+        "<b>彼[かれ]</b>は 走[はし]った。<b> 彼[かれ]</b>は 速[はや]い。",
+        id="Furigana - word occurs more than once, simple match",
+    ),
+    pytest.param(
+        "彼[かれ]は 走[はし]った。 彼[かれ]の 走[はし]り 方[かた]は 速[はや]い。",
+        "走[はし]る",
+        "彼[かれ]は<b> 走[はし]った</b>。 彼[かれ]の<b> 走[はし]り</b> 方[かた]は 速[はや]い。",
+        id="Furigana - word occurs more than once, inflected match",
+    ),
+    pytest.param(
+        (
             "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<k> 何[なん]</k>でも<k>"
             " 無[な]い</k> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
             " 特大[とくだい]ブーメランじゃねぇ？」</div>"
         ),
-        expected=(
+        "何[なん]でも 無[な]い",
+        (
             "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<b><k> 何[なん]</k>"
             "でも<k> 無[な]い</k></b> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
             " 特大[とくだい]ブーメランじゃねぇ？」</div>"
         ),
-    )
-    test(
-        test_name="Furigana - word is split by html tags in text /2",
-        word="花一匁[はないちもんめ]",
-        text=(
+        id="Furigana - word is split by html tags in text /1",
+    ),
+    pytest.param(
+        (
             "<k> 此[こ]れ</k>ってなんか 花[はな]<k> 一匁[いちもんめ]</k>だっけ？<k>"
             " 彼[あれ]</k><k> 位[ぐらい]</k>の<k> 乗[ノリ]</k>？"
         ),
-        expected=(
+        "花一匁[はないちもんめ]",
+        (
             "<k> 此[こ]れ</k>ってなんか<b> 花[はな]<k> 一匁[いちもんめ]</k></b>だっけ？<k>"
             " 彼[あれ]</k><k> 位[ぐらい]</k>の<k> 乗[ノリ]</k>？"
         ),
-    )
-    test(
-        test_name="Furigana - word with repeater and okuri",
-        word="嬉々[きき]として",
-        text=(
+        id="Furigana - word is split by html tags in text /2",
+    ),
+    pytest.param(
+        (
             "通常[つうじょう]で<k> 有[あ]れば</k> 忌[い]み 嫌[きら]われる<k> 筈[はず]</k>の<k>"
             " 此[こ]れ</k>ら<k> 糞[クソ]</k>ゲーを 嬉々[きき]として 求[もと]める 者[もの]<k>"
             " 達[たち]</k>"
         ),
-        expected=(
+        "嬉々[きき]として",
+        (
             "通常[つうじょう]で<k> 有[あ]れば</k> 忌[い]み 嫌[きら]われる<k> 筈[はず]</k>の<k>"
             " 此[こ]れ</k>ら<k> 糞[クソ]</k>ゲーを<b> 嬉々[きき]として</b> 求[もと]める 者[もの]<k>"
             " 達[たち]</k>"
         ),
-    )
-    test(
-        test_name="Furigana - tags in text, inflectable word /1",
-        word="火照[ほて]る",
-        text=(
+        id="Furigana - word with repeater and okuri",
+    ),
+    pytest.param(
+        (
             "<k> 然[しか]し</k>... 今日[きょう]はマジで 暑[あつ]いな。 何[なに]か... 凄[すご]い..."
             " 身体[からだ]が 火照[ほて]る"
         ),
-        expected=(
+        "火照[ほて]る",
+        (
             "<k> 然[しか]し</k>... 今日[きょう]はマジで 暑[あつ]いな。 何[なに]か... 凄[すご]い..."
             " 身体[からだ]が<b> 火照[ほて]る</b>"
         ),
-    )
-    test(
-        test_name="Furigana - tags in text, inflectable word /2",
-        word="褒[ほ]める",
-        text=(
+        id="Furigana - tags in text, inflectable word /1",
+    ),
+    pytest.param(
+        (
             "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《<k> 御[お]</k>"
             " 褒[ほ]めの<k> 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k>"
             " 御座[ござ]います</k>》</div>"
         ),
-        expected=(
+        "褒[ほ]める",
+        (
             "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《<k> 御[お]</k><b>"
             " 褒[ほ]め</b>の<k> 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k>"
             " 御座[ござ]います</k>》</div>"
         ),
-    )
-    test(
-        test_name="Furigana - tags in text, inflected verb /3",
-        word="護[まも]る",
-        text=(
+        id="Furigana - tags in text, inflectable word /2",
+    ),
+    pytest.param(
+        (
             "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
             " 人々[ひとびと]を 護[まも]りましょう"
         ),
-        expected=(
+        "護[まも]る",
+        (
             "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
             " 人々[ひとびと]を<b> 護[まも]りましょう</b>"
         ),
-    )
-    test(
-        test_name="Furigana - combination of furigana word and katakana word",
-        word="十徳[じゅっとく]ナイフ",
-        text=(
+        id="Furigana - tags in text, inflected verb /3",
+    ),
+    pytest.param(
+        (
             "<k> 止[や]めた</k> 方[ほう]が<k> 良[い]い</k>、 貴方[あなた]の 持[も]っている"
             " 十徳[じゅっとく]ナイフじゃ 私[わたし]には 勝[か]てない"
         ),
-        expected=(
+        "十徳[じゅっとく]ナイフ",
+        (
             "<k> 止[や]めた</k> 方[ほう]が<k> 良[い]い</k>、 貴方[あなた]の 持[も]っている"
             "<b> 十徳[じゅっとく]ナイフ</b>じゃ 私[わたし]には 勝[か]てない"
         ),
-    )
-    test(
-        test_name="Furigana - combination of furigana word with okurigana and katakana word",
-        word="彫[ほ]りナイフ",
-        text="塑像[そぞう]を 彫[ほ]りナイフで 彫[ほ]るのは 安[やす]いね。",
-        expected="塑像[そぞう]を<b> 彫[ほ]りナイフ</b>で 彫[ほ]るのは 安[やす]いね。",
-    )
-    test(
-        test_name="Furigana - noun in rendaku form in text",
-        word="腰[こし]",
-        text="及[およ]び 腰[ごし]",
-        expected="及[およ]び <b>腰[ごし]</b>",
-    )
-    test(
-        test_name="Furigana - multi-kanji noun with rendaku reading change",
-        word="手紙[てかみ]",
-        text="手紙[てがみ]を 書[か]いた",
-        expected="<b>手紙[てがみ]</b>を 書[か]いた",
-    )
-    test(
-        test_name="Furigana - verb in noun form in text",
-        word="及[およ]ぶ",
-        text="及[およ]び 腰[ごし]",
-        expected="<b>及[およ]び</b> 腰[ごし]",
-    )
-    test(
-        test_name="Furigana is colloquial /1",
+        id="Furigana - combination of furigana word and katakana word",
+    ),
+    pytest.param(
+        "塑像[そぞう]を 彫[ほ]りナイフで 彫[ほ]るのは 安[やす]いね。",
+        "彫[ほ]りナイフ",
+        "塑像[そぞう]を<b> 彫[ほ]りナイフ</b>で 彫[ほ]るのは 安[やす]いね。",
+        id="Furigana - combination of furigana word with okurigana and katakana word",
+    ),
+    pytest.param(
+        "及[およ]び 腰[ごし]",
+        "腰[こし]",
+        "及[およ]び <b>腰[ごし]</b>",
+        id="Furigana - noun in rendaku form in text",
+    ),
+    pytest.param(
+        "手紙[てがみ]を 書[か]いた",
+        "手紙[てかみ]",
+        "<b>手紙[てがみ]</b>を 書[か]いた",
+        id="Furigana - multi-kanji noun with rendaku reading change",
+    ),
+    pytest.param(
+        "及[およ]び 腰[ごし]",
+        "及[およ]ぶ",
+        "<b>及[およ]び</b> 腰[ごし]",
+        id="Furigana - verb in noun form in text",
+    ),
+    pytest.param(
+        "無[ねえ]な",
         # Needs some kind of exception handling, can only work when furigana are used
-        word="無[ない]",
-        text="無[ねえ]な",
-        expected="<b>無[ねえ]な</b>",
-        expected_failure=(
-            "無[ない] vs 無[ねえ] is a colloquial reading; matching it needs"
-            " furigana-aware exception handling"
+        "無[ない]",
+        "<b>無[ねえ]な</b>",
+        marks=pytest.mark.xfail(
+            reason=(
+                "無[ない] vs 無[ねえ] is a colloquial reading; matching it needs"
+                " furigana-aware exception handling"
+            ),
+            strict=True,
         ),
-    )
-    test(
-        test_name="Furigana word containing ヶ in middle 1/",
-        word="幡ヶ谷[はたがや]",
-        text="幡ヶ谷[はたがや]で 待[ま]ち 合[あ]わせ",
-        expected="<b>幡ヶ谷[はたがや]</b>で 待[ま]ち 合[あ]わせ",
-    )
-    test(
-        test_name="Furigana word containing ヶ in middle 2/",
-        word="一ヶ月[いっかげつ]",
-        text="一ヶ月[いっかげつ]で 仕上[しあ]げる",
-        expected="<b>一ヶ月[いっかげつ]</b>で 仕上[しあ]げる",
-    )
-    test(
-        test_name="Furigana word containing ヶ in start 1/",
-        word="ヶ月[かげつ]",
-        text="一ヶ月[いっかげつ]で 仕上[しあ]げる",
-        expected="一[いっ]<b> ヶ月[かげつ]</b>で 仕上[しあ]げる",
-    )
-    test(
-        test_name="Furigana word containing ヵ in middle 1/",
-        word="一ヵ月[いっかげつ]",
-        text="一ヵ月[いっかげつ]で 仕上[しあ]げる",
-        expected="<b>一ヵ月[いっかげつ]</b>で 仕上[しあ]げる",
-    )
-    test(
-        test_name="Furigana word containing ヵ in start 1/",
-        word="ヵ月[かげつ]",
-        text="一ヵ月[いっかげつ]で 仕上[しあ]げる",
-        expected="一[いっ]<b> ヵ月[かげつ]</b>で 仕上[しあ]げる",
-    )
-    test(
-        test_name="Furigana word split by ・ in text",
-        word="報連相[ほうれんそう]",
-        text="私[わたし]への 報[ほう]・ 連[れん]・ 相[そう]を 行[おこな]っていただきます",
-        expected="私[わたし]への<b> 報[ほう]・ 連[れん]・ 相[そう]</b>を 行[おこな]っていただきます",
-    )
-    test(
-        test_name="No furigana with kanji - single-kanji noun multiple occurrences",
-        word="家",
-        text="家で居る、家出はしない",
-        expected="<b>家</b>で居る、<b>家</b>出はしない",
-    )
-    test(
-        test_name="No furigana with kanji - multi-kanji noun",
-        word="魚市場",
-        text="この魚は魚市場で買った",
-        expected="この魚は<b>魚市場</b>で買った",
-    )
-    test(
-        test_name="No furigana with kanji - multi-kanji noun with okuri in middle /1",
-        word="髪の毛",
-        text="彼女の髪の毛は長い",
-        expected="彼女の<b>髪の毛</b>は長い",
-    )
-    test(
-        test_name="No furigana with kanji - multi-kanji noun with okuri in middle /2",
-        word="飲ん兵衛",
-        text="彼は飲ん兵衛だ",
-        expected="彼は<b>飲ん兵衛</b>だ",
-    )
-    test(
-        test_name="No furigana with kanji - verb inflection /1",
-        word="食べる",
-        text="彼は食べている",
-        expected="彼は<b>食べている</b>",
-    )
-    test(
-        test_name="No furigana with kanji - verb inflection /2",
-        word="苛めめる",
-        text="苛めなくていれないのか、お 前は？",
-        expected="<b>苛めなくて</b>いれないのか、お 前は？",
-    )
-    test(
-        test_name=(
-            "No furigana with kanji - inflected verb occurring in noun form and verb form in text"
-        ),
-        word="引く",
-        text="<k>此の</k>漢字を字引で引いてみて。",
-        expected="<k>此の</k>漢字を字<b>引</b>で<b>引いて</b>みて。",
-    )
-    test(
-        test_name="No furigana with kanji - adjective inflection /1",
-        word="美味しい",
-        text="このケーキ、美味しくない？",
-        expected="このケーキ、<b>美味しくない</b>？",
-    )
-    test(
-        test_name="No furigana with kanji - adjective inflection /2",
-        word="美味しい",
-        text="このケーキって、美味しくなくて 残念だったな！",
-        expected="このケーキって、<b>美味しくなくて</b> 残念だったな！",
-    )
-    test(
-        test_name="No furigana with kanji - word is split by html tags in text /1",
-        word="何でも無い",
-        text=(
+        id="Furigana is colloquial /1",
+    ),
+    pytest.param(
+        "幡ヶ谷[はたがや]で 待[ま]ち 合[あ]わせ",
+        "幡ヶ谷[はたがや]",
+        "<b>幡ヶ谷[はたがや]</b>で 待[ま]ち 合[あ]わせ",
+        id="Furigana word containing ヶ in middle 1/",
+    ),
+    pytest.param(
+        "一ヶ月[いっかげつ]で 仕上[しあ]げる",
+        "一ヶ月[いっかげつ]",
+        "<b>一ヶ月[いっかげつ]</b>で 仕上[しあ]げる",
+        id="Furigana word containing ヶ in middle 2/",
+    ),
+    pytest.param(
+        "一ヶ月[いっかげつ]で 仕上[しあ]げる",
+        "ヶ月[かげつ]",
+        "一[いっ]<b> ヶ月[かげつ]</b>で 仕上[しあ]げる",
+        id="Furigana word containing ヶ in start 1/",
+    ),
+    pytest.param(
+        "一ヵ月[いっかげつ]で 仕上[しあ]げる",
+        "一ヵ月[いっかげつ]",
+        "<b>一ヵ月[いっかげつ]</b>で 仕上[しあ]げる",
+        id="Furigana word containing ヵ in middle 1/",
+    ),
+    pytest.param(
+        "一ヵ月[いっかげつ]で 仕上[しあ]げる",
+        "ヵ月[かげつ]",
+        "一[いっ]<b> ヵ月[かげつ]</b>で 仕上[しあ]げる",
+        id="Furigana word containing ヵ in start 1/",
+    ),
+    pytest.param(
+        "私[わたし]への 報[ほう]・ 連[れん]・ 相[そう]を 行[おこな]っていただきます",
+        "報連相[ほうれんそう]",
+        "私[わたし]への<b> 報[ほう]・ 連[れん]・ 相[そう]</b>を 行[おこな]っていただきます",
+        id="Furigana word split by ・ in text",
+    ),
+    pytest.param(
+        "家で居る、家出はしない",
+        "家",
+        "<b>家</b>で居る、<b>家</b>出はしない",
+        id="No furigana with kanji - single-kanji noun multiple occurrences",
+    ),
+    pytest.param(
+        "この魚は魚市場で買った",
+        "魚市場",
+        "この魚は<b>魚市場</b>で買った",
+        id="No furigana with kanji - multi-kanji noun",
+    ),
+    pytest.param(
+        "彼女の髪の毛は長い",
+        "髪の毛",
+        "彼女の<b>髪の毛</b>は長い",
+        id="No furigana with kanji - multi-kanji noun with okuri in middle /1",
+    ),
+    pytest.param(
+        "彼は飲ん兵衛だ",
+        "飲ん兵衛",
+        "彼は<b>飲ん兵衛</b>だ",
+        id="No furigana with kanji - multi-kanji noun with okuri in middle /2",
+    ),
+    pytest.param(
+        "彼は食べている",
+        "食べる",
+        "彼は<b>食べている</b>",
+        id="No furigana with kanji - verb inflection /1",
+    ),
+    pytest.param(
+        "苛めなくていれないのか、お 前は？",
+        "苛めめる",
+        "<b>苛めなくて</b>いれないのか、お 前は？",
+        id="No furigana with kanji - verb inflection /2",
+    ),
+    pytest.param(
+        "<k>此の</k>漢字を字引で引いてみて。",
+        "引く",
+        "<k>此の</k>漢字を字<b>引</b>で<b>引いて</b>みて。",
+        id="No furigana with kanji - inflected verb occurring in noun form and verb form in text",
+    ),
+    pytest.param(
+        "このケーキ、美味しくない？",
+        "美味しい",
+        "このケーキ、<b>美味しくない</b>？",
+        id="No furigana with kanji - adjective inflection /1",
+    ),
+    pytest.param(
+        "このケーキって、美味しくなくて 残念だったな！",
+        "美味しい",
+        "このケーキって、<b>美味しくなくて</b> 残念だったな！",
+        id="No furigana with kanji - adjective inflection /2",
+    ),
+    pytest.param(
+        (
             "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<k>何</k>でも<k>無い</k>女の会話。"
             "」</div><div>「<k>其れ</k>、特大ブーメランじゃねぇ？」</div>"
         ),
-        expected=(
+        "何でも無い",
+        (
             "<div>「<k>糞</k><k>程</k><k>詰らん</k>。<b><k>何</k>でも<k>無い</k></b>女の会話。"
             "」</div><div>「<k>其れ</k>、特大ブーメランじゃねぇ？」</div>"
         ),
-    )
-    test(
-        test_name="No furigana with kanji - word is split by html tags in text /2",
-        word="花一匁",
-        text="<k>此れ</k>ってなんか花<k>一匁</k>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
-        expected="<k>此れ</k>ってなんか<b>花<k>一匁</k></b>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
-    )
-    test(
-        test_name="No furigana with kanji - word with repeater and okuri",
-        word="嬉々として",
-        text=(
+        id="No furigana with kanji - word is split by html tags in text /1",
+    ),
+    pytest.param(
+        "<k>此れ</k>ってなんか花<k>一匁</k>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
+        "花一匁",
+        "<k>此れ</k>ってなんか<b>花<k>一匁</k></b>だっけ？<k>彼</k><k>位</k>の<k>乗</k>？",
+        id="No furigana with kanji - word is split by html tags in text /2",
+    ),
+    pytest.param(
+        (
             "通常で<k>有れば</k>忌み嫌われる<k>筈</k>の<k>"
             "此れ</k>ら<k>糞</k>ゲーを嬉々として求める者<k>"
             "達</k>"
         ),
-        expected=(
+        "嬉々として",
+        (
             "通常で<k>有れば</k>忌み嫌われる<k>筈</k>の<k>"
             "此れ</k>ら<k>糞</k>ゲーを<b>嬉々として</b>求める者<k>"
             "達</k>"
         ),
-    )
-    test(
-        test_name="No furigana with kanji - tags in text, inflectable word /1",
-        word="火照る",
-        text="<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が火照る",
-        expected="<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が<b>火照る</b>",
-    )
-    test(
-        test_name="No furigana with kanji - tags in text, inflectable word /2",
-        word="褒める",
-        text=(
+        id="No furigana with kanji - word with repeater and okuri",
+    ),
+    pytest.param(
+        "<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が火照る",
+        "火照る",
+        "<k>然し</k>...今日はマジで暑いな。何か...凄い...身体が<b>火照る</b>",
+        id="No furigana with kanji - tags in text, inflectable word /1",
+    ),
+    pytest.param(
+        (
             "《咄嗟の障壁<k>巧い</k>ね》<br><div>《<k>御</k>褒めの<k>御</k>言葉<k>有難う</k>"
             "<k>御座います</k>》</div>"
         ),
-        expected=(
+        "褒める",
+        (
             "《咄嗟の障壁<k>巧い</k>ね》<br><div>《<k>御</k><b>褒め</b>の<k>御</k>言葉"
             "<k>有難う</k><k>御座います</k>》</div>"
         ),
-    )
-    test(
-        test_name="No furigana with kanji - verb in noun form in text",
-        word="及ぶ",
-        text="及び腰",
-        expected="<b>及び</b>腰",
-    )
-    test(
-        test_name="No furigana with kanji - tags in text, inflected verb /3",
-        word="護る",
-        text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を護りましょう",
-        expected="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>護りましょう</b>",
-    )
-    test(
-        test_name="No furigana with kanji - word containing ヶ 1/",
-        word="幡ヶ谷",
-        text="幡ヶ谷で待ち合わせ",
-        expected="<b>幡ヶ谷</b>で待ち合わせ",
-    )
-    test(
-        test_name="No furigana with kanji - word containing ヶ 2/",
-        word="一ヶ月",
-        text="一ヶ月で仕上げる",
-        expected="<b>一ヶ月</b>で仕上げる",
-    )
-    test(
-        test_name="No furigana with kanji - word containing ヵ 1/",
-        word="一ヵ月",
-        text="一ヵ月で仕上げる",
-        expected="<b>一ヵ月</b>で仕上げる",
-    )
-    test(
-        test_name="No furigana with kanji - word split by ・ in text",
-        word="報連相",
-        text="私への 報・ 連・ 相を 行っていただきます",
-        expected="私への<b> 報・ 連・ 相</b>を 行っていただきます",
-    )
+        id="No furigana with kanji - tags in text, inflectable word /2",
+    ),
+    pytest.param(
+        "及び腰",
+        "及ぶ",
+        "<b>及び</b>腰",
+        id="No furigana with kanji - verb in noun form in text",
+    ),
+    pytest.param(
+        "<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を護りましょう",
+        "護る",
+        "<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>護りましょう</b>",
+        id="No furigana with kanji - tags in text, inflected verb /3",
+    ),
+    pytest.param(
+        "幡ヶ谷で待ち合わせ",
+        "幡ヶ谷",
+        "<b>幡ヶ谷</b>で待ち合わせ",
+        id="No furigana with kanji - word containing ヶ 1/",
+    ),
+    pytest.param(
+        "一ヶ月で仕上げる",
+        "一ヶ月",
+        "<b>一ヶ月</b>で仕上げる",
+        id="No furigana with kanji - word containing ヶ 2/",
+    ),
+    pytest.param(
+        "一ヵ月で仕上げる",
+        "一ヵ月",
+        "<b>一ヵ月</b>で仕上げる",
+        id="No furigana with kanji - word containing ヵ 1/",
+    ),
+    pytest.param(
+        "私への 報・ 連・ 相を 行っていただきます",
+        "報連相",
+        "私への<b> 報・ 連・ 相</b>を 行っていただきます",
+        id="No furigana with kanji - word split by ・ in text",
+    ),
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
-    test(
-        test_name="Kana only - katakana word in text, word in hiragana",
-        word="たれこみ",
-        text="タレコミがあった",
-        expected="<b>タレコミ</b>があった",
-    )
-    test(
-        test_name="Kana only - hiragana word in text, word in katakana",
-        word="タレコミ",
-        text="たれこみがあった",
-        expected="<b>たれこみ</b>があった",
-    )
-    test(
-        test_name="Kana only - katakana in word and text",
-        word="マスターページョン",
-        text=(
+    pytest.param(
+        "タレコミがあった",
+        "たれこみ",
+        "<b>タレコミ</b>があった",
+        id="Kana only - katakana word in text, word in hiragana",
+    ),
+    pytest.param(
+        "たれこみがあった",
+        "タレコミ",
+        "<b>たれこみ</b>があった",
+        id="Kana only - hiragana word in text, word in katakana",
+    ),
+    pytest.param(
+        (
             "<k>此[こん]な</k> 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]"
             " 勃[た]ちでスタンティングオペレーションじゃなくてマスターページョン始[はじ]まっちゃうね。"
         ),
-        expected=(
+        "マスターページョン",
+        (
             "<k>此[こん]な</k> 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]"
             " 勃[た]ちでスタンティングオペレーションじゃなくて<b>マスターページョン</b>始[はじ]"
             "まっちゃうね。"
         ),
-    )
-    test(
-        test_name="Kana only - verb inflection /2",
-        word="いじめる",
-        text="いじめなくていれないのか、お 前[オマエ]は？",
-        expected="<b>いじめなくて</b>いれないのか、お 前[オマエ]は？",
-    )
-    test(
-        test_name="Kana only - adjective inflection /1",
-        word="おいしい",
-        text="このケーキ、おいしくない？",
-        expected="このケーキ、<b>おいしくない</b>？",
-    )
-    test(
-        test_name="Kana only - adjective inflection /2",
-        word="おいしい",
-        text="このケーキって、おいしくなくて 残念[ザンねん]だったな！",
-        expected="このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
-    )
-    test(
-        test_name="Kana only - kanji only & tags in text, inflectable word /1",
-        word="めげる",
-        text=(
+        id="Kana only - katakana in word and text",
+    ),
+    pytest.param(
+        "いじめなくていれないのか、お 前[オマエ]は？",
+        "いじめる",
+        "<b>いじめなくて</b>いれないのか、お 前[オマエ]は？",
+        id="Kana only - verb inflection /2",
+    ),
+    pytest.param(
+        "このケーキ、おいしくない？",
+        "おいしい",
+        "このケーキ、<b>おいしくない</b>？",
+        id="Kana only - adjective inflection /1",
+    ),
+    pytest.param(
+        "このケーキって、おいしくなくて 残念[ザンねん]だったな！",
+        "おいしい",
+        "このケーキって、<b>おいしくなくて</b> 残念[ザンねん]だったな！",
+        id="Kana only - adjective inflection /2",
+    ),
+    pytest.param(
+        (
             "<div>「でも魔王城の辺りって<k>滅茶苦茶</k>"
             "寒いんだよね。行きたくないなぁ…。"
             "」</div>「もうめげ始めている…」<br>"
         ),
-        expected=(
+        "めげる",
+        (
             "<div>「でも魔王城の辺りって<k>滅茶苦茶</k>"
             "寒いんだよね。行きたくないなぁ…。"
             "」</div>「もう<b>めげ</b>始めている…」<br>"
         ),
-    )
-    test(
-        test_name="Kana only - kanji only & tags in text, inflectable word /2",
-        word="ほめる",
-        text=(
+        id="Kana only - kanji only & tags in text, inflectable word /1",
+    ),
+    pytest.param(
+        (
             "《咄嗟の障壁<k>巧い</k>ね》<br><div>《おほめの<k>"
             "御</k>言葉<k>有難う</k><k>御座います</k>》</div>"
         ),
-        expected=(
+        "ほめる",
+        (
             "《咄嗟の障壁<k>巧い</k>ね》<br><div>《お<b>ほめ</b>の<k>"
             "御</k>言葉<k>有難う</k><k>御座います</k>》</div>"
         ),
-    )
-    test(
-        test_name="Kana only - kanji only & tags in text, inflectable word /3",
-        word="まもる",
-        text="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々をまもりましょう",
-        expected="<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>まもりましょう</b>",
-    )
-    test(
-        test_name="Kana only - kanji only & tags in text, inflectable word /4",
-        word="はにかむ",
-        text="「<k>彼の</k>はにかんだ笑顔が<k>如何</k>にも頭に残る」",
-        expected="「<k>彼の</k><b>はにかんだ</b>笑顔が<k>如何</k>にも頭に残る」",
-    )
-    test(
-        test_name="Kana only - noun spelling the word's stem is not the word",
-        word="はしる",
-        text="はしをわたる",
-        expected="はしをわたる",
-    )
-    test(
-        test_name="Kana only - noun spelling the word's stem is not the word /2",
-        word="あめる",
-        text="あめがふる",
-        expected="あめがふる",
-    )
-    test(
-        test_name="Kana only - the word itself still highlights when MeCab knows it",
-        word="はしる",
-        text="はしらないで歩く",
-        expected="<b>はしらないで</b>歩く",
-    )
-    test(
-        test_name="Kana only - stem MeCab parsed as a noun highlights when a conjugation follows",
-        word="バズる",
-        text="それはバズったね",
-        expected="それは<b>バズった</b>ね",
-    )
-    test(
-        test_name="Kana only - stem parsed as a noun, conjugation spanning several tokens",
-        word="バズる",
-        text="それはバズらないね",
-        expected="それは<b>バズらない</b>ね",
-    )
-    test(
-        test_name="Kana only - stem parsed as a noun, conjugation ending inside a token",
-        word="バズる",
-        text="それはバズってるね",
-        expected="それは<b>バズって</b>るね",
-    )
-    test(
-        test_name="Kana only - stem parsed as a noun, conjugation at the end of the text",
-        word="バズる",
-        text="それはバズった",
-        expected="それは<b>バズった</b>",
-    )
-    test(
-        test_name="Kana only - kanji only & tags in text, inflectable word /1",
-        word="めげる",
-        text=(
+        id="Kana only - kanji only & tags in text, inflectable word /2",
+    ),
+    pytest.param(
+        "<k>其々</k>の戦い方で<k>此れ</k>からも共に人々をまもりましょう",
+        "まもる",
+        "<k>其々</k>の戦い方で<k>此れ</k>からも共に人々を<b>まもりましょう</b>",
+        id="Kana only - kanji only & tags in text, inflectable word /3",
+    ),
+    pytest.param(
+        "「<k>彼の</k>はにかんだ笑顔が<k>如何</k>にも頭に残る」",
+        "はにかむ",
+        "「<k>彼の</k><b>はにかんだ</b>笑顔が<k>如何</k>にも頭に残る」",
+        id="Kana only - kanji only & tags in text, inflectable word /4",
+    ),
+    pytest.param(
+        "はしをわたる",
+        "はしる",
+        "はしをわたる",
+        id="Kana only - noun spelling the word's stem is not the word",
+    ),
+    pytest.param(
+        "あめがふる",
+        "あめる",
+        "あめがふる",
+        id="Kana only - noun spelling the word's stem is not the word /2",
+    ),
+    pytest.param(
+        "はしらないで歩く",
+        "はしる",
+        "<b>はしらないで</b>歩く",
+        id="Kana only - the word itself still highlights when MeCab knows it",
+    ),
+    pytest.param(
+        "それはバズったね",
+        "バズる",
+        "それは<b>バズった</b>ね",
+        id="Kana only - stem MeCab parsed as a noun highlights when a conjugation follows",
+    ),
+    pytest.param(
+        "それはバズらないね",
+        "バズる",
+        "それは<b>バズらない</b>ね",
+        id="Kana only - stem parsed as a noun, conjugation spanning several tokens",
+    ),
+    pytest.param(
+        "それはバズってるね",
+        "バズる",
+        "それは<b>バズって</b>るね",
+        id="Kana only - stem parsed as a noun, conjugation ending inside a token",
+    ),
+    pytest.param(
+        "それはバズった",
+        "バズる",
+        "それは<b>バズった</b>",
+        id="Kana only - stem parsed as a noun, conjugation at the end of the text",
+    ),
+    pytest.param(
+        (
             "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
             " 寒[さむ]いんだよね。 行[い]きたくないなぁ…。"
             "」</div>「もうめげ始[はじ]めている…」<br>"
         ),
-        expected=(
+        "めげる",
+        (
             "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
             " 寒[さむ]いんだよね。 行[い]きたくないなぁ…。"
             "」</div>「もう<b>めげ</b>始[はじ]めている…」<br>"
         ),
-    )
-    test(
-        test_name="Kana only - furigana & tags in text, inflectable word /2",
-        word="ほめる",
-        text=(
+        id="Kana only - furigana & tags in text, inflectable word /1",
+    ),
+    pytest.param(
+        (
             "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《おほめの<k>"
             " 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k> 御座[ござ]います</k>》</div>"
         ),
-        expected=(
+        "ほめる",
+        (
             "《 咄嗟[とっさ]の 障壁[しょうへき]<k> 巧[うま]い</k>ね》<br><div>《お<b>ほめ</b>の<k>"
             " 御[お]</k> 言葉[ことば]<k> 有難[ありがと]う</k><k> 御座[ござ]います</k>》</div>"
         ),
-    )
-    test(
-        test_name="Kana only - furigana & tags in text, inflectable word /3",
-        word="まもる",
-        text=(
+        id="Kana only - furigana & tags in text, inflectable word /2",
+    ),
+    pytest.param(
+        (
             "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
             " 人々[ひとびと]をまもりましょう"
         ),
-        expected=(
+        "まもる",
+        (
             "<k> 其々[それぞれ]</k>の 戦[たたか]い 方[かた]で<k> 此[こ]れ</k>からも 共[とも]に"
             " 人々[ひとびと]を<b>まもりましょう</b>"
         ),
-    )
-    test(
-        test_name="Kana only - furigana & tags in text, inflectable word /4",
-        word="はにかむ",
-        text="「<k> 彼[あ]の</k>はにかんだ 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に 残[のこ]る」",
-        expected=(
+        id="Kana only - furigana & tags in text, inflectable word /3",
+    ),
+    pytest.param(
+        "「<k> 彼[あ]の</k>はにかんだ 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に 残[のこ]る」",
+        "はにかむ",
+        (
             "「<k> 彼[あ]の</k><b>はにかんだ</b> 笑顔[えがお]が<k> 如何[どう]</k>にも 頭[あたま]に"
             " 残[のこ]る」"
         ),
-    )
-    test(
-        test_name="Shouldn't crash with mixture of furigana and non-furigana in word",
-        word="総[そう]勃ち",
-        text="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
+        id="Kana only - furigana & tags in text, inflectable word /4",
+    ),
+    pytest.param(
+        "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
+        "総[そう]勃ち",
         # Might not always highlight correctly, though this one does, but at least shouldn't crash
-        expected="こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
-    )
-    print("\n\033[92mTests passed\033[0m")
+        "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
+        id="Shouldn't crash with mixture of furigana and non-furigana in word",
+    ),
+]
+
+
+@pytest.mark.parametrize("text, word, expected", CASES)
+def test_word_highlight(text: str, word: str, expected: str):
+    assert word_highlight(text, word) == expected
 
 
 if __name__ == "__main__":
-    main()
+    # Habit, and the `-m` form the other suites still use, keeps working.
+    raise SystemExit(pytest.main([__file__]))
