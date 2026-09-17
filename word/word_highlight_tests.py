@@ -11,12 +11,15 @@ def test(
     text: str,
     word: str,
     expected: Optional[str] = None,
-    ignore_fail: bool = False,
+    expected_failure: Optional[str] = None,
     debug: bool = False,
 ):
     """Run tests for the word_highlight function.
     Args:
         test_name: Name of the test case.
+        expected_failure: reason this case is known to fail. It is reported instead
+            of failing the run, and an unexpected pass is reported so the reason
+            gets dropped.
     """
     logger = Logger("debug") if debug else Logger("error")
     try:
@@ -25,7 +28,8 @@ def test(
             print("\n\n")
         assert result == expected
     except AssertionError:
-        if ignore_fail:
+        if expected_failure is not None:
+            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
             return
         # Re-run with logging enabled to see what went wrong
         word_highlight(text, word, logger=Logger("debug"))
@@ -35,14 +39,25 @@ def test(
 \033[92mGot:      {result}
 \033[0m""")
         # Stop testing here
-        sys.exit(0)
+        sys.exit(1)
     except Exception:
+        if expected_failure is not None:
+            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
+            return
         # rerun test with logger enabled to see what went wrong
         print(f"""\033[91mTest "{test_name}" raised an exception.\033[0m""")
         try:
             word_highlight(text, word, logger=Logger("debug"))
         except Exception as e:
             raise e
+        # The rerun did not raise, so the failure is not reproducible, but the
+        # first run still failed: do not let it pass silently.
+        sys.exit(1)
+    if expected_failure is not None:
+        print(
+            f"\033[93m{test_name} unexpectedly passed, remove its"
+            f" expected_failure reason: {expected_failure}\033[0m"
+        )
 
 
 def main():
@@ -342,7 +357,10 @@ def main():
         word="無[ない]",
         text="無[ねえ]な",
         expected="<b>無[ねえ]な</b>",
-        ignore_fail=True,
+        expected_failure=(
+            "無[ない] vs 無[ねえ] is a colloquial reading; matching it needs"
+            " furigana-aware exception handling"
+        ),
     )
     test(
         test_name="Furigana word containing ヶ in middle 1/",

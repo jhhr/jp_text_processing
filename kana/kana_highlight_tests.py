@@ -15,8 +15,12 @@ GREEN = "\033[92m"
 RESET = "\033[0m"
 
 
-def main(test_nums: Optional[list[str]] = None):
+def main(test_nums: Optional[list[str]] = None) -> int:
     failed_test_keys: list[str] = []
+    # (case number, reason) for cases marked expected_failure
+    expected_failure_keys: list[Tuple[str, str]] = []
+    unexpected_pass_keys: list[Tuple[str, str]] = []
+    interrupted = False
     run_test_cases = 0
     skipped_test_cases = 0
     total_test_cases = 0
@@ -42,7 +46,7 @@ def main(test_nums: Optional[list[str]] = None):
         test_name: str,
         kanji: Optional[str],
         sentence: str,
-        ignore_fail: bool = False,
+        expected_failure: Optional[str] = None,
         onyomi_to_katakana: bool = True,
         include_suru_okuri: bool = False,
         debug: bool = False,
@@ -59,6 +63,10 @@ def main(test_nums: Optional[list[str]] = None):
         """
         Test setup function to run kana_highlight tests with various configurations. Adds
         the test to a list to be executed later.
+
+        expected_failure: reason every case of this test is known to fail. Such a case is
+        reported as an expected failure instead of failing the run, and a case that passes
+        anyway is reported so the stale reason gets dropped.
         """
         nonlocal total_test_cases
         cases: list[Tuple[FuriReconstruct, WithTagsDef, Optional[str]]] = [
@@ -114,6 +122,20 @@ def main(test_nums: Optional[list[str]] = None):
 
         def run_test(cur_test_index: int, total_tests: int = 1):
 
+            def record_failure(key: str, rerun: Callable):
+                """
+                Books a failed case. A test carrying an expected_failure reason is recorded
+                as an expected failure and does not fail the run; otherwise the first
+                failure's rerun is kept for the debug replay at the end.
+                """
+                nonlocal rerun_test_with_debug
+                if expected_failure is not None:
+                    expected_failure_keys.append((key, expected_failure))
+                    return
+                if rerun_test_with_debug is None:
+                    rerun_test_with_debug = rerun
+                failed_test_keys.append(key)
+
             def print_progress(color):
                 failed = f"{RED} {len(failed_test_keys)} failed" if failed_test_keys else ""
                 print(
@@ -147,18 +169,17 @@ def main(test_nums: Optional[list[str]] = None):
                     )
                     print_progress(GREEN)
                 except Exception:
-                    # Uncaught exception, rerun with debug logging
+                    # Uncaught exception, rerun with debug logging. The rerun outlives this
+                    # iteration, which rebinds rerun_args and logger, so bind them here.
 
-                    def rerun():
+                    def rerun(args=rerun_args, case_logger=logger):
                         try:
-                            kana_highlight(*rerun_args)
+                            kana_highlight(*args)
                         except Exception as e:
-                            logger.error(f"Error during rerun with debug logging: {e}")
+                            case_logger.error(f"Error during rerun with debug logging: {e}")
                             raise e
 
-                    if rerun_test_with_debug is None:
-                        rerun_test_with_debug = rerun
-                    failed_test_keys.append(cur_test_num)
+                    record_failure(cur_test_num, rerun)
                     print_progress(RED)
                     continue
 
@@ -168,9 +189,6 @@ def main(test_nums: Optional[list[str]] = None):
                     assert result == expected
                 except AssertionError:
                     print_progress(RED)
-                    if ignore_fail:
-                        continue
-
                     # Highlight the diff between the expected and the result
                     check = GREEN + "✓" if expected == result else RED + "✗"
                     diff = f"""{RED}Test {cur_test_num}: {test_name}
@@ -181,14 +199,17 @@ Return type: {return_type}
 {check}
 {RESET}"""
 
-                    # Store the first failed test with logging enabled to see what went wrong
-                    def rerun():
-                        kana_highlight(*rerun_args)
-                        print(diff)
+                    # Store the first failed test with logging enabled to see what went
+                    # wrong. diff and rerun_args are bound here because the loop rebinds
+                    # them before the stored rerun is ever called.
+                    def rerun(args=rerun_args, case_diff=diff):
+                        kana_highlight(*args)
+                        print(case_diff)
 
-                    if rerun_test_with_debug is None:
-                        rerun_test_with_debug = rerun
-                    failed_test_keys.append(cur_test_num)
+                    record_failure(cur_test_num, rerun)
+                    continue
+                if expected_failure is not None:
+                    unexpected_pass_keys.append((cur_test_num, expected_failure))
 
         nonlocal test_list
         test_list.append(run_test)
@@ -1987,8 +2008,7 @@ Return type: {return_type}
     test(
         test_name="reading mixup /1",
         kanji="口",
-        ignore_fail=True,
-        # 口 kunyomi くち is found in the furigana but the correct match is the onyomi ク
+        # 口 kunyomi くち is found in the furigana too, but the onyomi ク wins correctly
         sentence="口調[くちょう]",
         expected_kana_only="<b>ク</b>チョウ",
         expected_kana_only_with_tags_split="<b><on>ク</on></b><on>チョウ</on>",
@@ -2271,8 +2291,10 @@ Return type: {return_type}
     )
     test(
         test_name="word where shorter reading is incorrect 1/",
-        # 不 has two matching onyomi フ and フウ where the shorter is correct for 不運
-        ignore_fail=True,
+        expected_failure=(
+            "不 has two matching onyomi フ and フウ and the longer one wins, but フ is the"
+            " correct reading for 不運"
+        ),
         kanji="不",
         sentence="不運[ふうん]",
         expected_kana_only="<b>ふ</b>うん",
@@ -5150,6 +5172,7 @@ Return type: {return_type}
         for i, test_func in enumerate(test_list):
             test_func(i, total_test_count)
     except KeyboardInterrupt:
+        interrupted = True
         print("\r\033[K", end="", flush=True)  # Clear progress line
         print(f"\n{YELLOW}Tests interrupted by user{RESET}")
     total_failed_test_cases = len(failed_test_keys)
@@ -5164,6 +5187,17 @@ Return type: {return_type}
             "\nTo rerun particular tests with debug logging, run: `python run_with_setup.py"
             " kana_highlight_tests.py X.Y Z.W ...` where X.Y Z.W are the test numbers from above"
         )
+    if expected_failure_keys:
+        print(f"{YELLOW}{len(expected_failure_keys)} expected failures:{RESET}")
+        for key, reason in expected_failure_keys:
+            print(f"{YELLOW}  {key}: {reason}{RESET}")
+    if unexpected_pass_keys:
+        print(
+            f"{YELLOW}{len(unexpected_pass_keys)} test cases unexpectedly passed; drop"
+            f" their expected_failure reason:{RESET}"
+        )
+        for key, reason in unexpected_pass_keys:
+            print(f"{YELLOW}  {key}: {reason}{RESET}")
     if skipped_test_cases > 0:
         print(f"{YELLOW}Skipped {skipped_test_cases}/{total_test_cases} test cases.{RESET}")
     end_time = time.time()
@@ -5172,6 +5206,9 @@ Return type: {return_type}
     if rerun_test_with_debug is not None:
         print(f"\nDebug log for first failed test: {failed_test_keys[0]}")
         rerun_test_with_debug()
+
+    # A run that failed or never finished must not report success to the caller.
+    return 1 if failed_test_keys or interrupted else 0
 
 
 if __name__ == "__main__":
@@ -5182,4 +5219,4 @@ if __name__ == "__main__":
         test_nums = sys.argv[2:]
     else:
         test_nums = sys.argv[1:]
-    main(test_nums)
+    sys.exit(main(test_nums))

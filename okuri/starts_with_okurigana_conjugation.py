@@ -103,7 +103,7 @@ def test(text, okurigana, kanji, kanji_reading, expected):
         )
         print(f"\033[91mTest failed for '{text}' -- {e}\033[0m")
         # Stop the testing here
-        sys.exit(0)
+        sys.exit(1)
 
 
 def main():

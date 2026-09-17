@@ -1,6 +1,7 @@
 import sys
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 from ..regex.kanji_furi import (
     KANJI_AND_FURIGANA_AND_OKURIGANA_RE,
@@ -59,14 +60,15 @@ def word_up_to_okuri(
 def test(
     text: str,
     expected: WordSplitResult,
-    ignore_fail: bool = False,
+    expected_failure: Optional[str] = None,
 ):
     result = word_up_to_okuri(text)
     try:
         # Compare each part of the result
         assert result == expected
     except AssertionError:
-        if ignore_fail:
+        if expected_failure is not None:
+            print(f"\033[93mExpected failure: {text} -- {expected_failure}\033[0m")
             return
         # Highlight the diff between the expected and the result
         print(f"""\033[91m{text}
@@ -74,7 +76,12 @@ def test(
 \033[92mGot:      {result.before}, {result.kanji}, {result.furigana}, {result.okurigana}
 \033[0m""")
         # Stop testing here
-        sys.exit(0)
+        sys.exit(1)
+    if expected_failure is not None:
+        print(
+            f"\033[93m{text} unexpectedly passed, remove its expected_failure"
+            f" reason: {expected_failure}\033[0m"
+        )
 
 
 def main():

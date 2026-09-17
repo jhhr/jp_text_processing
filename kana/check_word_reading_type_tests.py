@@ -1,3 +1,4 @@
+import sys
 from typing import Optional
 
 from .check_word_reading_type import WordReadingType, check_word_reading_type
@@ -9,12 +10,14 @@ def test(
     test_name: str,
     word: str,
     expected: Optional[WordReadingType] = None,
-    ignore_fail: bool = False,
+    expected_failure: Optional[str] = None,
     debug: bool = False,
 ):
     """Run tests for the check_word_reading_type function.
     Args:
         test_name: Name of the test case.
+        expected_failure: reason this case is known to fail. It is reported instead of
+            failing the run, and an unexpected pass is reported so the reason gets dropped.
     """
     logger = Logger("debug") if debug else Logger("error")
     result = check_word_reading_type(word, logger=logger)
@@ -23,7 +26,8 @@ def test(
     try:
         assert result == expected
     except AssertionError:
-        if ignore_fail:
+        if expected_failure is not None:
+            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
             return
         # Re-run with logging enabled to see what went wrong
         check_word_reading_type(word, logger=Logger("debug"))
@@ -32,7 +36,12 @@ def test(
 \033[92mGot:      {result}
 \033[0m""")
         # Stop testing here
-        exit(0)
+        sys.exit(1)
+    if expected_failure is not None:
+        print(
+            f"\033[93m{test_name} unexpectedly passed, remove its expected_failure"
+            f" reason: {expected_failure}\033[0m"
+        )
 
 
 def main():

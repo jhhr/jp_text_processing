@@ -274,5 +274,5 @@ if __name__ == "__main__":
 \033[93mGot:      {result}
 \033[0m""")
             # Stop testing here
-            sys.exit(0)
+            sys.exit(1)
     print("\n\033[92mTests passed\033[0m")

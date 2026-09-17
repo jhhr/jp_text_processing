@@ -472,7 +472,7 @@ word: {kanji_tags}, furigana: {furigana}
 \033[92mGot:      {result}
 \033[0m""")
             # Stop testing here
-            sys.exit(0)
+            sys.exit(1)
 
 
 def main():

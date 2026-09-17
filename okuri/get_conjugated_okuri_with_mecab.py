@@ -226,7 +226,7 @@ def test(kanji, kanji_reading, maybe_okuri, expected, okuri_prefix="word", debug
 \033[92mGot:      {(result.okurigana, result.rest_kana, is_suru_verb)}
 \033[0m""")
         # Stop the testing here
-        sys.exit(0)
+        sys.exit(1)
 
 
 def main():
