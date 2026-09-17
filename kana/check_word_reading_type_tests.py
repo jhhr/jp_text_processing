@@ -1,208 +1,166 @@
-import sys
-from typing import Optional
+"""Cases for `check_word_reading_type`, run with pytest from `anki_shared/`:
+
+    python -m pytest jp_text_processing/kana/check_word_reading_type_tests.py
+
+Pass `--log-cli-level=debug` to see what the function logged for a case; pytest captures the
+package logger on its own, so nothing here has to turn logging on.
+
+A case that is known to fail gets `marks=pytest.mark.xfail(reason="...", strict=True)` in its
+`pytest.param`: strict so an unexpected pass fails the run and the reason gets dropped. None
+of the cases below need it today.
+"""
+
+import pytest
 
 from .check_word_reading_type import WordReadingType, check_word_reading_type
 
-from ..utils.logger import console_logging, set_level
 
-
-def test(
-    test_name: str,
-    word: str,
-    expected: Optional[WordReadingType] = None,
-    expected_failure: Optional[str] = None,
-    debug: bool = False,
-):
-    """Run tests for the check_word_reading_type function.
-    Args:
-        test_name: Name of the test case.
-        expected_failure: reason this case is known to fail. It is reported instead of
-            failing the run, and an unexpected pass is reported so the reason gets dropped.
-    """
-    set_level("debug" if debug else "error")
-    result = check_word_reading_type(word)
-    if debug:
-        print("\n\n")
-    try:
-        assert result == expected
-    except AssertionError:
-        if expected_failure is not None:
-            print(f"\033[93mExpected failure: {test_name} -- {expected_failure}\033[0m")
-            return
-        # Re-run with logging enabled to see what went wrong
-        set_level("debug")
-        check_word_reading_type(word)
-        print(f"""\033[91m{test_name}
-\033[93mExpected: {expected}
-\033[92mGot:      {result}
-\033[0m""")
-        # Stop testing here
-        sys.exit(1)
-    if expected_failure is not None:
-        print(
-            f"\033[93m{test_name} unexpectedly passed, remove its expected_failure"
-            f" reason: {expected_failure}\033[0m"
-        )
-
-
-def main():
-    console_logging("error")
-    # test each tag type, on/kun/juk with 1) single and 2) multiple tags, with a) no ending kana,
-    # b) okurigana, c) with non-okuri ending kana and d) both okurigana and non-okuri ending kana
-    # for a total of 6 tests per tag type
-
+# Each tag type, on/kun/juk, with 1) a single and 2) multiple tags, and a) no ending kana,
+# b) okurigana, c) non-okuri ending kana and d) both — six cases per tag type.
+CASES = [
     # kunyomi single tag
-    test(
-        test_name="kunyomi only, single tag, no ending kana",
-        word="<kun>山[やま]</kun>",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, single tag, with okurigana",
-        word="<kun>帰[かえ]</kun><oku>る</oku>",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, single tag, with non-okuri ending kana",
-        word="<kun>既[すで]</kun>に",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, single tag, with okurigana and non-okuri ending kana",
-        word="<kun>走[はし]</kun><oku>り</oku>だす",
-        expected="kun",
-    )
-
+    pytest.param("<kun>山[やま]</kun>", "kun", id="kunyomi only, single tag, no ending kana"),
+    pytest.param(
+        "<kun>帰[かえ]</kun><oku>る</oku>",
+        "kun",
+        id="kunyomi only, single tag, with okurigana",
+    ),
+    pytest.param(
+        "<kun>既[すで]</kun>に",
+        "kun",
+        id="kunyomi only, single tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<kun>走[はし]</kun><oku>り</oku>だす",
+        "kun",
+        id="kunyomi only, single tag, with okurigana and non-okuri ending kana",
+    ),
     # Kunyomi multi-tag
-    test(
-        test_name="kunyomi only, multi-tag, no ending kana",
-        word="<kun>山[やま]</kun><kun>田[だ]</kun>",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, multi-tag, with non-okuri ending kana",
-        word="<kun>山[やま]</kun><kun>田[だ]</kun>さん",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, multi-tag, with okurigana",
-        word="<kun>日[ひ]</kun><kun>帰[がえ]</kun><oku>り</oku>",
-        expected="kun",
-    )
-    test(
-        test_name="kunyomi only, multi-tag, with okurigana and non-okuri ending kana",
-        word="<kun>日[ひ]</kun><kun>帰[がえ]</kun><oku>り</oku>に",
-        expected="kun",
-    )
-
+    pytest.param(
+        "<kun>山[やま]</kun><kun>田[だ]</kun>",
+        "kun",
+        id="kunyomi only, multi-tag, no ending kana",
+    ),
+    pytest.param(
+        "<kun>山[やま]</kun><kun>田[だ]</kun>さん",
+        "kun",
+        id="kunyomi only, multi-tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<kun>日[ひ]</kun><kun>帰[がえ]</kun><oku>り</oku>",
+        "kun",
+        id="kunyomi only, multi-tag, with okurigana",
+    ),
+    pytest.param(
+        "<kun>日[ひ]</kun><kun>帰[がえ]</kun><oku>り</oku>に",
+        "kun",
+        id="kunyomi only, multi-tag, with okurigana and non-okuri ending kana",
+    ),
     # onyomi single tag
-    test(
-        test_name="onyomi only, single tag, no ending kana",
-        word="<on> 分[ぶん]</on>",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, single tag, with okurigana",
-        word="<on> 博[はく]</on><oku>す</oku>",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, single tag, with non-okuri ending kana",
-        word="<on> 単[たん]</on>に",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, single tag, with okurigana and non-okuri ending kana",
-        word="<on> 博[はく]</on><oku>す</oku>で",
-        expected="on",
-    )
-
+    pytest.param("<on> 分[ぶん]</on>", "on", id="onyomi only, single tag, no ending kana"),
+    pytest.param(
+        "<on> 博[はく]</on><oku>す</oku>",
+        "on",
+        id="onyomi only, single tag, with okurigana",
+    ),
+    pytest.param(
+        "<on> 単[たん]</on>に",
+        "on",
+        id="onyomi only, single tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<on> 博[はく]</on><oku>す</oku>で",
+        "on",
+        id="onyomi only, single tag, with okurigana and non-okuri ending kana",
+    ),
     # onyomi multi-tag
-    test(
-        test_name="onyomi only, multi tag, no ending kana",
-        word="<on>学[がっ]</on><on>校[こう]</on>",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, multi tag, with non-okuri ending kana",
-        word="<on>学[がっ]</on><on>校[こう]</on>に",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, multi tag, with okurigana",
-        word="<on> 茶[ちゃ]</on><on> 化[か]</on><oku>す</oku>",
-        expected="on",
-    )
-    test(
-        test_name="onyomi only, multi tag, with okurigana and non-okuri ending kana",
-        word="<on> 茶[ちゃ]</on><on> 化[か]</on><oku>す</oku>から",
-        expected="on",
-    )
+    pytest.param(
+        "<on>学[がっ]</on><on>校[こう]</on>",
+        "on",
+        id="onyomi only, multi tag, no ending kana",
+    ),
+    pytest.param(
+        "<on>学[がっ]</on><on>校[こう]</on>に",
+        "on",
+        id="onyomi only, multi tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<on> 茶[ちゃ]</on><on> 化[か]</on><oku>す</oku>",
+        "on",
+        id="onyomi only, multi tag, with okurigana",
+    ),
+    pytest.param(
+        "<on> 茶[ちゃ]</on><on> 化[か]</on><oku>す</oku>から",
+        "on",
+        id="onyomi only, multi tag, with okurigana and non-okuri ending kana",
+    ),
     # jukujikun single tag
-    test(
-        test_name="jukujikun only, single tag, no ending kana",
-        word="<juk> 頁[ページ]</juk>",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, single tag, with okurigana",
-        word="<juk> 勃[た]</juk><oku>つ</oku>",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, single tag, with non-okuri ending kana",
-        word="<juk> 実[げ]</juk>に",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, single tag, with okurigana and non-okuri ending kana",
-        word="<juk> 勃[た]</juk><oku>ち</oku>も",
-        expected="juk",
-    )
+    pytest.param("<juk> 頁[ページ]</juk>", "juk", id="jukujikun only, single tag, no ending kana"),
+    pytest.param(
+        "<juk> 勃[た]</juk><oku>つ</oku>",
+        "juk",
+        id="jukujikun only, single tag, with okurigana",
+    ),
+    pytest.param(
+        "<juk> 実[げ]</juk>に",
+        "juk",
+        id="jukujikun only, single tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<juk> 勃[た]</juk><oku>ち</oku>も",
+        "juk",
+        id="jukujikun only, single tag, with okurigana and non-okuri ending kana",
+    ),
     # jukujikun multi-tag
-    test(
-        test_name="jukujikun only, multi tag, no ending kana",
-        word="<juk>今[きょ]</juk><juk>日[う]</juk>",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, multi tag, with non-okuri ending kana",
-        word="<juk>今[きょ]</juk><juk>日[う]</juk>は",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, multi tag, with okurigana",
-        word="<juk> 躊[ため]</juk><juk> 躇[ら]</juk><oku>い</oku>",
-        expected="juk",
-    )
-    test(
-        test_name="jukujikun only, multi tag, with okurigana and non-okuri ending kana",
-        word="<juk> 躊[ため]</juk><juk> 躇[ら]</juk><oku>い</oku>が",
-        expected="juk",
-    )
+    pytest.param(
+        "<juk>今[きょ]</juk><juk>日[う]</juk>",
+        "juk",
+        id="jukujikun only, multi tag, no ending kana",
+    ),
+    pytest.param(
+        "<juk>今[きょ]</juk><juk>日[う]</juk>は",
+        "juk",
+        id="jukujikun only, multi tag, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<juk> 躊[ため]</juk><juk> 躇[ら]</juk><oku>い</oku>",
+        "juk",
+        id="jukujikun only, multi tag, with okurigana",
+    ),
+    pytest.param(
+        "<juk> 躊[ため]</juk><juk> 躇[ら]</juk><oku>い</oku>が",
+        "juk",
+        id="jukujikun only, multi tag, with okurigana and non-okuri ending kana",
+    ),
     # mixed reading
-    test(
-        test_name="mixed reading, on and kun tags, no ending kana",
-        word="<kun> 丸[まる]</kun><on> 損[ぞん]</on>",
-        expected="mix",
-    )
-    test(
-        test_name="mixed reading, on and kun tags, with okurigana",
-        word="<on> 不[ふ]</on><kun> 向[む]</kun><oku>き</oku>",
-        expected="mix",
-    )
-    test(
-        test_name="mixed reading, on and kun tags, with non-okuri ending kana",
-        word="<kun> 若[わか]</kun><on> 死[じ]</on>に",
-        expected="mix",
-    )
-    test(
-        test_name="mixed reading, on and kun tags, with okurigana and non-okuri ending kana",
-        word="<on> 開[かい]</on><kun> 始[はじ]</kun><oku>め</oku>で",
-        expected="mix",
-    )
-    print("\n\033[92mAll tests passed\033[0m")
+    pytest.param(
+        "<kun> 丸[まる]</kun><on> 損[ぞん]</on>",
+        "mix",
+        id="mixed reading, on and kun tags, no ending kana",
+    ),
+    pytest.param(
+        "<on> 不[ふ]</on><kun> 向[む]</kun><oku>き</oku>",
+        "mix",
+        id="mixed reading, on and kun tags, with okurigana",
+    ),
+    pytest.param(
+        "<kun> 若[わか]</kun><on> 死[じ]</on>に",
+        "mix",
+        id="mixed reading, on and kun tags, with non-okuri ending kana",
+    ),
+    pytest.param(
+        "<on> 開[かい]</on><kun> 始[はじ]</kun><oku>め</oku>で",
+        "mix",
+        id="mixed reading, on and kun tags, with okurigana and non-okuri ending kana",
+    ),
+]
+
+
+@pytest.mark.parametrize("word, expected", CASES)
+def test_check_word_reading_type(word: str, expected: WordReadingType):
+    assert check_word_reading_type(word) == expected
 
 
 if __name__ == "__main__":
-    main()
+    # Habit, and the `-m` form the other suites still use, keeps working.
+    raise SystemExit(pytest.main([__file__]))
