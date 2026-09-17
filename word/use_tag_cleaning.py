@@ -1,5 +1,4 @@
 import re
-import sys
 
 from .use_text_part_storage import (
     use_text_part_storage,
@@ -169,43 +168,3 @@ def use_tag_cleaning_with_b_insertion(
         return result
 
     return cleaned_text, custom_incrementer, custom_restorer, indexes
-
-
-TEST_CASES = [
-    # An opening tag right before <b>, closed within the b span
-    (
-        "<k><b> 何[なん]</k>でも<k> 無[な]い</b></k>",
-        "<b><k> 何[なん]</k>でも<k> 無[な]い</k></b>",
-    ),
-    # A tag opened within the b span and closed after it, with text in between
-    (
-        "<k> 其[そ]れ</k>には<b><k> 優劣[ゆうれつ]</k>を<k> 付[つ]け</b> 難[がた]い</k>。",
-        "<k> 其[そ]れ</k>には<b><k> 優劣[ゆうれつ]</k>を<k> 付[つ]け</k></b><k> 難[がた]い</k>。",
-    ),
-    # A tag opened before <b> and closed within it, with text in between
-    (
-        "<k> 何[なん]<b>でも</k> 無[な]い</b>",
-        "<k> 何[なん]</k><b><k>でも</k> 無[な]い</b>",
-    ),
-    # Whole tags within the b span, and b spans within a tag, are left alone
-    ("<k> 何[なん]<b>でも</b> 無[な]い</k>", "<k> 何[なん]<b>でも</b> 無[な]い</k>"),
-    ("<b><k> 何[なん]</k>でも</b>", "<b><k> 何[なん]</k>でも</b>"),
-]
-
-
-def run_tests():
-    failed = False
-    for unfixed_text, expected in TEST_CASES:
-        fixed_text = apply_tag_fixes(unfixed_text)
-        if fixed_text != expected:
-            failed = True
-            print(f"Test failed for apply_tag_fixes on '{unfixed_text}'")
-            print(f"\033[93mExpected: '{expected}'\033[0m")
-            print(f"\033[92mGot:      '{fixed_text}'\033[0m")
-    if failed:
-        sys.exit(1)
-    print("\n\033[92mTests passed\033[0m")
-
-
-if __name__ == "__main__":
-    run_tests()

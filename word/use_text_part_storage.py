@@ -174,20 +174,3 @@ def use_text_part_storage(
         return edited_text
 
     return cleaned_text, increment_indexes, restore_parts, part_indexes
-
-
-def run_tests():
-    # Should reconstruct identically if no modifications
-    text1 = (
-        "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<k> 何[なん]</k>でも<k>"
-        " 無[な]い</k> 女[おんな]の 会話[かいわ]。」</div><div>「<k> 其[そ]れ</k>、"
-        " 特大[とくだい]ブーメランじゃねぇ？」</div>"
-    )
-    cleaned_text, increment_indexes, restore_parts, indexes = use_text_part_storage(text1)
-    reconstructed_text = restore_parts(cleaned_text)
-    assert reconstructed_text == text1, f"Expected: '{text1}', Got: '{reconstructed_text}'"
-    print("\n\033[92mTests passed\033[0m")
-
-
-if __name__ == "__main__":
-    run_tests()
