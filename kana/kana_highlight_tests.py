@@ -9,7 +9,6 @@ from ..all_types.main_types import WithTagsDef
 
 from ..utils.logger import console_logging, package_logger, set_level, silenced
 
-
 RED = "\033[91m"
 YELLOW = "\033[93m"
 GREEN = "\033[92m"
@@ -282,9 +281,7 @@ Return type: {return_type}
         expected_furigana="<b> 生物[セイブツ]</b> 学[ガク]",
         expected_furikanji="<b> セイブツ[生物]</b> ガク[学]",
         expected_kana_only="<b>セイブツ</b>ガク",
-        expected_furigana_with_tags_split=(
-            "<b><on> 生[セイ]</on><on> 物[ブツ]</on></b><on> 学[ガク]</on>"
-        ),
+        expected_furigana_with_tags_split="<b><on> 生[セイ]</on><on> 物[ブツ]</on></b><on> 学[ガク]</on>",
         expected_furigana_with_tags_merged="<b><on> 生物[セイブツ]</on></b><on> 学[ガク]</on>",
         expected_furikanji_with_tags_split=(
             "<b><on> セイ[生]</on><on> ブツ[物]</on></b><on> ガク[学]</on>"
@@ -305,16 +302,12 @@ Return type: {return_type}
             "<b><on> 生[セイ]</on><on> 物[ブツ]</on></b><on> 物[ブツ]</on><on> 理[リ]</on>"
             "<on> 学[ガク]</on>"
         ),
-        expected_furigana_with_tags_merged=(
-            "<b><on> 生物[セイブツ]</on></b><on> 物理学[ブツリガク]</on>"
-        ),
+        expected_furigana_with_tags_merged="<b><on> 生物[セイブツ]</on></b><on> 物理学[ブツリガク]</on>",
         expected_furikanji_with_tags_split=(
             "<b><on> セイ[生]</on><on> ブツ[物]</on></b><on> ブツ[物]</on><on> リ[理]</on>"
             "<on> ガク[学]</on>"
         ),
-        expected_furikanji_with_tags_merged=(
-            "<b><on> セイブツ[生物]</on></b><on> ブツリガク[物理学]</on>"
-        ),
+        expected_furikanji_with_tags_merged="<b><on> セイブツ[生物]</on></b><on> ブツリガク[物理学]</on>",
         expected_kana_only_with_tags_split=(
             "<b><on>セイ</on><on>ブツ</on></b><on>ブツ</on><on>リ</on><on>ガク</on>"
         ),
@@ -1346,12 +1339,10 @@ Return type: {return_type}
             "<on>セイ</on><on>ブツ</on><on>ブツ</on><on>リ</on><on>ガク</on>"
         ),
         expected_furigana_with_tags_split=(
-            "<on> 生[セイ]</on><on> 物[ブツ]</on><on> 物[ブツ]</on><on> 理[リ]</on><on>"
-            " 学[ガク]</on>"
+            "<on> 生[セイ]</on><on> 物[ブツ]</on><on> 物[ブツ]</on><on> 理[リ]</on><on> 学[ガク]</on>"
         ),
         expected_furikanji_with_tags_split=(
-            "<on> セイ[生]</on><on> ブツ[物]</on><on> ブツ[物]</on><on> リ[理]</on><on>"
-            " ガク[学]</on>"
+            "<on> セイ[生]</on><on> ブツ[物]</on><on> ブツ[物]</on><on> リ[理]</on><on> ガク[学]</on>"
         ),
         expected_kana_only_with_tags_merged="<on>セイブツブツリガク</on>",
         expected_furigana_with_tags_merged="<on> 生物物理学[セイブツブツリガク]</on>",
@@ -2340,16 +2331,17 @@ Return type: {return_type}
         ),
     )
     test(
-        test_name="word where shorter reading is incorrect 1/",
-        expected_failure=(
-            "不 has two matching onyomi フ and フウ and the longer one wins, but フ is the"
-            " correct reading for 不運"
-        ),
+        test_name="word where shorter reading is correct 1/",
+        # 不 has two matching onyomi フ and フウ and but フ is the correct reading for 不運
         kanji="不",
         sentence="不運[ふうん]",
-        expected_kana_only="<b>ふ</b>うん",
-        expected_kana_only_with_tags_split="<b><on>ふ</on></b><on>うん</on>",
-        expected_kana_only_with_tags_merged="<b><on>ふ</on></b><on>うん</on>",
+        expected_kana_only="<b>フ</b>ウン",
+        expected_kana_only_with_tags_split="<b><on>フ</on></b><on>ウン</on>",
+        expected_kana_only_with_tags_merged="<b><on>フ</on></b><on>ウン</on>",
+        expected_furigana_with_tags_split="<b><on> 不[フ]</on></b><on> 運[ウン]</on>",
+        expected_furikanji_with_tags_split="<b><on> フ[不]</on></b><on> ウン[運]</on>",
+        expected_furigana_with_tags_merged="<b><on> 不[フ]</on></b><on> 運[ウン]</on>",
+        expected_furikanji_with_tags_merged="<b><on> フ[不]</on></b><on> ウン[運]</on>",
     )
     test(
         test_name="jukujikun test 大人 1/",
@@ -2713,16 +2705,12 @@ Return type: {return_type}
         expected_furigana_with_tags_split=(
             "<juk> 山[ぱぴ]</juk><juk> 川[ぷ]</juk><on> 保[ほ]</on><juk> 田[ぺぽ]</juk>"
         ),
-        expected_furigana_with_tags_merged=(
-            "<juk> 山川[ぱぴぷ]</juk><on> 保[ほ]</on><juk> 田[ぺぽ]</juk>"
-        ),
+        expected_furigana_with_tags_merged="<juk> 山川[ぱぴぷ]</juk><on> 保[ほ]</on><juk> 田[ぺぽ]</juk>",
         expected_furikanji=" ぱぴぷほぺぽ[山川保田]",
         expected_furikanji_with_tags_split=(
             "<juk> ぱぴ[山]</juk><juk> ぷ[川]</juk><on> ほ[保]</on><juk> ぺぽ[田]</juk>"
         ),
-        expected_furikanji_with_tags_merged=(
-            "<juk> ぱぴぷ[山川]</juk><on> ほ[保]</on><juk> ぺぽ[田]</juk>"
-        ),
+        expected_furikanji_with_tags_merged="<juk> ぱぴぷ[山川]</juk><on> ほ[保]</on><juk> ぺぽ[田]</juk>",
     )
     test(
         test_name="jukujikun runs on both sides of a matched kanji keep the order with highlight",
@@ -2762,16 +2750,12 @@ Return type: {return_type}
         expected_furigana_with_tags_split=(
             "<juk> 山[ぱ]</juk><on> 保[ほ]</on><juk> 川[ぴぷ]</juk><juk> 田[ぺ]</juk>"
         ),
-        expected_furigana_with_tags_merged=(
-            "<juk> 山[ぱ]</juk><on> 保[ほ]</on><juk> 川田[ぴぷぺ]</juk>"
-        ),
+        expected_furigana_with_tags_merged="<juk> 山[ぱ]</juk><on> 保[ほ]</on><juk> 川田[ぴぷぺ]</juk>",
         expected_furikanji=" ぱほぴぷぺ[山保川田]",
         expected_furikanji_with_tags_split=(
             "<juk> ぱ[山]</juk><on> ほ[保]</on><juk> ぴぷ[川]</juk><juk> ぺ[田]</juk>"
         ),
-        expected_furikanji_with_tags_merged=(
-            "<juk> ぱ[山]</juk><on> ほ[保]</on><juk> ぴぷぺ[川田]</juk>"
-        ),
+        expected_furikanji_with_tags_merged="<juk> ぱ[山]</juk><on> ほ[保]</on><juk> ぴぷぺ[川田]</juk>",
     )
     test(
         test_name="jukujikun test 蕎麦 not matched",
@@ -4600,19 +4584,11 @@ Return type: {return_type}
         kanji="円",
         sentence="10000円[いちまんえん]",
         expected_furigana=" 10000[イチマン]<b> 円[エン]</b>",
-        expected_furigana_with_tags_split=(
-            "<mix> 10000[イチマン]</mix><b><on> 円[エン]</on></b>"
-        ),
-        expected_furigana_with_tags_merged=(
-            "<on> 10000[イチマン]</on><b><on> 円[エン]</on></b>"
-        ),
+        expected_furigana_with_tags_split="<mix> 10000[イチマン]</mix><b><on> 円[エン]</on></b>",
+        expected_furigana_with_tags_merged="<on> 10000[イチマン]</on><b><on> 円[エン]</on></b>",
         expected_furikanji=" イチマン[10000]<b> エン[円]</b>",
-        expected_furikanji_with_tags_split=(
-            "<mix> イチマン[10000]</mix><b><on> エン[円]</on></b>"
-        ),
-        expected_furikanji_with_tags_merged=(
-            "<on> イチマン[10000]</on><b><on> エン[円]</on></b>"
-        ),
+        expected_furikanji_with_tags_split="<mix> イチマン[10000]</mix><b><on> エン[円]</on></b>",
+        expected_furikanji_with_tags_merged="<on> イチマン[10000]</on><b><on> エン[円]</on></b>",
         expected_kana_only="イチマン<b>エン</b>",
         expected_kana_only_with_tags_split="<on>イチ</on><on>マン</on><b><on>エン</on></b>",
         expected_kana_only_with_tags_merged="<on>イチマン</on><b><on>エン</on></b>",
@@ -4621,9 +4597,7 @@ Return type: {return_type}
         test_name="Myriad numbers keep the 一 - 一千万, 一億, 一兆",
         kanji="",
         sentence="10000000[いっせんまん] 100000000[いちおく] 1000000000000[いっちょう]",
-        expected_furigana=(
-            " 10000000[イッセンマン] 100000000[イチオク] 1000000000000[イッチョウ]"
-        ),
+        expected_furigana=" 10000000[イッセンマン] 100000000[イチオク] 1000000000000[イッチョウ]",
         expected_furigana_with_tags_split=(
             "<mix> 10000000[イッセンマン]</mix><mix> 100000000[イチオク]</mix>"
             "<mix> 1000000000000[イッチョウ]</mix>"
@@ -4632,9 +4606,7 @@ Return type: {return_type}
             "<on> 10000000[イッセンマン]</on><on> 100000000[イチオク]</on>"
             "<on> 1000000000000[イッチョウ]</on>"
         ),
-        expected_furikanji=(
-            " イッセンマン[10000000] イチオク[100000000] イッチョウ[1000000000000]"
-        ),
+        expected_furikanji=" イッセンマン[10000000] イチオク[100000000] イッチョウ[1000000000000]",
         expected_furikanji_with_tags_split=(
             "<mix> イッセンマン[10000000]</mix><mix> イチオク[100000000]</mix>"
             "<mix> イッチョウ[1000000000000]</mix>"
@@ -4648,28 +4620,18 @@ Return type: {return_type}
             "<on>イッ</on><on>セン</on><on>マン</on> <on>イチ</on><on>オク</on>"
             " <on>イッ</on><on>チョウ</on>"
         ),
-        expected_kana_only_with_tags_merged=(
-            "<on>イッセンマン</on> <on>イチオク</on> <on>イッチョウ</on>"
-        ),
+        expected_kana_only_with_tags_merged="<on>イッセンマン</on> <on>イチオク</on> <on>イッチョウ</on>",
     )
     test(
         test_name="十, 百 and a lone 千 still drop the 一",
         kanji="",
         sentence="1000[せん] 1000000[ひゃくまん]",
         expected_furigana=" 1000[セン] 1000000[ヒャクマン]",
-        expected_furigana_with_tags_split=(
-            "<on> 1000[セン]</on><mix> 1000000[ヒャクマン]</mix>"
-        ),
-        expected_furigana_with_tags_merged=(
-            "<on> 1000[セン]</on><on> 1000000[ヒャクマン]</on>"
-        ),
+        expected_furigana_with_tags_split="<on> 1000[セン]</on><mix> 1000000[ヒャクマン]</mix>",
+        expected_furigana_with_tags_merged="<on> 1000[セン]</on><on> 1000000[ヒャクマン]</on>",
         expected_furikanji=" セン[1000] ヒャクマン[1000000]",
-        expected_furikanji_with_tags_split=(
-            "<on> セン[1000]</on><mix> ヒャクマン[1000000]</mix>"
-        ),
-        expected_furikanji_with_tags_merged=(
-            "<on> セン[1000]</on><on> ヒャクマン[1000000]</on>"
-        ),
+        expected_furikanji_with_tags_split="<on> セン[1000]</on><mix> ヒャクマン[1000000]</mix>",
+        expected_furikanji_with_tags_merged="<on> セン[1000]</on><on> ヒャクマン[1000000]</on>",
         expected_kana_only="セン ヒャクマン",
         expected_kana_only_with_tags_split="<on>セン</on> <on>ヒャク</on><on>マン</on>",
         expected_kana_only_with_tags_merged="<on>セン</on> <on>ヒャクマン</on>",
