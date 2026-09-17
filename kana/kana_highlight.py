@@ -32,6 +32,7 @@ from ..all_types.main_types import (
     FinalResult,
     MoraAlignment,
     WrapMatchEntry,
+    WrapTag,
 )
 from .furigana_exceptions import check_exception
 from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
@@ -315,6 +316,12 @@ def reconstruct_from_alignment(
 
     for i, kanji in enumerate(word_for_alignment):
         surface_kanji = surface_slices[i] if i < len(surface_slices) else kanji
+        # Every entry field gets a value before the branches, so a branch that does not speak for
+        # one of them leaves this kanji's own default rather than whatever the previous kanji had.
+        reading = ""
+        tag: WrapTag = "mix"
+        is_num = False
+        is_noun_suru_verb: Optional[bool] = False
         if i in juku_parts:
             part = juku_parts[i]
             reading = part["furigana"]
@@ -344,9 +351,6 @@ def reconstruct_from_alignment(
                 kanji,
                 i,
             )
-            reading = ""
-            tag = "mix"
-            is_num = False
 
         entries.append({
             "kanji": surface_kanji,

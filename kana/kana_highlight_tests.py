@@ -334,6 +334,39 @@ Return type: {return_type}
         ),
     )
     test(
+        # An exception word (薔薇) covers its own positions in juku_parts, so the redistribution
+        # that would have covered the rest is skipped and the kanji before it end up with neither
+        # a reading match nor a juku part. The first such kanji used to raise UnboundLocalError.
+        test_name="Should not crash when a kanji has neither a reading match nor a juku part",
+        kanji="",
+        sentence="栗栗薔薇[ぽぽぽぽばら]",
+        expected_furigana=" 栗栗薔薇[ばら]",
+        expected_furigana_with_tags_split="<mix> 栗栗[]</mix><juk> 薔[ば]</juk><juk> 薇[ら]</juk>",
+        expected_furigana_with_tags_merged="<mix> 栗栗[]</mix><juk> 薔薇[ばら]</juk>",
+        expected_furikanji=" ばら[栗栗薔薇]",
+        expected_furikanji_with_tags_split="<mix> [栗栗]</mix><juk> ば[薔]</juk><juk> ら[薇]</juk>",
+        expected_furikanji_with_tags_merged="<mix> [栗栗]</mix><juk> ばら[薔薇]</juk>",
+        expected_kana_only="ばら",
+        expected_kana_only_with_tags_split="<mix></mix><juk>ば</juk><juk>ら</juk>",
+        expected_kana_only_with_tags_merged="<mix></mix><juk>ばら</juk>",
+    )
+    test(
+        # Same gap, but after the exception instead of before it, so the unmatched kanji is not
+        # the first one. That position used to take whatever the previous kanji had been given.
+        test_name="Should not inherit the previous kanji's values when a kanji has no match",
+        kanji="薔",
+        sentence="薔薇栗[ばらぽぽ]",
+        expected_furigana="<b> 薔[ば]</b> 薇栗[ら]",
+        expected_furigana_with_tags_split="<b><juk> 薔[ば]</juk></b><juk> 薇栗[ら]</juk>",
+        expected_furigana_with_tags_merged="<b><juk> 薔[ば]</juk></b><juk> 薇栗[ら]</juk>",
+        expected_furikanji="<b> ば[薔]</b> ら[薇栗]",
+        expected_furikanji_with_tags_split="<b><juk> ば[薔]</juk></b><juk> ら[薇栗]</juk>",
+        expected_furikanji_with_tags_merged="<b><juk> ば[薔]</juk></b><juk> ら[薇栗]</juk>",
+        expected_kana_only="<b>ば</b>ら",
+        expected_kana_only_with_tags_split="<b><juk>ば</juk></b><juk>ら</juk>",
+        expected_kana_only_with_tags_merged="<b><juk>ば</juk></b><juk>ら</juk>",
+    )
+    test(
         test_name="Should gracefully handle empty furigana - no highlight",
         kanji="",
         sentence="今日[]は天気[てんき]がいい。",
