@@ -111,28 +111,31 @@ def highlight_inflected_words_with_mecab(
         f" possible_parts_of_speech: {possible_parts_of_speech}"
     )
 
-    def is_inflected_stem(tokens: list[MecabParsedToken], index: int) -> bool:
+    def inflected_stem_okurigana_len(tokens: list[MecabParsedToken], index: int) -> int:
         """
-        Check whether a token spelling the word's stem really is an inflected occurrence of it.
+        Length of the conjugation following a token spelling the word's stem, 0 if it has none.
 
         MeCab does not know every verb; for an unknown one it splits the word into a noun-ish
         stem plus the conjugation, so the stem token's headword is the word's stem. The stem
         alone is no evidence though - はし is the noun 橋 as much as it is the stem of はしる -
         so require that the text following the token continues as one of the conjugations
-        possible for this word.
+        possible for this word. The longest such conjugation is the one the word actually got,
+        and it is also how far the highlight has to reach: MeCab mis-parsed the word, so its
+        tokens cannot be asked where the conjugation ends.
         """
         if tokens[index].headword != word_stem:
-            return False
+            return 0
         following_text = "".join(t.word for t in tokens[index + 1 :])
+        okurigana_len = 0
         for pos in possible_parts_of_speech:
             progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(pos)
-            for char in following_text:
+            for char_index, char in enumerate(following_text):
                 progression = progression.get(char) if progression else None
                 if not progression:
                     break
                 if progression.get("is_last"):
-                    return True
-        return False
+                    okurigana_len = max(okurigana_len, char_index + 1)
+        return okurigana_len
 
     # Store indexes of all whitespace as mecab wipes them out
     space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
@@ -155,24 +158,41 @@ def highlight_inflected_words_with_mecab(
     opened_bold = False
     text_char_idx = 0
     open_bold_idx = -1
+    # Okurigana of a stem match still waiting to be covered by the highlight, in characters
+    stem_okuri_remaining = 0
     for token_idx, token in enumerate(all_tokens):
         logger.debug(f"token.word: '{token.word}', cur result: \33[32m'{result}'\033[0m")
         if found_word:
-            add_to_conjugated_okuri, _ = get_all_conjugation_conditions(
-                token,
-                all_tokens,
-                word_type,
-            )
+            # How many characters at the start of this token still belong inside the highlight.
+            # Only a stem match has any: it is the one case where the highlight's end is known
+            # up front rather than token by token.
+            highlighted_chars = 0
+            if stem_okuri_remaining > 0:
+                # The word was found by its stem, which means MeCab mis-parsed it - the
+                # conjugation conditions read its tokens as if they were their own words
+                # (バズった gives っ the headword く) and would end the highlight on the first of
+                # them. Follow the okurigana matched on the stem instead, and since those
+                # tokens are not the word's, let the highlight end inside one of them
+                # (バズ/っ/てる, where the conjugation って ends mid-てる).
+                highlighted_chars = min(len(token.word), stem_okuri_remaining)
+                stem_okuri_remaining -= highlighted_chars
+                add_to_conjugated_okuri = highlighted_chars == len(token.word)
+            else:
+                add_to_conjugated_okuri, _ = get_all_conjugation_conditions(
+                    token,
+                    all_tokens,
+                    word_type,
+                )
             if add_to_conjugated_okuri:
                 logger.debug(f"Continuing highlight for conjugated okuri: {token.word}")
                 result += token.word
                 text_char_idx += len(token.word)
             else:
                 logger.debug(f"Ending highlight for conjugated okuri: {token.word}")
-                result += "</b>" + token.word
+                result += token.word[:highlighted_chars] + "</b>" + token.word[highlighted_chars:]
                 # We need to subtract the length of the opening tag because the text_char_idx
                 # is counting text including it
-                before_b_close_idx = text_char_idx - 3
+                before_b_close_idx = text_char_idx + highlighted_chars - 3
                 text_char_idx += len(token.word) + 4
                 logger.debug(
                     f"open_bold_idx: {open_bold_idx}, before_b_close_idx: {before_b_close_idx}"
@@ -181,8 +201,10 @@ def highlight_inflected_words_with_mecab(
                 opened_bold = False
                 found_word = False
         elif (
+            stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)
+        ) or (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
-        ) or is_inflected_stem(all_tokens, token_idx):
+        ):
             logger.debug(f"Found beginning of word to highlight: {token.word}")
             found_word = True
             result += "<b>" + token.word

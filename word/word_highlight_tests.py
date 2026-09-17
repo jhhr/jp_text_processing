@@ -628,7 +628,25 @@ def main():
         test_name="Kana only - stem MeCab parsed as a noun highlights when a conjugation follows",
         word="バズる",
         text="それはバズったね",
-        expected="それは<b>バズ</b>ったね",
+        expected="それは<b>バズった</b>ね",
+    )
+    test(
+        test_name="Kana only - stem parsed as a noun, conjugation spanning several tokens",
+        word="バズる",
+        text="それはバズらないね",
+        expected="それは<b>バズらない</b>ね",
+    )
+    test(
+        test_name="Kana only - stem parsed as a noun, conjugation ending inside a token",
+        word="バズる",
+        text="それはバズってるね",
+        expected="それは<b>バズって</b>るね",
+    )
+    test(
+        test_name="Kana only - stem parsed as a noun, conjugation at the end of the text",
+        word="バズる",
+        text="それはバズった",
+        expected="それは<b>バズった</b>",
     )
     test(
         test_name="Kana only - kanji only & tags in text, inflectable word /1",
