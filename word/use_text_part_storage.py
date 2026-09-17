@@ -41,7 +41,7 @@ def make_diff_string_for_indexes(
     # offset
     simulated_edited_text = cleaned_text
     total_offset = 0
-    logger.debug(f"Offset indexes: {offset_indexes}")
+    logger.debug("Offset indexes: %s", offset_indexes)
     for index, offset in sorted(offset_indexes, key=lambda x: x[0]):
         adjusted_index = index + total_offset
         simulated_edited_text = (
@@ -50,7 +50,7 @@ def make_diff_string_for_indexes(
             + simulated_edited_text[adjusted_index:]
         )
         total_offset += offset
-    logger.debug(f"Simulated edited text: \33[90m'{simulated_edited_text}'\33[0m")
+    logger.debug("Simulated edited text: \033[90m'%s'\033[0m", simulated_edited_text)
     # Then reconstruct the parts into the simulated edited text exactly as restore_parts
     for start, end, part_str in indexes:
         simulated_edited_text = (
@@ -80,22 +80,24 @@ def use_text_part_storage(
     offset_indexes: OffsetIndexes = []
     last_index = 0
 
-    logger.debug(f"Using part regex: '{part_regex}' to store text parts.")
+    logger.debug("Using part regex: '%s' to store text parts.", part_regex)
 
     cleaned_text = ""
     for match in re.finditer(part_regex, text):
         start, end = match.span()
         cleaned_text += text[last_index:start]
         part_indexes.append((start, end, match.group(0)))
-        logger.debug(f"Found part matching regex: '{match.group(0)}' at indexes ({start}, {end})")
+        logger.debug(
+            "Found part matching regex: '%s' at indexes (%s, %s)", match.group(0), start, end
+        )
         last_index = end
     cleaned_text += text[last_index:]
-    logger.debug(f"Text after removal of parts: '{cleaned_text}'")
-    logger.debug(f"Indexes of removed parts stored: {part_indexes}")
+    logger.debug("Text after removal of parts: '%s'", cleaned_text)
+    logger.debug("Indexes of removed parts stored: %s", part_indexes)
 
     def part_free_to_original_index(part_free_index: int) -> int:
         """Convert index in text after removal to index in original text."""
-        logger.debug(f"Converting part_free_index: {part_free_index} to original index")
+        logger.debug("Converting part_free_index: %s to original index", part_free_index)
         # Calculate offset due to removed parts
         parts_offset = 0
         for start, end, _ in part_indexes:
@@ -103,7 +105,7 @@ def use_text_part_storage(
                 parts_offset += end - start
             else:
                 break
-        logger.debug(f"original_index with parts_offset: {part_free_index + parts_offset}")
+        logger.debug("original_index with parts_offset: %s", part_free_index + parts_offset)
         # Now account for any offsets added during modifications
         offsets_offset = 0
         for index, offset in offset_indexes:
@@ -112,8 +114,8 @@ def use_text_part_storage(
             else:
                 break
         logger.debug(
-            "final original_index with offsets_offset:"
-            f" {part_free_index + parts_offset - offsets_offset}"
+            "final original_index with offsets_offset: %s",
+            part_free_index + parts_offset - offsets_offset,
         )
 
         return part_free_index + parts_offset - offsets_offset
@@ -143,30 +145,33 @@ def use_text_part_storage(
                 break
 
         logger.debug(
-            "increment_indexes:"
-            f" after_original={after_original_index} (actual={actual_after_index}),"
-            f" offset={offset}"
+            "increment_indexes: after_original=%s (actual=%s), offset=%s",
+            after_original_index,
+            actual_after_index,
+            offset,
         )
 
         for i in range(len(part_indexes)):
             start, end, tag_str = part_indexes[i]
             if start >= actual_after_index:
                 part_indexes[i] = (start + offset, end + offset, tag_str)
-                logger.debug(f"  Incremented part at {start} to {start + offset}")
+                logger.debug("  Incremented part at %s to %s", start, start + offset)
 
         # Record the offset for future index calculations
         offset_indexes.append((after_part_free_index, offset))
 
-        logger.debug(
-            f"Diff state after increment_indexes - part regex: {part_regex}\n"
-            f"\33[90m'{make_diff_string_for_indexes(cleaned_text, part_indexes, offset_indexes, logger)}'\033[0m"
-        )
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Diff state after increment_indexes - part regex: %s\n\033[90m'%s'\033[0m",
+                part_regex,
+                make_diff_string_for_indexes(cleaned_text, part_indexes, offset_indexes, logger),
+            )
 
     def restore_parts(edited_text: str) -> str:
         """Restores the parts back into the text."""
         for start, end, part_str in part_indexes:
             edited_text = edited_text[:start] + part_str + edited_text[start:]
-            logger.debug(f"Restored part: '{part_str}' at index {start}")
+            logger.debug("Restored part: '%s' at index %s", part_str, start)
 
         return edited_text
 

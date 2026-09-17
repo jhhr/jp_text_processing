@@ -23,7 +23,7 @@ def make_furigana_from_reading(
     if re.search(KANJI_RE, word) is None:
         return word
     added_word_with_furigana = f"{word}[{reading}]"
-    logger.debug(f"Added word with furigana: {added_word_with_furigana}")
+    logger.debug("Added word with furigana: %s", added_word_with_furigana)
     return kana_highlight(
         kanji_to_highlight="",
         text=added_word_with_furigana,

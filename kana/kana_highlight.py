@@ -93,9 +93,12 @@ def reconstruct_furigana(
     :return: The reconstructed furigana with the kanji and that kanji's furigana highlighted
     """
     logger.debug(
-        f"reconstruct_furigana - final_result: {furi_okuri_result}, reconstruct_type:"
-        f" {reconstruct_type}, wrap_with_tags: {with_tags_def.with_tags}, merge_consecutive:"
-        f" {with_tags_def.merge_consecutive}"
+        "reconstruct_furigana - final_result: %s, reconstruct_type: %s, wrap_with_tags: %s,"
+        " merge_consecutive: %s",
+        furi_okuri_result,
+        reconstruct_type,
+        with_tags_def.with_tags,
+        with_tags_def.merge_consecutive,
     )
     segments: list[list[WrapMatchEntry]] = furi_okuri_result.get("segments", [])
     highlight_indices: list[int] = furi_okuri_result.get("highlight_segment_indices", [])
@@ -184,12 +187,16 @@ def reconstruct_furigana(
             rendered_segments[i] = f"<b>{rendered_segments[i]}</b>"
 
     logger.debug(
-        f"reconstruct_furigana - highlight segments at indices {highlight_indices},"
-        f" last_is_highlighted: {last_is_highlighted}"
+        "reconstruct_furigana - highlight segments at indices %s, last_is_highlighted: %s",
+        highlight_indices,
+        last_is_highlighted,
     )
     logger.debug(
-        "reconstruct_furigana - rendered segments before okurigana/rest kana handling:"
-        f" {rendered_segments}, okurigana: {okurigana}, rest_kana: {rest_kana}"
+        "reconstruct_furigana - rendered segments before okurigana/rest kana handling: %s,"
+        " okurigana: %s, rest_kana: %s",
+        rendered_segments,
+        okurigana,
+        rest_kana,
     )
     if rendered_segments and okurigana:
         last_segment_part: Optional[WrapMatchEntry] = segments[-1][-1] if segments[-1] else None
@@ -200,7 +207,8 @@ def reconstruct_furigana(
         )
         logger.debug(
             "reconstruct_furigana - okurigana exists, checking if okurigana should be outside"
-            f" highlight: {okuri_out_of_highlight}"
+            " highlight: %s",
+            okuri_out_of_highlight,
         )
         # Append okurigana to the last segment if it exists, also handling highlight
         if not last_is_highlighted:
@@ -208,24 +216,24 @@ def reconstruct_furigana(
             rendered_segments[-1] = f"{rendered_segments[-1]}{okurigana}"
             wrap_highlighted_segments()
             logger.debug(
-                "reconstruct_furigana - no highlight in last segment, appended okurigana:"
-                f" {rendered_segments[-1]}"
+                "reconstruct_furigana - no highlight in last segment, appended okurigana: %s",
+                rendered_segments[-1],
             )
         elif not okuri_out_of_highlight:
             # Highlight segment is last and okurigana should be inside it
             wrap_highlighted_segments(skip_last=True)
             rendered_segments[-1] = f"<b>{rendered_segments[-1]}{okurigana}</b>"
             logger.debug(
-                "reconstruct_furigana - highlight in last segment, included okurigana:"
-                f" {rendered_segments[-1]}"
+                "reconstruct_furigana - highlight in last segment, included okurigana: %s",
+                rendered_segments[-1],
             )
         else:
             # Highlight segment is last but okurigana should be outside it
             wrap_highlighted_segments(skip_last=True)
             rendered_segments[-1] = f"<b>{rendered_segments[-1]}</b>{okurigana}"
             logger.debug(
-                "reconstruct_furigana - highlight in last segment, okurigana outside highlight:"
-                f" {rendered_segments[-1]}"
+                "reconstruct_furigana - highlight in last segment, okurigana outside highlight: %s",
+                rendered_segments[-1],
             )
     elif okurigana:
         logger.debug("reconstruct_furigana - no segments but okurigana exists, adding okurigana")
@@ -338,7 +346,9 @@ def reconstruct_from_alignment(
             is_num = surface_kanji.isdigit()
         else:
             logger.error(
-                f"reconstruct_from_alignment: No match or juku_part for kanji {kanji} at index {i}"
+                "reconstruct_from_alignment: No match or juku_part for kanji %s at index %s",
+                kanji,
+                i,
             )
             reading = ""
             tag = "mix"
@@ -358,7 +368,7 @@ def reconstruct_from_alignment(
     if furigana_prefix and entries:
         entries[0]["furigana"] = f"{furigana_prefix}{entries[0]['furigana']}"
 
-    logger.debug(f"reconstruct_from_alignment - initial entries: {entries}")
+    logger.debug("reconstruct_from_alignment - initial entries: %s", entries)
 
     # Mark every position the kanji occupies, not just the first: the point is to show the kanji
     # wherever it turns up, and a word can use it more than once - 生物物理学 is 生物 + 物理学 and
@@ -439,8 +449,10 @@ def reconstruct_from_alignment(
         segments = [entries]
 
     logger.debug(
-        "reconstruct_from_alignment - match type from highlighted kanji at position"
-        f" {kanji_to_highlight_pos}, kanji_matches: {alignment['kanji_matches']},"
+        "reconstruct_from_alignment - match type from highlighted kanji at position %s,"
+        " kanji_matches: %s,",
+        kanji_to_highlight_pos,
+        alignment['kanji_matches'],
     )
     # Determine match type of the highlight segment
     highlight_match_type: MatchType = "none"
@@ -462,7 +474,7 @@ def reconstruct_from_alignment(
         "restored_chars": restored_chars,
         "original_furigana": original_furigana,
     }
-    logger.debug(f"reconstruct_from_alignment - final_result: {final_result}")
+    logger.debug("reconstruct_from_alignment - final_result: %s", final_result)
 
     return reconstruct_furigana(
         final_result,
@@ -535,27 +547,30 @@ def kana_highlight(
         full_furigana = match.group(2)
         maybe_okuri = match.group(3)
         logger.debug(
-            f"furigana_replacer - word: {full_word}, furigana: {full_furigana}, okurigana:"
-            f" {maybe_okuri}"
+            "furigana_replacer - word: %s, furigana: %s, okurigana: %s",
+            full_word,
+            full_furigana,
+            maybe_okuri,
         )
         # An audio tag is not furigana. Test the raw bracket content, before any cleaning can
         # turn sound:test.mp3 into an empty string or sound:かんじ.mp3 into a reading, and hand
         # the whole match back untouched — the same thing kana_filter does.
         if full_furigana.startswith("sound:"):
-            logger.debug(f"furigana_replacer - sound tag, left as is: {match.group(0)}")
+            logger.debug("furigana_replacer - sound tag, left as is: %s", match.group(0))
             return match.group(0)
         # Clean off non-kana characters from furigana, unless it becomes empty
         cleaned_furigana = re.sub(NON_KANA_REC, "", full_furigana)
         if cleaned_furigana:
             logger.debug(
-                f"furigana_replacer - cleaned furigana: {cleaned_furigana} from original:"
-                f" {full_furigana}"
+                "furigana_replacer - cleaned furigana: %s from original: %s",
+                cleaned_furigana,
+                full_furigana,
             )
             full_furigana = cleaned_furigana
         # if furigana is invalid - empty or all non-kana characters - try to return something
         # sensible
         if not full_furigana or not is_kana_str(full_furigana):
-            logger.debug(f"furigana_replacer - empty or invalid furigana case: {full_furigana}")
+            logger.debug("furigana_replacer - empty or invalid furigana case: %s", full_furigana)
             if return_type == "kana_only":
                 # return furigana as is, since it's either empty or invalid
                 # Since the kanji are omitted, there's nothing to highlight
@@ -592,7 +607,7 @@ def kana_highlight(
         # spelling alone, so the repeater form is only a *lookup* key here; whether the word is
         # rewritten to use 々 is decided later, by whether the reading says it repeats.
         repeater_word = DOUBLE_KANJI_REC.sub(lambda m: m.group(1) + "々", full_word)
-        logger.debug(f"furigana_replacer - repeater lookup form: {repeater_word}")
+        logger.debug("furigana_replacer - repeater lookup form: %s", repeater_word)
 
         # Take the kana that carry no reading of their own out of the way, so that what is left can
         # be matched against the kanji's listed readings. They are written back in at the end from
@@ -603,8 +618,11 @@ def kana_highlight(
         furigana_prefix = to_hiragana(normalized["prefix"])
         if original_furigana != full_furigana or furigana_prefix:
             logger.debug(
-                f"furigana_replacer - normalized furigana for matching: {full_furigana}, prefix:"
-                f" {normalized['prefix']}, restored_chars: {normalized['restored_chars']}"
+                "furigana_replacer - normalized furigana for matching: %s, prefix: %s,"
+                " restored_chars: %s",
+                full_furigana,
+                normalized['prefix'],
+                normalized['restored_chars'],
             )
 
         def build_restored_chars(long_vowel_positions: list[int]) -> dict[int, str]:
@@ -645,9 +663,9 @@ def kana_highlight(
             furigana=full_furigana,
             logger=logger,
         )
-        logger.debug(f"furigana_replacer - exception_alignment: {exception_alignment}")
+        logger.debug("furigana_replacer - exception_alignment: %s", exception_alignment)
         if exception_alignment is not None:
-            logger.debug(f"furigana_replacer - using exception alignment: {exception_alignment}")
+            logger.debug("furigana_replacer - using exception alignment: %s", exception_alignment)
             full_word = repeater_word
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
                 word=full_word,
@@ -691,9 +709,11 @@ def kana_highlight(
                 whole_word_mora_split(full_word, full_furigana)
             )
             logger.debug(
-                "furigana_replacer - whole_word_case possible_splits:"
-                f" {possible_whole_word_splits}, katakana_positions: {katakana_positions},"
-                f" long_vowel_positions: {long_vowel_positions}"
+                "furigana_replacer - whole_word_case possible_splits: %s, katakana_positions: %s,"
+                " long_vowel_positions: %s",
+                possible_whole_word_splits,
+                katakana_positions,
+                long_vowel_positions,
             )
             alignment = find_first_complete_alignment(
                 word=alignment_word,
@@ -706,7 +726,7 @@ def kana_highlight(
             mora_result = split_to_mora_list(full_furigana, len(full_word))
             katakana_positions = mora_result["katakana_positions"]
             long_vowel_positions = mora_result["long_vowel_positions"]
-            logger.debug(f"furigana_replacer - partial_word_case mora_result: {mora_result}")
+            logger.debug("furigana_replacer - partial_word_case mora_result: %s", mora_result)
             alignment = find_first_complete_alignment(
                 word=alignment_word,
                 furigana=full_furigana,
@@ -715,7 +735,7 @@ def kana_highlight(
                 logger=logger,
             )
 
-        logger.debug(f"furigana_replacer - juku_positions: {alignment['jukujikun_positions']}")
+        logger.debug("furigana_replacer - juku_positions: %s", alignment['jukujikun_positions'])
 
         # Step 4: Handle jukujikun positions if any
         final_okurigana = alignment["final_okurigana"]
@@ -734,7 +754,7 @@ def kana_highlight(
                 logger=logger,
             )
             logger.debug(
-                f"furigana_replacer - juku_parts: {juku_parts}, juku_okurigana: {juku_okurigana}"
+                "furigana_replacer - juku_parts: %s, juku_okurigana: %s", juku_parts, juku_okurigana
             )
 
             # Use jukujikun okurigana when the last kanji is jukujikun. If we already have
@@ -763,7 +783,7 @@ def kana_highlight(
             furigana_prefix=furigana_prefix,
             logger=logger,
         )
-        logger.debug(f"furigana_replacer - final_result: {final_result}\n")
+        logger.debug("furigana_replacer - final_result: %s\n", final_result)
         return final_result
 
     # Drop any <b> tags the text came in with, so the ones added below are the only ones in the
@@ -780,7 +800,7 @@ def kana_highlight(
     # Clean any potential mixed okurigana cases, turning them normal
     clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     processed_text = KANJI_AND_FURIGANA_AND_OKURIGANA_REC.sub(furigana_replacer, clean_text)
-    logger.debug(f"processed_text: {processed_text}")
+    logger.debug("processed_text: %s", processed_text)
     # Clean any double spaces that might have been created by the furigana reconstruction
     # Including those right before a <b> tag as the space is added with those
     processed_text = re.sub(r" {2}", " ", processed_text)

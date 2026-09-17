@@ -54,18 +54,18 @@ def construct_wrapped_furi_word(
     # Convert original furigana to hiragana for matching
     original_hiragana = to_hiragana(original_furigana) if original_furigana else ""
 
-    logger.debug(f"kanji_tags: {kanji_tags}")
+    logger.debug("kanji_tags: %s", kanji_tags)
     wrapped_furi_word = ""
     index = 0
     original_cursor = original_start_index
     while index < len(kanji_tags):
         cur_tag_res = kanji_tags[index]
-        logger.debug(f"cur_tag_res: {cur_tag_res} in index: {index}")
+        logger.debug("cur_tag_res: %s in index: %s", cur_tag_res, index)
         # merge consecutive results with the same tag and highlight
         # and merge numbers together in any mode but kana_only
         while next_tag_res := (kanji_tags[index + 1] if (index + 1 < len(kanji_tags)) else None):
             do_merge = False
-            logger.debug(f"next_tag_res: {next_tag_res}")
+            logger.debug("next_tag_res: %s", next_tag_res)
             if (
                 next_tag_res["kanji"] == "々"
                 and next_tag_res["tag"] == cur_tag_res["tag"]
@@ -76,7 +76,7 @@ def construct_wrapped_furi_word(
                 # merging is disabled so split outputs can surface each component.
                 and (merge_consecutive or cur_tag_res["kanji"] != "" or next_tag_res["kanji"] != "")
             ):
-                logger.debug(f"Merging repeated kanji/repeater: {cur_tag_res}, {next_tag_res}")
+                logger.debug("Merging repeated kanji/repeater: %s, %s", cur_tag_res, next_tag_res)
                 do_merge = True
                 tag = cur_tag_res["tag"]
                 highlight = cur_tag_res["highlight"]
@@ -94,7 +94,7 @@ def construct_wrapped_furi_word(
                 ):
                     do_merge = False
                 else:
-                    logger.debug(f"Merging consecutive tags: {cur_tag_res}, {next_tag_res}")
+                    logger.debug("Merging consecutive tags: %s, %s", cur_tag_res, next_tag_res)
                     is_num = cur_tag_res["is_num"] and next_tag_res["is_num"]
                     tag = cur_tag_res["tag"]
                     highlight = cur_tag_res["highlight"]
@@ -109,7 +109,7 @@ def construct_wrapped_furi_word(
                 # (e.g., 123 → ['', 'ニ', 'ジュウ', 'サン']) into the numeric block so the final
                 # mix tag contains the full reading.
                 logger.debug(
-                    f"Merging numeric placeholder into number: {cur_tag_res}, {next_tag_res}"
+                    "Merging numeric placeholder into number: %s, %s", cur_tag_res, next_tag_res
                 )
                 do_merge = True
                 highlight = cur_tag_res["highlight"]
@@ -123,7 +123,7 @@ def construct_wrapped_furi_word(
             ):
                 # Merge consecutive numeric digits in furikanji/furigana mode.
                 # Preserve the tag when all parts share it; use mix only when tags differ.
-                logger.debug(f"Merging consecutive numbers: {cur_tag_res}, {next_tag_res}")
+                logger.debug("Merging consecutive numbers: %s, %s", cur_tag_res, next_tag_res)
                 do_merge = True
                 highlight = cur_tag_res["highlight"]
                 is_num = True
@@ -140,7 +140,7 @@ def construct_wrapped_furi_word(
                 if not peek_next and next_tag_res["tag"] == cur_tag_res["tag"]:
                     # Last item and same tag, merge
                     logger.debug(
-                        f"Merging number with counter (same tag): {cur_tag_res}, {next_tag_res}"
+                        "Merging number with counter (same tag): %s, %s", cur_tag_res, next_tag_res
                     )
                     do_merge = True
                     is_num = False  # Result is number+counter, not pure number
@@ -149,7 +149,7 @@ def construct_wrapped_furi_word(
             elif next_tag_res["furigana"] == "":
                 # Gracefully handle incorrect furigana input where there was more kanji than
                 # mora provided - merge empty furigana entries into previous to avoid broken output.
-                logger.debug(f"Merging empty furigana entry: {cur_tag_res}, {next_tag_res}")
+                logger.debug("Merging empty furigana entry: %s, %s", cur_tag_res, next_tag_res)
                 do_merge = True
                 tag = cur_tag_res["tag"]
                 highlight = cur_tag_res["highlight"]
@@ -164,7 +164,7 @@ def construct_wrapped_furi_word(
                     "furigana": cur_tag_res["furigana"] + next_tag_res["furigana"],
                     "is_num": is_num,
                 }
-                logger.debug(f"New merged tag: {cur_tag_res}")
+                logger.debug("New merged tag: %s", cur_tag_res)
                 # Now we skip the next tag, since it's been merged
                 index += 1
             else:
@@ -196,7 +196,12 @@ def construct_wrapped_furi_word(
         original_cursor += len(kana)
 
         logger.debug(
-            f"kanji: {kanji}, tag: {tag}, highlight: {highlight}, kana: {kana}, is_num: {is_num},"
+            "kanji: %s, tag: %s, highlight: %s, kana: %s, is_num: %s,",
+            kanji,
+            tag,
+            highlight,
+            kana,
+            is_num,
         )
 
         # For multi-kanji numbers (3+ kanji) in furikanji/furigana modes, use <mix> tag
@@ -234,7 +239,7 @@ def construct_wrapped_furi_word(
 
         wrapped_furi_word += with_furi
         index += 1
-    logger.debug(f"construct_wrapped_furi_word wrapped_furi_word: {wrapped_furi_word}")
+    logger.debug("construct_wrapped_furi_word wrapped_furi_word: %s", wrapped_furi_word)
     return wrapped_furi_word
 
 

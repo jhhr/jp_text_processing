@@ -38,8 +38,10 @@ def highlight_inflected_words_with_mecab(
         return text
     if depth >= 2:
         logger.debug(
-            f"Maximum recursion depth reached ({depth}) for text: '{text}',"
-            f" base_form_word: '{base_form_word}'"
+            "Maximum recursion depth reached (%s) for text: '%s', base_form_word: '%s'",
+            depth,
+            text,
+            base_form_word,
         )
         return text
 
@@ -70,8 +72,10 @@ def highlight_inflected_words_with_mecab(
             word_type = "i_adjective"
             break
     logger.debug(
-        f"Determined word_type: '{word_type}' for base_form_word: '{base_form_word}',"
-        f" possible_parts_of_speech: {possible_parts_of_speech}"
+        "Determined word_type: '%s' for base_form_word: '%s', possible_parts_of_speech: %s",
+        word_type,
+        base_form_word,
+        possible_parts_of_speech,
     )
 
     def inflected_stem_okurigana_len(tokens: list[MecabParsedToken], index: int) -> int:
@@ -124,7 +128,7 @@ def highlight_inflected_words_with_mecab(
     # Okurigana of a stem match still waiting to be covered by the highlight, in characters
     stem_okuri_remaining = 0
     for token_idx, token in enumerate(all_tokens):
-        logger.debug(f"token.word: '{token.word}', cur result: \33[32m'{result}'\033[0m")
+        logger.debug("token.word: '%s', cur result: \033[32m'%s'\033[0m", token.word, result)
         if found_word:
             # How many characters at the start of this token still belong inside the highlight.
             # Only a stem match has any: it is the one case where the highlight's end is known
@@ -147,18 +151,18 @@ def highlight_inflected_words_with_mecab(
                     word_type,
                 )
             if add_to_conjugated_okuri:
-                logger.debug(f"Continuing highlight for conjugated okuri: {token.word}")
+                logger.debug("Continuing highlight for conjugated okuri: %s", token.word)
                 result += token.word
                 text_char_idx += len(token.word)
             else:
-                logger.debug(f"Ending highlight for conjugated okuri: {token.word}")
+                logger.debug("Ending highlight for conjugated okuri: %s", token.word)
                 result += token.word[:highlighted_chars] + "</b>" + token.word[highlighted_chars:]
                 # We need to subtract the length of the opening tag because the text_char_idx
                 # is counting text including it
                 before_b_close_idx = text_char_idx + highlighted_chars - 3
                 text_char_idx += len(token.word) + 4
                 logger.debug(
-                    f"open_bold_idx: {open_bold_idx}, before_b_close_idx: {before_b_close_idx}"
+                    "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
                 )
                 increment_indexes_for_b(open_bold_idx, before_b_close_idx)
                 opened_bold = False
@@ -168,14 +172,14 @@ def highlight_inflected_words_with_mecab(
         ) or (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
         ):
-            logger.debug(f"Found beginning of word to highlight: {token.word}")
+            logger.debug("Found beginning of word to highlight: %s", token.word)
             found_word = True
             result += "<b>" + token.word
             open_bold_idx = text_char_idx
             text_char_idx += len(token.word) + 3
             opened_bold = True
         else:
-            logger.debug(f"Not highlighting token: {token.word}")
+            logger.debug("Not highlighting token: %s", token.word)
             result += token.word
             text_char_idx += len(token.word)
             found_word = False
@@ -186,7 +190,7 @@ def highlight_inflected_words_with_mecab(
                 before_b_close_idx = text_char_idx - 3
                 text_char_idx += 4
                 logger.debug(
-                    f"open_bold_idx: {open_bold_idx}, before_b_close_idx: {before_b_close_idx}"
+                    "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
                 )
                 increment_indexes_for_b(open_bold_idx, before_b_close_idx)
                 opened_bold = False
@@ -214,16 +218,16 @@ def highlight_inflected_words_with_mecab(
             return highlight_inflected_words_with_mecab(
                 text, to_hiragana(base_form_word), logger, 0
             )
-    logger.debug(f"Final highlighted result before restoring tags/spaces: '{result}'")
+    logger.debug("Final highlighted result before restoring tags/spaces: '%s'", result)
 
     # Restore removed parts in reverse order
     # First tags
     result = restore_tags(result)
-    logger.debug(f"Restored html tags result: '{result}'")
+    logger.debug("Restored html tags result: '%s'", result)
 
     # Then spaces
     result = restore_spaces(result)
-    logger.debug(f"Restored spaces result: '{result}'")
+    logger.debug("Restored spaces result: '%s'", result)
 
     # Make some fixes to spaces
     result = result.replace("</b >", "</b> ")

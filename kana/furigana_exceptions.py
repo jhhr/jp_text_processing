@@ -192,7 +192,7 @@ def check_exception(
     :return: MoraAlignment for the exception, or None
     """
     exception_key = f"{word}_{furigana}"
-    logger.debug(f"check_exception: checking for exception key: {exception_key}")
+    logger.debug("check_exception: checking for exception key: %s", exception_key)
     parts = FURIGANA_EXCEPTION_ALIGNMENTS.get(exception_key)
     if not parts:
         return None

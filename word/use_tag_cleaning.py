@@ -166,9 +166,9 @@ def use_tag_cleaning_with_b_insertion(
 
     def custom_restorer(edited_text: str) -> str:
         result = restore_parts(edited_text)
-        logger.debug(f"Text before applying tag fixes: '{result}'")
+        logger.debug("Text before applying tag fixes: '%s'", result)
         result = apply_tag_fixes(result)
-        logger.debug(f"Text after applying tag fixes: '{result}'")
+        logger.debug("Text after applying tag fixes: '%s'", result)
         return result
 
     return cleaned_text, custom_incrementer, custom_restorer, indexes

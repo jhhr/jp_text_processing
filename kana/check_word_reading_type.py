@@ -22,7 +22,7 @@ def check_word_reading_type(
     # A reading is kunyomi if it contains only <kun> tags and no <on> or <juk> tags
     # First strip any ending hiragana/katakana and/or <oku> tags
     word_with_tags = re.sub(r"(?:<oku>[ぁ-んァ-ン]+</oku>)?(?:[ぁ-んァ-ン]+)?$", "", word_with_tags)
-    logger.debug(f"Stripped word_with_tags: {word_with_tags}")
+    logger.debug("Stripped word_with_tags: %s", word_with_tags)
     # Then if all remaining tags are <kun>, it's a kunyomi reading
     tags = re.findall(r"<(kun|on|juk)>", word_with_tags)
     if tags:

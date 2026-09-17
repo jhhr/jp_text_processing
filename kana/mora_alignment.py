@@ -87,16 +87,19 @@ def find_first_complete_alignment(
             raise ValueError("Either mora_list or possible_splits must be provided")
         possible_splits = get_ordered_sublists(mora_list, kanji_count)
         logger.debug(
-            f"find_first_complete_alignment - generated {len(possible_splits)} possible splits"
-            f" for word '{word}' with mora_list: {mora_list}"
+            "find_first_complete_alignment - generated %s possible splits for word '%s' with"
+            " mora_list: %s",
+            len(possible_splits),
+            word,
+            mora_list,
         )
 
     # Filter out invalid splits
     if contains_repeated_kanji(word):
         filtered_splits = [s for s in possible_splits if is_valid_split_for_repeaters(word, s)]
         logger.debug(
-            "find_first_complete_alignment - filtered splits for repeaters,"
-            f" remaining count: {len(filtered_splits)}"
+            "find_first_complete_alignment - filtered splits for repeaters, remaining count: %s",
+            len(filtered_splits),
         )
         if filtered_splits:
             possible_splits = filtered_splits
@@ -122,7 +125,7 @@ def find_first_complete_alignment(
 
     def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
         nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count, youon_mora_splits
-        logger.debug(f"find_first_complete_alignment - trying mora_split: {mora_split}")
+        logger.debug("find_first_complete_alignment - trying mora_split: %s", mora_split)
         kanji_matches: list[Optional[ReadingMatchInfo]] = []
         jukujikun_positions: list[int] = []
         final_okurigana = ""
@@ -145,23 +148,31 @@ def find_first_complete_alignment(
                 mora_sequence = ""
                 logger.error(
                     "find_first_complete_alignment - mora_split contains fewer parts than"
-                    f" kanji_count for word '{word}': {mora_split} vs {kanji_count}"
+                    " kanji_count for word '%s': %s vs %s",
+                    word,
+                    mora_split,
+                    kanji_count,
                 )
 
             # Get kanji data
             kanji_data = all_kanji_data.get(kanji, None)
             if kanji_data is None:
-                logger.error(f"Kanji data not found for '{kanji}'")
+                logger.error("Kanji data not found for '%s'", kanji)
                 kanji_data = KanjiData(onyomi="", kunyomi="")
 
             repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
             check_okurigana = is_last_kanji or (next_kanji_is_repeater and repeater_is_last)
 
             logger.debug(
-                f"find_first_complete_alignment - processing kanji: {kanji}, mora_sequence:"
-                f" {mora_sequence}, is_last_kanji: {is_last_kanji},"
-                f" next_kanji_is_repeater: {next_kanji_is_repeater},"
-                f" check_okurigana: {check_okurigana}, okurigana: {maybe_okuri}"
+                "find_first_complete_alignment - processing kanji: %s, mora_sequence: %s,"
+                " is_last_kanji: %s, next_kanji_is_repeater: %s, check_okurigana: %s, okurigana:"
+                " %s",
+                kanji,
+                mora_sequence,
+                is_last_kanji,
+                next_kanji_is_repeater,
+                check_okurigana,
+                maybe_okuri,
             )
 
             # Try to match reading to either kunyomi or onyomi
@@ -213,9 +224,13 @@ def find_first_complete_alignment(
                     match_info = kunyomi_match
 
             logger.debug(
-                f"find_first_complete_alignment - kanji: {kanji}, mora_sequence: {mora_sequence},"
-                f" kunyomi_match: {kunyomi_match}, onyomi_match: {onyomi_match},"
-                f" selected match_info: {match_info}"
+                "find_first_complete_alignment - kanji: %s, mora_sequence: %s, kunyomi_match: %s,"
+                " onyomi_match: %s, selected match_info: %s",
+                kanji,
+                mora_sequence,
+                kunyomi_match,
+                onyomi_match,
+                match_info,
             )
 
             # Test for possible youon match
@@ -251,8 +266,10 @@ def find_first_complete_alignment(
                     youon_mora_split[i] = small
                     youon_mora_splits.append(youon_mora_split)
                     logger.debug(
-                        "find_first_complete_alignment - found youon match_info:"
-                        f" {youon_match_info}, youon_mora_split: {youon_mora_split}"
+                        "find_first_complete_alignment - found youon match_info: %s,"
+                        " youon_mora_split: %s",
+                        youon_match_info,
+                        youon_mora_split,
                     )
 
             if match_info:
@@ -322,7 +339,7 @@ def find_first_complete_alignment(
             final_rest_kana=final_rest_kana,
         )
 
-        logger.debug(f"find_first_complete_alignment - alignment result: {alignment}")
+        logger.debug("find_first_complete_alignment - alignment result: %s", alignment)
 
         # Early exit: if we found a complete match, return immediately
         if not jukujikun_positions:
@@ -334,10 +351,12 @@ def find_first_complete_alignment(
             len(match["matched_mora"]) for match in alignment["kanji_matches"] if match is not None
         )
         logger.debug(
-            "find_first_complete_alignment - partial alignment with jukujikun positions:"
-            f" {len(jukujikun_positions)}, chars matched: {chars_matched_count},"
-            f" best_jukujikun_count: {best_jukujikun_count},"
-            f" best_chars_matched_count: {best_chars_matched_count}"
+            "find_first_complete_alignment - partial alignment with jukujikun positions: %s, chars"
+            " matched: %s, best_jukujikun_count: %s, best_chars_matched_count: %s",
+            len(jukujikun_positions),
+            chars_matched_count,
+            best_jukujikun_count,
+            best_chars_matched_count,
         )
         # Update best alignment if better than previous best, either jukujikun count or chars matched
         # should be improved while the other is at least as good
@@ -349,9 +368,11 @@ def find_first_complete_alignment(
             and chars_matched_count > best_chars_matched_count
         ):
             logger.debug(
-                "find_first_complete_alignment - new best partial alignment found with"
-                f" {len(jukujikun_positions)} jukujikun positions and"
-                f" {chars_matched_count} chars matched: {alignment}"
+                "find_first_complete_alignment - new best partial alignment found with %s"
+                " jukujikun positions and %s chars matched: %s",
+                len(jukujikun_positions),
+                chars_matched_count,
+                alignment,
             )
             best_chars_matched_count = chars_matched_count
             best_jukujikun_count = len(jukujikun_positions)
@@ -377,7 +398,9 @@ def find_first_complete_alignment(
     # Fallback: all kanji are jukujikun
     logger.debug(
         "find_first_complete_alignment - no valid alignment found, all jukujikun, possible_splits:"
-        f" {joined_splits}, mora_list: {mora_list}"
+        " %s, mora_list: %s",
+        joined_splits,
+        mora_list,
     )
     fallback_split: list[str] = []
     if joined_splits:

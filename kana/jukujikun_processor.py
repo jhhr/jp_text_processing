@@ -69,9 +69,14 @@ def split_mora_for_jukujikun(
     remainder = mora_count % kanji_count
 
     logger.debug(
-        f"split_mora_for_jukujikun - mora_count: {mora_count}, kanji_count: {kanji_count},"
-        f" mora_per_kanji: {mora_per_kanji}, remainder: {remainder}, mora_list: {mora_list}, kanji:"
-        f" {kanji}"
+        "split_mora_for_jukujikun - mora_count: %s, kanji_count: %s, mora_per_kanji: %s,"
+        " remainder: %s, mora_list: %s, kanji: %s",
+        mora_count,
+        kanji_count,
+        mora_per_kanji,
+        remainder,
+        mora_list,
+        kanji,
     )
 
     result: list[str] = []
@@ -88,7 +93,7 @@ def split_mora_for_jukujikun(
         # Join mora for this kanji
         mora_string = "".join(mora_list[cur_mora_index:end_index])
 
-        logger.debug(f"split_mora_for_jukujikun - kanji: {kanji[i]}, mora: {mora_string}")
+        logger.debug("split_mora_for_jukujikun - kanji: %s, mora: %s", kanji[i], mora_string)
         result.append(mora_string)
 
         cur_mora_index = end_index
@@ -128,7 +133,7 @@ def process_jukujikun_positions(
 
     # Build the full furigana string from mora_split for exception substring detection
     full_furigana = "".join(alignment["mora_split"])
-    logger.debug(f"process_jukujikun_positions: full_furigana: {full_furigana}")
+    logger.debug("process_jukujikun_positions: full_furigana: %s", full_furigana)
 
     # Priority: If the word contains a known exception substring and the furigana contains
     # its reading, assign jukujikun parts directly based on the exception mapping.
@@ -204,8 +209,11 @@ def process_jukujikun_positions(
                 kanji_count=len(run),
             )["mora_list"]
             logger.debug(
-                f"process_jukujikun_positions - jukujikun run {run} gets mora {run_mora_str},"
-                f" alignment.mora_split: {mora_split}"
+                "process_jukujikun_positions - jukujikun run %s gets mora %s,"
+                " alignment.mora_split: %s",
+                run,
+                run_mora_str,
+                mora_split,
             )
             if not run_mora:
                 continue
@@ -244,8 +252,11 @@ def process_jukujikun_positions(
 
         # Use mecab to extract okurigana
         logger.debug(
-            "process_jukujikun_positions - extracting okurigana for last jukujikun kanji:"
-            f" {last_kanji}, juku_reading: {juku_reading}, remaining_kana: {remaining_kana}"
+            "process_jukujikun_positions - extracting okurigana for last jukujikun kanji: %s,"
+            " juku_reading: %s, remaining_kana: %s",
+            last_kanji,
+            juku_reading,
+            remaining_kana,
         )
         # Either the full word or the last kanji may produce okurigana correctly, check both
         # and take the one that produces the longest okurigana match
@@ -307,15 +318,22 @@ def process_jukujikun_positions(
             word_okuri=word_okuri_result.okurigana,
         ):
             logger.debug(
-                "process_jukujikun_positions - rejecting lexicalized plain ない suffix as"
-                f" okurigana for word: {word}, reading: {furigana}, remaining_kana:"
-                f" {remaining_kana}, juku_reading: {juku_reading}"
+                "process_jukujikun_positions - rejecting lexicalized plain ない suffix as okurigana"
+                " for word: %s, reading: %s, remaining_kana: %s, juku_reading: %s",
+                word,
+                furigana,
+                remaining_kana,
+                juku_reading,
             )
             okuri_result = okuri_result._replace(okurigana="", rest_kana=remaining_kana)
 
         logger.debug(
-            f"process_jukujikun_positions - okuri_result: {okuri_result}, remaining_kana:"
-            f" {remaining_kana}, juku_reading: {juku_reading}, last_kanji: {last_kanji}"
+            "process_jukujikun_positions - okuri_result: %s, remaining_kana: %s, juku_reading: %s,"
+            " last_kanji: %s",
+            okuri_result,
+            remaining_kana,
+            juku_reading,
+            last_kanji,
         )
 
         extracted_okurigana = okuri_result.okurigana

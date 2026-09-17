@@ -66,20 +66,20 @@ def recursive_number_to_kanji(
         num (int): The number to convert.
         result (list[str]): The list to append the kanji representation to.
     """
-    logger.debug(f"Converting number: {num}, digit_mult: {digit_mult}")
+    logger.debug("Converting number: %s, digit_mult: %s", num, digit_mult)
     unit = 1
     # how many 十, 百, 千, 万, 億 we have
     while num > 0:
         digit = num % 10
-        logger.debug(f"Processing digit: {digit}, unit: {unit}")
+        logger.debug("Processing digit: %s, unit: %s", digit, unit)
         if digit > 0:
             try:
                 kanji_digit = NUMBER_TO_KANJI[str(digit)]
             except KeyError:
-                logger.error(f"Digit {digit} not found in NUMBER_TO_KANJI mapping.")
+                logger.error("Digit %s not found in NUMBER_TO_KANJI mapping.", digit)
                 return
             if unit in KANJI_UNITS:
-                logger.debug(f"Adding kanji digit {kanji_digit} with unit {KANJI_UNITS[unit]}")
+                logger.debug("Adding kanji digit %s with unit %s", kanji_digit, KANJI_UNITS[unit])
                 # digit_mult > 1 means the recursion split off a 十/百/千 of this unit, so
                 # the digit carries that sub-unit with it: 1000万 -> 一千 + 万. The 一 in front of the
                 # sub-unit is always written here; number_to_kanji decides whether to drop it.
@@ -109,18 +109,21 @@ def recursive_number_to_kanji(
                     further_index -= 1
 
                 logger.debug(
-                    f"Cur unit: {cur_unit}, Found same unit: {found_same_unit}, further_index:"
-                    f" {further_index}, max_further_index: {max_further_index}"
+                    "Cur unit: %s, Found same unit: %s, further_index: %s, max_further_index: %s",
+                    cur_unit,
+                    found_same_unit,
+                    further_index,
+                    max_further_index,
                 )
                 if not found_same_unit:
                     partial_num += cur_unit
                 result.append(partial_num)
-                logger.debug(f"Appended {partial_num} to result, current result: {result}")
+                logger.debug("Appended %s to result, current result: %s", partial_num, result)
             else:
                 # The unit is a multiple of another smaller unit, start from 10
-                logger.debug(f"Recursive call for unit {unit}, digit {digit}")
+                logger.debug("Recursive call for unit %s, digit %s", unit, digit)
                 sub_num = digit * unit // 10
-                logger.debug(f"Recursively processing number {sub_num}")
+                logger.debug("Recursively processing number %s", sub_num)
                 recursive_number_to_kanji(sub_num, result, digit_mult * 10, logger)
 
         num //= 10
@@ -143,7 +146,7 @@ def number_to_kanji(num_str: str, logger: logging.Logger = package_logger) -> st
     clean_num_str = "".join(str(JPN_NUMBER_TO_NUM.get(char, char)) for char in num_str)
 
     if not clean_num_str.isdigit():
-        logger.debug(f"Input string '{num_str}' is not a valid number.")
+        logger.debug("Input string '%s' is not a valid number.", num_str)
         # If the string contains non-digit characters, return it as is
         return num_str
 
@@ -163,7 +166,7 @@ def number_to_kanji(num_str: str, logger: logging.Logger = package_logger) -> st
     # above, which always keep it (一万, 一億). A 千 that tops a 万-group keeps it too, so
     # 10000000 is 一千万 and not 千万.
     kanji_result = re.sub(rf"一(?=[{SUB_MYRIAD_UNITS}])(?!千[{MYRIAD_UNITS}])", "", kanji_result)
-    logger.debug(f"Stripped leading '一' where droppable, result: {kanji_result}")
+    logger.debug("Stripped leading '一' where droppable, result: %s", kanji_result)
 
     return kanji_result
 

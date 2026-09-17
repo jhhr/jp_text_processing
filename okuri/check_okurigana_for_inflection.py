@@ -35,8 +35,12 @@ def check_okurigana_for_inflection(
     # contain other kana after the okurigana
     maybe_okuri
     logger.debug(
-        f"check okurigana 0 - reading_okurigana: {reading_okurigana}, maybe_okuri:"
-        f" {maybe_okuri}, reading: {reading}, part_of_speech: {part_of_speech}"
+        "check okurigana 0 - reading_okurigana: %s, maybe_okuri: %s, reading: %s, part_of_speech:"
+        " %s",
+        reading_okurigana,
+        maybe_okuri,
+        reading,
+        part_of_speech,
     )
 
     if not maybe_okuri or not reading_okurigana:
@@ -65,7 +69,7 @@ def check_okurigana_for_inflection(
         return OkuriResults(conjugatable_stem, "", "full_okuri", detected_part_of_speech)
 
     logger.debug(
-        f"check okurigana with reading_okurigana 1 - conjugatable_stem: {conjugatable_stem}"
+        "check okurigana with reading_okurigana 1 - conjugatable_stem: %s", conjugatable_stem
     )
     if conjugatable_stem is None or not maybe_okuri.startswith(conjugatable_stem):
         logger.debug(
@@ -74,7 +78,7 @@ def check_okurigana_for_inflection(
         # Not a verb or i-adjective, so just check for an exact match within the okurigana
         if maybe_okuri.startswith(reading_okurigana):
             logger.debug(
-                f"check okurigana with reading_okurigana 3 - maybe_okuri_text: {maybe_okuri}"
+                "check okurigana with reading_okurigana 3 - maybe_okuri_text: %s", maybe_okuri
             )
             return OkuriResults(
                 reading_okurigana,
@@ -86,7 +90,7 @@ def check_okurigana_for_inflection(
 
     # Remove the conjugatable_stem from maybe_okurigana
     trimmed_maybe_okuri = maybe_okuri[len(conjugatable_stem) :]
-    logger.debug(f"check okurigana 5 - trimmed_maybe_okuri: {trimmed_maybe_okuri}")
+    logger.debug("check okurigana 5 - trimmed_maybe_okuri: %s", trimmed_maybe_okuri)
 
     # Then check if that contains a conjugation for what we're looking for
     conjugated_okuri, rest, return_type, detected_part_of_speech = (
@@ -100,13 +104,17 @@ def check_okurigana_for_inflection(
         )
     )
     logger.debug(
-        f"check okurigana 6 - conjugated_okuri: {conjugated_okuri}, rest: {rest},"
-        f" return_type: {return_type}, detected_part_of_speech: {detected_part_of_speech}"
+        "check okurigana 6 - conjugated_okuri: %s, rest: %s, return_type: %s,"
+        " detected_part_of_speech: %s",
+        conjugated_okuri,
+        rest,
+        return_type,
+        detected_part_of_speech,
     )
 
     if return_type != "no_okuri":
         logger.debug(
-            f"check okurigana 7 - result: {conjugatable_stem + conjugated_okuri}, rest: {rest}"
+            "check okurigana 7 - result: %s, rest: %s", conjugatable_stem + conjugated_okuri, rest
         )
         # remember to add the stem back!
         return OkuriResults(

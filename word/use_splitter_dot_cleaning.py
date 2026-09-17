@@ -44,9 +44,9 @@ def use_splitter_dot_cleaning_with_b_insertion(
         base_splitter_indexes.append((start, end, part))
         last_index = end
     cleaned_text += text[last_index:]
-    logger.debug(f"Text after splitter removal: '{cleaned_text}'")
-    logger.debug(f"Splitter regex used: '{splitter_regex}'")
-    logger.debug(f"Splitter indexes: {splitter_indexes}")
+    logger.debug("Text after splitter removal: '%s'", cleaned_text)
+    logger.debug("Splitter regex used: '%s'", splitter_regex)
+    logger.debug("Splitter indexes: %s", splitter_indexes)
 
     def split_free_to_original_index(split_free_index: int) -> int:
         """Convert an index in splitter-free text to current original coordinates."""

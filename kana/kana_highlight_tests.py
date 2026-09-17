@@ -176,7 +176,7 @@ def main(test_nums: Optional[list[str]] = None) -> int:
                         try:
                             kana_highlight(*args)
                         except Exception as e:
-                            package_logger.error(f"Error during rerun with debug logging: {e}")
+                            package_logger.error("Error during rerun with debug logging: %s", e)
                             raise e
 
                     record_failure(cur_test_num, rerun)

@@ -38,8 +38,13 @@ def get_conjugated_okuri_with_mecab(
             and the rest of the okurigana, along with a boolean indicating if it is a suru verb
     """
     logger.debug(
-        f"get_conjugated_okuri - maybe_okuri: {maybe_okuri}, word: {word}, reading:"
-        f" {reading}, okuri_prefix: {okuri_prefix}, strict_inflection: {strict_inflection}"
+        "get_conjugated_okuri - maybe_okuri: %s, word: %s, reading: %s, okuri_prefix: %s,"
+        " strict_inflection: %s",
+        maybe_okuri,
+        word,
+        reading,
+        okuri_prefix,
+        strict_inflection,
     )
     if not maybe_okuri:
         logger.debug("get_conjugated_okuri - No okurigana provided, no processing needed.")
@@ -65,8 +70,11 @@ def get_conjugated_okuri_with_mecab(
             okuri_prefix = "word"
     if not parse_text_prefix:
         logger.error(
-            f"get_conjugated_okuri - cannot set parse_text_prefix, okuri_prefix: '{okuri_prefix}',"
-            f" word: '{word}', reading: '{reading}'"
+            "get_conjugated_okuri - cannot set parse_text_prefix, okuri_prefix: '%s', word: '%s',"
+            " reading: '%s'",
+            okuri_prefix,
+            word,
+            reading,
         )
         return OkuriResults("", maybe_okuri, "no_okuri", None), False
     text_to_parse = f"{parse_text_prefix}{maybe_okuri}"
@@ -89,33 +97,38 @@ def get_conjugated_okuri_with_mecab(
             return OkuriResults("し", rest_kana, okuri_type, "adj-i"), is_suru_verb
 
     tokens: list[MecabParsedToken] = list(mecab.translate(text_to_parse))
-    logger.debug(
-        f"Parsed text: {text_to_parse} ->\n"
-        + "\n".join([f"{token.word}, PartOfSpeech: {token.part_of_speech}" for token in tokens]),
-    )
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Parsed text: %s ->\n%s",
+            text_to_parse,
+            "\n".join(f"{token.word}, PartOfSpeech: {token.part_of_speech}" for token in tokens),
+        )
     if not tokens:
         logger.debug(
-            f"get_conjugated_okuri - No tokens found for text: {text_to_parse}, returning no okuri."
+            "get_conjugated_okuri - No tokens found for text: %s, returning no okuri.",
+            text_to_parse,
         )
         return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
     first_token = tokens[0]
     if not first_token.part_of_speech:
-        logger.error(f"get_conjugated_okuri - No PartOfSpeech found for {text_to_parse}")
+        logger.error("get_conjugated_okuri - No PartOfSpeech found for %s", text_to_parse)
         return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
 
     word_type = get_word_type_from_mecab_token(first_token)
     logger.debug(
-        f"First token: {first_token.word},  PartOfSpeech: {first_token.part_of_speech},"
-        f" first_token word_type: {word_type}"
+        "First token: %s,  PartOfSpeech: %s, first_token word_type: %s",
+        first_token.word,
+        first_token.part_of_speech,
+        word_type,
     )
     if not word_type:
         # If the first token is not one of the processable types, try again with kanji_reading
         # as the prefix
         if okuri_prefix == "word":
             logger.debug(
-                f"First token not valid: {first_token.word}, PartOfSpeech:"
-                f" {first_token.part_of_speech}, Retrying with reading as"
-                " prefix."
+                "First token not valid: %s, PartOfSpeech: %s, Retrying with reading as prefix.",
+                first_token.word,
+                first_token.part_of_speech,
             )
             if reading:
                 return get_conjugated_okuri_with_mecab(
@@ -131,12 +144,14 @@ def get_conjugated_okuri_with_mecab(
                 return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         elif okuri_prefix == "reading":
             logger.debug(
-                f"First token is not a verb or adjective: {first_token.word}, PartOfSpeech:"
-                f" {first_token.part_of_speech}, Returning empty okuri."
+                "First token is not a verb or adjective: %s, PartOfSpeech: %s, Returning empty"
+                " okuri.",
+                first_token.word,
+                first_token.part_of_speech,
             )
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         else:
-            logger.error(f"Unknown okuri_prefix: {okuri_prefix}. Expected 'word' or 'reading'.")
+            logger.error("Unknown okuri_prefix: %s. Expected 'word' or 'reading'.", okuri_prefix)
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
     # The first token will actually include the conjugation stem, so we need to extract it
     conjugated_okuri = first_token.word[len(parse_text_prefix) :]
@@ -146,8 +161,9 @@ def get_conjugated_okuri_with_mecab(
         conjugated_okuri = first_token.word[len(parse_text_prefix) : -1]
         okuri_type = "full_okuri"
         logger.debug(
-            f"Detected okuri for noun: {conjugated_okuri}, rest:"
-            f" {maybe_okuri[len(conjugated_okuri):]}"
+            "Detected okuri for noun: %s, rest: %s",
+            conjugated_okuri,
+            maybe_okuri[len(conjugated_okuri):],
         )
         return (
             OkuriResults(conjugated_okuri, maybe_okuri[len(conjugated_okuri) :], okuri_type, None),
@@ -155,8 +171,11 @@ def get_conjugated_okuri_with_mecab(
         )
     rest_kana = maybe_okuri[len(conjugated_okuri) :]
     logger.debug(
-        f"Initial conjugated okuri: {conjugated_okuri}, rest_kana: {rest_kana}, first token:"
-        f" {first_token.word}, PartOfSpeech: {first_token.part_of_speech}"
+        "Initial conjugated okuri: %s, rest_kana: %s, first token: %s, PartOfSpeech: %s",
+        conjugated_okuri,
+        rest_kana,
+        first_token.word,
+        first_token.part_of_speech,
     )
     rest_tokens = tokens[1:]
     added_conjugation_token = False
@@ -173,16 +192,21 @@ def get_conjugated_okuri_with_mecab(
             # Remove the text from the rest of the okurigana
             rest_kana = rest_kana[len(token.word) :]
             logger.debug(
-                f"Added to okuri: {token.word}, headword: {token.headword}, POS:"
-                f" {token.part_of_speech}, new okuri: {conjugated_okuri}, rest_kana: {rest_kana}"
+                "Added to okuri: %s, headword: %s, POS: %s, new okuri: %s, rest_kana: %s",
+                token.word,
+                token.headword,
+                token.part_of_speech,
+                conjugated_okuri,
+                rest_kana,
             )
             if was_suru_verb:
                 is_suru_verb = True
         else:
             # If we hit a non-auxiliary token, stop processing
             logger.debug(
-                f"Stopping at non-auxiliary token: {token.word}, PartOfSpeech:"
-                f" {token.part_of_speech},"
+                "Stopping at non-auxiliary token: %s, PartOfSpeech: %s,",
+                token.word,
+                token.part_of_speech,
             )
             break
 
@@ -198,8 +222,10 @@ def get_conjugated_okuri_with_mecab(
     ):
         logger.debug(
             "get_conjugated_okuri - strict_inflection: rejecting noun/adverb lexical suffix as"
-            f" okuri, conjugated_okuri: {conjugated_okuri}, maybe_okuri: {maybe_okuri},"
-            f" token: {first_token.word}"
+            " okuri, conjugated_okuri: %s, maybe_okuri: %s, token: %s",
+            conjugated_okuri,
+            maybe_okuri,
+            first_token.word,
         )
         return OkuriResults("", maybe_okuri, "rejected_lexical_suffix", None), is_suru_verb
 

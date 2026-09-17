@@ -188,7 +188,7 @@ def get_part_of_speech(
 
     # Godan verb endings
     godan_type = GODAN_ENDINGS.get(okurigana[-1])
-    logger.debug(f"last char: {okurigana[-1]}")
+    logger.debug("last char: %s", okurigana[-1])
     if godan_type:
         return godan_type
 
@@ -220,8 +220,11 @@ def get_okuri_dict_for_okurigana(
             logger=logger,
         )
     logger.debug(
-        f"part_of_speech: {part_of_speech}, okurigana: {okurigana}, kanji: {kanji}, kanji_reading:"
-        f" {kanji_reading}"
+        "part_of_speech: %s, okurigana: %s, kanji: %s, kanji_reading: %s",
+        part_of_speech,
+        okurigana,
+        kanji,
+        kanji_reading,
     )
     if part_of_speech is None:
         return None, None

@@ -93,9 +93,14 @@ def leading_kana_cleaning_replacer(match, logger: logging.Logger = package_logge
         # The kanji's readings account for neither spelling, so the prefix has to decide.
         take_the_kana = bool(SELF_READING_PREFIX_REC.match(pre))
     logger.debug(
-        f"leading_kana_cleaning_replacer - {pre}{kanji}[{furigana}]: unread kanji"
-        f" {kept_unread} keeping the kana vs {stripped_unread} taking it,"
-        f" taking it: {take_the_kana}"
+        "leading_kana_cleaning_replacer - %s%s[%s]: unread kanji %s keeping the kana vs %s taking"
+        " it, taking it: %s",
+        pre,
+        kanji,
+        furigana,
+        kept_unread,
+        stripped_unread,
+        take_the_kana,
     )
     if not take_the_kana:
         return match.group(0)

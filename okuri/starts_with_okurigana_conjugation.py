@@ -43,8 +43,11 @@ def starts_with_okurigana_conjugation(
         return OkuriResults("", kana_text, "no_okuri", None)
 
     logger.debug(
-        f"kana_text: {kana_text}, kanji_okurigana: {kanji_okurigana}, kanji: {kanji},"
-        f" kanji_reading: {kanji_reading}"
+        "kana_text: %s, kanji_okurigana: %s, kanji: %s, kanji_reading: %s",
+        kana_text,
+        kanji_okurigana,
+        kanji,
+        kanji_reading,
     )
 
     if not kana_text[0] in okuri_dict and not okuri_dict[""]:
@@ -60,13 +63,17 @@ def starts_with_okurigana_conjugation(
     while True:
         cur_char = rest[0]
         logger.debug(
-            f"okurigana: {okurigana}, rest: {rest}, cur_char: {cur_char}, in dict:"
-            f" {cur_char in prev_dict}"
+            "okurigana: %s, rest: %s, cur_char: %s, in dict: %s",
+            okurigana,
+            rest,
+            cur_char,
+            cur_char in prev_dict,
         )
         if cur_char not in prev_dict:
             logger.debug(
-                f"reached dict end, empty_dict: {not prev_dict}, is_last:"
-                f" {prev_dict.get('is_last')}"
+                "reached dict end, empty_dict: %s, is_last: %s",
+                not prev_dict,
+                prev_dict.get('is_last'),
             )
             okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
