@@ -54,9 +54,7 @@ class _ConsoleHandler(logging.StreamHandler):
     """The handler `console_logging` owns, so calling it again replaces rather than stacks."""
 
 
-def console_logging(
-    level: LogLevel | int = "error", stream: TextIO | None = None
-) -> None:
+def console_logging(level: LogLevel | int = "error", stream: TextIO | None = None) -> None:
     """
     Send the package's logging to `stream` (stdout as of the call) at `level`, replacing any
     earlier console handler.

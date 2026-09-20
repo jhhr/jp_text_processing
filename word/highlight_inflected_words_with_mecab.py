@@ -1,4 +1,3 @@
-
 from collections.abc import Iterator
 
 from ..all_types.main_types import PartOfSpeech
@@ -206,9 +205,7 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
             # The whole token is outside the highlight, so it gets the same look as any other
             # token below: two occurrences can sit next to each other (はしってはしって) and the
             # one ending the first highlight is then the start of the second.
-        if (
-            stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)
-        ) or (
+        if (stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)) or (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
         ):
             logger.debug("Found beginning of word to highlight: %s", token.word)

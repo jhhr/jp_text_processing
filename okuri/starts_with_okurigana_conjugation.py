@@ -1,4 +1,3 @@
-
 from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
 from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..utils.logger import package_logger as logger
@@ -67,7 +66,7 @@ def starts_with_okurigana_conjugation(
             logger.debug(
                 "reached dict end, empty_dict: %s, is_last: %s",
                 not prev_dict,
-                prev_dict.get('is_last'),
+                prev_dict.get("is_last"),
             )
             okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break

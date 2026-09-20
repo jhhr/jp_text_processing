@@ -6,7 +6,6 @@ splitting mora evenly among consecutive jukujikun positions and extracting okuri
 when the last kanji is jukujikun.
 """
 
-
 from ..all_types.main_types import WrapMatchEntry
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 from ..utils.logger import package_logger as logger
@@ -258,8 +257,7 @@ def process_jukujikun_positions(
             kanji_count=len(run),
         )["mora_list"]
         logger.debug(
-            "process_jukujikun_positions - jukujikun run %s gets mora %s,"
-            " alignment.mora_split: %s",
+            "process_jukujikun_positions - jukujikun run %s gets mora %s, alignment.mora_split: %s",
             run,
             run_mora_str,
             mora_split,
@@ -324,6 +322,7 @@ def process_jukujikun_positions(
             okuri_prefix="reading",
             strict_inflection=True,
         )
+
         # Whatever is taken as okurigana has to be spent out of the kana that follow the word:
         # okurigana + rest_kana == remaining_kana. A candidate claiming more than that has taken
         # the difference from the kanji's own reading, which stays in the furigana as well. For

@@ -1,4 +1,3 @@
-
 from ..all_types.main_types import (
     PartOfSpeech,
 )

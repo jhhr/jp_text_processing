@@ -738,10 +738,12 @@ def word_highlight(text: str, word: str) -> str:
                     okuri_result.okurigana,
                     maybe_okuri,
                 )
-                result_indices.append((
-                    m.start(0),
-                    m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
-                ))
+                result_indices.append(
+                    (
+                        m.start(0),
+                        m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
+                    )
+                )
             else:
                 logger.debug("No valid inflected form found with kana_highlight")
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))

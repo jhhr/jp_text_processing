@@ -86,7 +86,9 @@ def crossed_tags(
             remove_innermost(open_before, tag)
     closed_from_before_as_written: list[tuple[str, str]] = []
     for tag in closed_from_before:
-        closed_from_before_as_written.append(remove_innermost(open_before, tag) or (tag, f"<{tag}>"))
+        closed_from_before_as_written.append(
+            remove_innermost(open_before, tag) or (tag, f"<{tag}>")
+        )
     return opened, closed_from_before_as_written
 
 

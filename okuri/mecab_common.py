@@ -54,8 +54,7 @@ def get_word_type_from_mecab_token(token: MecabParsedToken) -> MecabWordType | N
 
     if token.part_of_speech == PartOfSpeech.i_adjective or (
         # i-adjective inflected to く gets categorized as an adverb
-        token.part_of_speech == PartOfSpeech.adverb
-        and token.word.endswith("く")
+        token.part_of_speech == PartOfSpeech.adverb and token.word.endswith("く")
     ):
         return "i_adjective"
     if (

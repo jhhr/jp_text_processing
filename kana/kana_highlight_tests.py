@@ -17,7 +17,6 @@ expected/got diff itself. A case known to fail is written
 `pytest.param(..., marks=pytest.mark.xfail(reason="why"))`; none carries one at the moment.
 """
 
-
 import pytest
 
 from ..all_types.main_types import WithTagsDef

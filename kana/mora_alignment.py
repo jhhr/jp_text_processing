@@ -310,7 +310,9 @@ def find_first_complete_alignment(
                     else:
                         repeater_match = match_info.copy()
                         repeater_match["matched_mora"] = second_mora
-                    repeater_match["kanji"] = "々" if next_kanji == "々" or rendaku_matched else kanji
+                    repeater_match["kanji"] = (
+                        "々" if next_kanji == "々" or rendaku_matched else kanji
+                    )
 
                     # Add match for first kanji
                     # We'll remove the okurigana from the first match for now as it should only

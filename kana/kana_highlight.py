@@ -345,9 +345,7 @@ def reconstruct_from_alignment(
             if with_tags_def.onyomi_to_katakana and match_type == "onyomi":
                 reading = to_katakana(reading)
 
-            tag = (
-                "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
-            )
+            tag = "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
             is_num = surface_kanji.isdigit()
         else:
             logger.error(
@@ -356,14 +354,16 @@ def reconstruct_from_alignment(
                 i,
             )
 
-        entries.append({
-            "kanji": surface_kanji,
-            "tag": tag,
-            "furigana": reading,
-            "highlight": False,
-            "is_num": is_num,
-            "is_noun_suru_verb": is_noun_suru_verb,
-        })
+        entries.append(
+            {
+                "kanji": surface_kanji,
+                "tag": tag,
+                "furigana": reading,
+                "highlight": False,
+                "is_num": is_num,
+                "is_noun_suru_verb": is_noun_suru_verb,
+            }
+        )
     # Give back the kana that was taken off the front of the furigana for matching. The first
     # kanji's reading is what it sat in front of, so that is where it goes, and from here on the
     # readings line up with the original furigana again.
@@ -442,13 +442,15 @@ def reconstruct_from_alignment(
                 combined_furi += next_entry["furigana"]
                 j += 1
 
-            merged_entries.append({
-                "kanji": combined_kanji,
-                "tag": tag,
-                "furigana": combined_furi,
-                "highlight": highlight_flag,
-                "is_num": True,
-            })
+            merged_entries.append(
+                {
+                    "kanji": combined_kanji,
+                    "tag": tag,
+                    "furigana": combined_furi,
+                    "highlight": highlight_flag,
+                    "is_num": True,
+                }
+            )
             idx = j
 
         entries = merged_entries
@@ -473,7 +475,7 @@ def reconstruct_from_alignment(
         "reconstruct_from_alignment - match type from highlighted kanji at position %s,"
         " kanji_matches: %s,",
         kanji_to_highlight_pos,
-        alignment['kanji_matches'],
+        alignment["kanji_matches"],
     )
     # Determine match type of the highlight segment
     highlight_match_type: MatchType = "none"
@@ -649,8 +651,8 @@ def kana_highlight(
                 "furigana_replacer - normalized furigana for matching: %s, prefix: %s,"
                 " restored_chars: %s",
                 full_furigana,
-                normalized['prefix'],
-                normalized['restored_chars'],
+                normalized["prefix"],
+                normalized["restored_chars"],
             )
 
         def build_restored_chars(long_vowel_positions: list[int]) -> dict[int, str]:
@@ -763,7 +765,7 @@ def kana_highlight(
                 mora_list=mora_result["mora_list"],
             )
 
-        logger.debug("furigana_replacer - juku_positions: %s", alignment['jukujikun_positions'])
+        logger.debug("furigana_replacer - juku_positions: %s", alignment["jukujikun_positions"])
 
         # Step 4: Handle jukujikun positions if any
         final_okurigana = alignment["final_okurigana"]

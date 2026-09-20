@@ -114,9 +114,9 @@ FURIGANA_EXCEPTION_ALIGNMENTS: dict[str, list[ExceptionAlignmentEntry]] = {
 
 def _build_alignment(word: str, parts: list[ExceptionAlignmentEntry]) -> MoraAlignment:
     kanji_count = len(word)
-    assert kanji_count == len(
-        parts
-    ), f"Exception alignment parts length mismatch for '{word}': {len(parts)} vs {kanji_count}"
+    assert kanji_count == len(parts), (
+        f"Exception alignment parts length mismatch for '{word}': {len(parts)} vs {kanji_count}"
+    )
     kanji_matches: list[ReadingMatchInfo | None] = []
     mora_split: list[str] = []
     jukujikun_positions: list[int] = []

@@ -154,7 +154,9 @@ CASES = [
     ),
     # The honorific is still given back when the kanji can account for neither spelling: 土産
     # reads みやげ as jukujikun either way, so the prefix itself has to decide.
-    pytest.param("お土産[おみやげ]", "お土産[みやげ]", id="honorific prefix before a jukujikun word"),
+    pytest.param(
+        "お土産[おみやげ]", "お土産[みやげ]", id="honorific prefix before a jukujikun word"
+    ),
     # A reading that spells a particle out belongs to the particle, not to the kanji.
     pytest.param(
         "と時間[とじかん]",
@@ -180,7 +182,9 @@ CASES = [
         id="two words whose okurigana and reading share a kana",
     ),
     pytest.param(
-        "食べ[たべ]たい 食べ[たべ]る", "食[た]べたい 食[た]べる", id="the same word twice in one text"
+        "食べ[たべ]たい 食べ[たべ]る",
+        "食[た]べたい 食[た]べる",
+        id="the same word twice in one text",
     ),
     # A line start marks where a word begins just as a space does. Fields written in the HTML
     # editor break their lines with <br>, but fields pasted or imported as plain text carry \n,

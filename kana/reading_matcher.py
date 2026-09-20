@@ -5,7 +5,6 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
-
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
 from ..kanji.all_kanji_data import KanjiData
 from ..mecab_controller.kana_conv import to_hiragana

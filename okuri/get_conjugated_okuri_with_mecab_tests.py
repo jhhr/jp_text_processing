@@ -22,9 +22,7 @@ CASES = [
     pytest.param("逆上", "のぼ", "せたので", ("せた", "ので", False), id="逆上[のぼ]せたので"),
     pytest.param("悔", "くや", "しいくらい", ("しい", "くらい", False), id="悔[くや]しいくらい"),
     pytest.param("安", "やす", "くなかった", ("くなかった", "", False), id="安[やす]くなかった"),
-    pytest.param(
-        "来", "く", "れたらいくよ", ("れたら", "いくよ", False), id="来[く]れたらいくよ"
-    ),
+    pytest.param("来", "く", "れたらいくよ", ("れたら", "いくよ", False), id="来[く]れたらいくよ"),
     pytest.param(
         "青",
         "あお",
@@ -99,13 +97,9 @@ CASES = [
     ),
     pytest.param("何気", "なにげ", "にと", ("に", "と", False), id="何気[なにげ]にと"),
     pytest.param("為", "す", "るしかない", ("る", "しかない", False), id="為[す]るしかない"),
-    pytest.param(
-        "静", "しず", "かにいった", ("かに", "いった", False), id="静[しず]かにいった"
-    ),
+    pytest.param("静", "しず", "かにいった", ("かに", "いった", False), id="静[しず]かにいった"),
     pytest.param("静", "しず", "かでよい", ("か", "でよい", False), id="静[しず]かでよい"),
-    pytest.param(
-        "静", "しず", "かなあおさ", ("かな", "あおさ", False), id="静[しず]かなあおさ"
-    ),
+    pytest.param("静", "しず", "かなあおさ", ("かな", "あおさ", False), id="静[しず]かなあおさ"),
     pytest.param("賑", "にぎ", "やかな", ("やかな", "", False), id="賑[にぎ]やかな"),
     # 静か and 賑やか are na-adjective stems mecab tags as plain nouns, so their な is
     # okurigana. 幾つか, 誰か and 何か end in か as well but are an interrogative plus か and
@@ -126,9 +120,7 @@ CASES = [
     ),
     pytest.param("清々", "すっきり", "した", ("した", "", True), id="清々[すっきり]した"),
     pytest.param("熱々", "あつあつ", "だね", ("", "だね", False), id="熱々[あつあつ]だね"),
-    pytest.param(
-        "好々爺", "こうこうや", "です", ("", "です", False), id="好々爺[こうこうや]です"
-    ),
+    pytest.param("好々爺", "こうこうや", "です", ("", "です", False), id="好々爺[こうこうや]です"),
     pytest.param(
         "瑞々",
         "みずみず",
@@ -142,15 +134,11 @@ CASES = [
         "悪", "あ", "しがわからない", ("し", "がわからない", False), id="悪[あ]しがわからない"
     ),
     pytest.param("死", "し", "んでいない", ("んでいない", "", False), id="死[し]んでいない"),
-    pytest.param(
-        "聞", "き", "いていたかい", ("いていた", "かい", False), id="聞[き]いていたかい"
-    ),
+    pytest.param("聞", "き", "いていたかい", ("いていた", "かい", False), id="聞[き]いていたかい"),
     pytest.param("目論", "もくろ", "む", ("む", "", False), id="目論[もくろ]む"),
     # 久ぶりに doesn't get split into ひさし and ぶりに and is instead treated as a single noun
     pytest.param("久", "ひさ", "しぶりに", ("し", "ぶりに", False), id="久[ひさ]しぶりに"),
-    pytest.param(
-        "久", "ひさ", "しいきもち", ("しい", "きもち", False), id="久[ひさ]しいきもち"
-    ),
+    pytest.param("久", "ひさ", "しいきもち", ("しい", "きもち", False), id="久[ひさ]しいきもち"),
     pytest.param(
         "仄々", "ほのぼの", "したようす", ("した", "ようす", False), id="仄々[ほのぼの]したようす"
     ),
@@ -159,9 +147,7 @@ CASES = [
     # pytest.param("欲", "ほっ", "ればやる", ("れば", "やる", False), id="欲[ほっ]ればやる"),
     pytest.param("欲", "ほ", "しいなら", ("しい", "なら", False), id="欲[ほ]しいなら"),
     pytest.param("放", "ほ", "ったらかす", ("ったら", "かす", False), id="放[ほ]ったらかす"),
-    pytest.param(
-        "放", "ほう", "ったらかす", ("ったら", "かす", False), id="放[ほう]ったらかす"
-    ),
+    pytest.param("放", "ほう", "ったらかす", ("ったら", "かす", False), id="放[ほう]ったらかす"),
     pytest.param("放", "ほう", "っておく", ("って", "おく", False), id="放[ほう]っておく"),
     pytest.param("高", "たか", "めるから", ("める", "から", False), id="高[たか]めるから"),
     pytest.param(
@@ -175,9 +161,7 @@ CASES = [
         "抉", "えぐ", "られたように", ("られた", "ように", False), id="抉[えぐ]られたように"
     ),
     # Works when using okuri_prefix="kanji_reading" instead of "kanji"
-    pytest.param(
-        "抉", "えぐ", "かったよな", ("かった", "よな", False), id="抉[えぐ]かったよな"
-    ),
+    pytest.param("抉", "えぐ", "かったよな", ("かった", "よな", False), id="抉[えぐ]かったよな"),
     # えぐくて is too niche for mecab...
     # pytest.param(
     #     "抉", "えぐ", "くてやわらかい", ("くて", "やわらかい", False), id="抉[えぐ]くてやわらかい"
