@@ -600,6 +600,26 @@ CASES = [
         "<b>はしらないで</b>歩く",
         id="Kana only - the word itself still highlights when MeCab knows it",
     ),
+    # Two occurrences with nothing between them: the token that ends the first highlight is
+    # the one that begins the second, so it gets looked at as a beginning too.
+    pytest.param(
+        "はしってはしって",
+        "はしる",
+        "<b>はしって</b><b>はしって</b>",
+        id="Kana only - two adjacent occurrences both highlight",
+    ),
+    pytest.param(
+        "たべたたべた",
+        "たべる",
+        "<b>たべた</b><b>たべた</b>",
+        id="Kana only - two adjacent occurrences both highlight /2",
+    ),
+    pytest.param(
+        "はしって はしって",
+        "はしる",
+        "<b>はしって</b> <b>はしって</b>",
+        id="Kana only - two occurrences separated by only a space both highlight",
+    ),
     pytest.param(
         "それはバズったね",
         "バズる",

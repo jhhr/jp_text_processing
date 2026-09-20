@@ -155,20 +155,29 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
                 logger.debug("Continuing highlight for conjugated okuri: %s", token.word)
                 result += token.word
                 text_char_idx += len(token.word)
-            else:
-                logger.debug("Ending highlight for conjugated okuri: %s", token.word)
-                result += token.word[:highlighted_chars] + "</b>" + token.word[highlighted_chars:]
-                # We need to subtract the length of the opening tag because the text_char_idx
-                # is counting text including it
-                before_b_close_idx = text_char_idx + highlighted_chars - 3
-                text_char_idx += len(token.word) + 4
-                logger.debug(
-                    "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
-                )
-                increment_indexes_for_b(open_bold_idx, before_b_close_idx)
-                opened_bold = False
-                found_word = False
-        elif (
+                continue
+            logger.debug("Ending highlight for conjugated okuri: %s", token.word)
+            result += token.word[:highlighted_chars] + "</b>"
+            # We need to subtract the length of the opening tag because the text_char_idx
+            # is counting text including it
+            before_b_close_idx = text_char_idx + highlighted_chars - 3
+            text_char_idx += highlighted_chars + 4
+            logger.debug(
+                "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
+            )
+            increment_indexes_for_b(open_bold_idx, before_b_close_idx)
+            opened_bold = False
+            found_word = False
+            if highlighted_chars:
+                # The highlight ended inside this token, so what is left of it is the tail of
+                # the word's own conjugation and cannot begin the next occurrence
+                result += token.word[highlighted_chars:]
+                text_char_idx += len(token.word) - highlighted_chars
+                continue
+            # The whole token is outside the highlight, so it gets the same look as any other
+            # token below: two occurrences can sit next to each other (はしってはしって) and the
+            # one ending the first highlight is then the start of the second.
+        if (
             stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)
         ) or (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
