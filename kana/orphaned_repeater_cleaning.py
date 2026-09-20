@@ -1,5 +1,7 @@
 import re
 
+from ..regex.kanji_furi import KANJI_RANGES
+
 # 々 stands in for the kanji written before it, so it is only ever half of a word. The furigana
 # regex reads a word as an unbroken run of kanji before a bracket, which means anything sitting
 # between the kanji and its 々 - a space, or the kanji having been given a bracket of its own -
@@ -8,7 +10,7 @@ import re
 #
 # The character 々 repeats has to be a real kanji, not the ヶ of 三ヶ月 or a number, both of which
 # KANJI_CHAR_RE otherwise counts as kanji for furigana purposes.
-REPEATED_KANJI_RE = r"[一-龯㐀-䶿]"
+REPEATED_KANJI_RE = rf"[{KANJI_RANGES}]"
 
 # Regex for a 々 separated from the word it belongs to. For example
 # (a) 其 々[それぞれ]      - only the 々 was given the reading

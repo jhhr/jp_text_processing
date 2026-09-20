@@ -11,18 +11,19 @@ from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertio
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 from ..kana.kana_highlight import kana_highlight, WithTagsDef
 from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
+from ..regex.kanji_furi import KANJI_RANGES
 from ..utils.logger import package_logger as logger
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
-    r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
+    rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbfヶヵ])(々?)(?:\[([^\]]*?)\])?$"
+LAST_KANJI_FURIGANA_RE = rf"([{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
-    r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])(?:"
-    r" ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])"
+    rf"(?: ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])(?:"
+    rf" ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])"
 )
-FURIGANA_TOKEN_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\]"
+FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:

@@ -30,6 +30,11 @@ CASES = [
         "いっかげつさんがつひとびと",
         id="small ヶ, numbers and 々 count as kanji",
     ),
+    pytest.param(
+        "〆切[しめきり] 四〇三[よんまるさん] 𠮟[しか]る",
+        "しめきりよんまるさんしかる",
+        id="〆, 〇 and a supplementary plane kanji count as kanji",
+    ),
     pytest.param("漢字[かんじ]&nbsp;語[ご]", "かんじご", id="&nbsp; is treated as a space"),
     # Where this differs from Anki: kanji are matched directly instead of with [^ >], so text
     # before the kanji isn't swallowed. Anki's version would give かんじです here.

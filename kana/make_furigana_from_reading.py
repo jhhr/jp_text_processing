@@ -1,9 +1,10 @@
 import re
 from .kana_highlight import kana_highlight, WithTagsDef
 
+from ..regex.kanji_furi import KANJI_RANGES
 from ..utils.logger import package_logger as logger
 
-KANJI_RE = r"[\d々\u4e00-\u9faf\u3400-\u4dbf]"
+KANJI_RE = rf"[\d々{KANJI_RANGES}]"
 
 
 def make_furigana_from_reading(word: str, reading: str) -> str:
