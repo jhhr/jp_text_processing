@@ -827,6 +827,12 @@ CASES = [
         "毎日[まいにち]<b> 報[ほう]・ 連[れん]・ 相[そう]しています</b>",
         id="Splitter dot - inside a furigana word with okurigana",
     ),
+    pytest.param(
+        "<span></span>はしって",
+        "はしる",
+        "<span></span><b>はしって</b>",
+        id="Html shape - an empty element next to the word is the caller's and stays",
+    ),
 ]
 
 

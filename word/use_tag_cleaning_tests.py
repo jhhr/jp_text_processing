@@ -43,6 +43,12 @@ CASES = [
         "<b><k> 何[なん]</k>でも</b>",
         id="whole tag inside the span is left alone",
     ),
+    # An empty element is only dropped when it is one a reordering here reopened
+    pytest.param(
+        "<k></k><b> 何[なん]でも</b>",
+        "<k></k><b> 何[なん]でも</b>",
+        id="empty tag next to the span with nothing to reorder is left alone",
+    ),
 ]
 
 

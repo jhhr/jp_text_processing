@@ -122,11 +122,14 @@ def apply_tag_fixes(restored_text: str) -> str:
     result = re.sub(r"(<([^>]+)>[^<]*)(</b>)(<\/\2>)", r"\1\4\3", result)
     # Any remaining tag the b span crosses instead of enclosing
     result = balance_b_tags(result)
-    # The reopened tags can end up empty, e.g. when the reordering above already handled them
-    result = re.sub(rf"{EMPTY_PAIR}(?=<b>)", "", result)
-    result = re.sub(rf"(?<=<b>){EMPTY_PAIR}", "", result)
-    result = re.sub(rf"{EMPTY_PAIR}(?=</b>)", "", result)
-    result = re.sub(rf"(?<=</b>){EMPTY_PAIR}", "", result)
+    if result != restored_text:
+        # The reopened tags can end up empty, e.g. when the reordering above already handled
+        # them. Only what the reorderings left behind is cleaned up: an empty element the
+        # caller wrote next to the word is theirs and stays.
+        result = re.sub(rf"{EMPTY_PAIR}(?=<b>)", "", result)
+        result = re.sub(rf"(?<=<b>){EMPTY_PAIR}", "", result)
+        result = re.sub(rf"{EMPTY_PAIR}(?=</b>)", "", result)
+        result = re.sub(rf"(?<=</b>){EMPTY_PAIR}", "", result)
     return result
 
 
