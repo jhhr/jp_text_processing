@@ -8,7 +8,7 @@ when the last kanji is jukujikun.
 
 from typing import Tuple
 
-from ..all_types.main_types import ReadingMatchInfo, WrapMatchEntry
+from ..all_types.main_types import WrapMatchEntry
 from .mora_splitter import split_to_mora_list
 from .mora_alignment import MoraAlignment
 from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
@@ -176,7 +176,10 @@ def process_jukujikun_positions(
 
     :param word: The full word
     :param furigana: The full furigana reading for the word
-    :param alignment: The mora alignment result containing jukujikun positions
+    :param alignment: The mora alignment result containing jukujikun positions. It is updated
+        in place: a furigana exception may add positions to ``jukujikun_positions``, and
+        ``recut_mora_around_exceptions`` rewrites ``mora_split``. The caller reads both again
+        after this returns.
     :param with_tags: Whether to wrap jukujikun portions in <juk> tags
     :param remaining_kana: The kana following the word (for okurigana extraction)
     :return: Tuple of (jukujikun_parts_dict, okurigana, rest_kana)
@@ -225,21 +228,6 @@ def process_jukujikun_positions(
                         "furigana": mora_portion,
                         "is_num": word[pos].isdigit(),
                     }
-                # Special-case: when there is exactly one kanji before the first exception,
-                # set its matched mora to the furigana prefix before the exception reading.
-                if start_search == 0 and start == 1 and not alignment["kanji_matches"][0]:
-                    prefix_str = full_furigana.split(ex_furi, 1)[0]
-                    if prefix_str:
-                        alignment["kanji_matches"][0] = ReadingMatchInfo(
-                            reading=prefix_str,
-                            dict_form=prefix_str,
-                            match_type="onyomi",
-                            reading_variant="plain",
-                            matched_mora=prefix_str,
-                            kanji=word[0],
-                            okurigana="",
-                            rest_kana="",
-                        )
                 start_search = start + len(ex_word)
 
     # Redistribute over whatever the exception mapping left unclaimed. Claiming some positions

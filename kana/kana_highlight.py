@@ -667,6 +667,8 @@ def kana_highlight(
             )
             use_okurigana = ""
             use_rest_kana = maybe_okuri
+            # process_jukujikun_positions updated the alignment in place, so this and the
+            # reconstruction below see the positions and mora it settled on.
             if len(full_word) - 1 in exception_alignment["jukujikun_positions"]:
                 use_okurigana = juku_okurigana
                 use_rest_kana = juku_rest_kana
@@ -746,6 +748,8 @@ def kana_highlight(
 
             # Use jukujikun okurigana when the last kanji is jukujikun. If we already have
             # okurigana from alignment, prefer the longer match from the juku extraction.
+            # process_jukujikun_positions updated the alignment in place, so this and the
+            # reconstruction below see the positions and mora it settled on.
             if len(full_word) - 1 in alignment["jukujikun_positions"]:
                 if len(juku_okurigana) >= len(final_okurigana):
                     final_okurigana = juku_okurigana
