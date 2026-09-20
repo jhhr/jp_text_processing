@@ -151,6 +151,25 @@ CASES = [
         ("った", "", "full_okuri", "v5r"),
         id="去[さ]る + った",
     ),
+    # partial okuri tests
+    pytest.param(
+        # 聞[き]い is only the start of 聞[き]いて/聞[き]いた, the text ends mid-conjugation
+        "い",
+        "く",
+        "聞",
+        "き",
+        ("い", "", "partial_okuri", "v5k"),
+        id="聞[き]く + い",
+    ),
+    pytest.param(
+        # 泳[およ]ぐ takes いで/いだ, so た is not a continuation and 泳[およ]い is left partial
+        "いた",
+        "ぐ",
+        "泳",
+        "およ",
+        ("い", "た", "partial_okuri", "v5g"),
+        id="泳[およ]ぐ + いた",
+    ),
     # empty okuri tests
     pytest.param(
         # 恥[は]ずかしげな is an i-adjective, not na-adjective!
