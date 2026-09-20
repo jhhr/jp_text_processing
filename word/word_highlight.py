@@ -1,28 +1,56 @@
 import re
 
-from ..kana.reading_matcher import check_reading_match
 from ..all_types.main_types import OkuriResults
-
+from ..kana.kana_highlight import WithTagsDef, kana_highlight
+from ..kana.reading_matcher import check_reading_match
+from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
+from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..regex.kanji_furi import KANJI_RANGES
+from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
-from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
-from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
-from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..kana.kana_highlight import kana_highlight, WithTagsDef
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-from ..utils.logger import package_logger as logger
+from .use_tag_cleaning import (
+    FURIGANA_PART_RE,
+    TAG_AND_BARE_DOT_PART_RE,
+    TAG_AND_DOT_PART_RE,
+    TAG_PART_RE,
+    use_tag_cleaning_with_b_insertion,
+)
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
-    r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
+    rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = r"([\u4e00-\u9faf\u3400-\u4dbfヶヵ])(々?)(?:\[([^\]]*?)\])?$"
+LAST_KANJI_FURIGANA_RE = rf"([{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
-    r"(?: ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])(?:"
-    r" ([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\])"
+    rf"(?: ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])(?:"
+    rf" ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])"
 )
-FURIGANA_TOKEN_RE = r"([\d々\u4e00-\u9faf\u3400-\u4dbfヶヵ]+)\[([^\]]*?)\]"
+FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
+KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
+KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
+
+
+def kanji_run_with_maybe_furigana(escaped_kanji: str, run_may_continue: bool = True) -> str:
+    """Create a pattern for a kanji run of the word that gives no reading for it.
+
+    The text can carry furigana the word was written without (an Anki word field often has
+    none where the sentence field does). The kanji then match a text run that has a bracket
+    too, so the bracket stays inside the highlight instead of being cut off from the kanji it
+    belongs to. The word can also be only part of that run, whose one reading cannot be split
+    without the word's own reading, so the rest of the run is taken along with the bracket.
+    A run the text wrote no reading on is matched as far as the word goes, as before.
+
+    An inflecting word's okurigana follows its last kanji directly, so a run that goes on past
+    that kanji is not the word (出来事 is not 出来る) and run_may_continue is False for it. Only
+    this path needs the rule; a word that gives its own readings has them to disagree with the
+    text's. The run may still begin before the word: a compound ending in the word's kanji is
+    a genuine ambiguity (花見 / 見る).
+    """
+    run_tail = rf"{KANJI_RUN_CHAR_RE}*" if run_may_continue else ""
+    bare_kanji = escaped_kanji if run_may_continue else rf"{escaped_kanji}(?!{KANJI_RUN_CHAR_RE})"
+    return rf"(?:{KANJI_RUN_CHAR_RE}*{escaped_kanji}{run_tail}\[[^\]]*\]|{bare_kanji})"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:
@@ -35,13 +63,38 @@ def replace_hiragana_in_pattern(text: str) -> str:
     return re.sub(r"[ぁ-ん]", replace_hiragana, text)
 
 
-def make_word_pattern(word: str) -> str:
+def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
+    """Create a regex pattern matching the word, with or without the text's furigana.
+
+    A kanji run the word already gives a reading for is matched as written; one it does not
+    also matches the reading the text has for it, together with the space furigana syntax
+    puts before the kanji and the rest of the text's kanji run that reading covers. Where the
+    word has okurigana after its last kanji, the text's run has to end at that kanji.
+    """
     # Remove first space
     word = re.sub(r"^ ", "", word)
-    # Escape the word for regex special characters
-    escaped_word = re.escape(word)
-    escaped_word = replace_hiragana_in_pattern(escaped_word)
-    return rf"\s?{escaped_word}"
+    pattern_parts: list[str] = [r"\s?"]
+    cursor = 0
+    kanji_matches = list(re.finditer(KANJI_RUN_AND_MAYBE_FURIGANA_RE, word))
+    for index, match in enumerate(kanji_matches):
+        literal_prefix = word[cursor : match.start()]
+        if literal_prefix:
+            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            pattern_parts.append(r"\s?")
+        kanji, kanji_furigana = match.group(1), match.group(2)
+        if kanji_furigana:
+            pattern_parts.append(re.escape(kanji))
+            pattern_parts.append(replace_hiragana_in_pattern(re.escape(kanji_furigana)))
+        else:
+            run_ends_word = followed_by_okurigana and index == len(kanji_matches) - 1
+            pattern_parts.append(
+                kanji_run_with_maybe_furigana(re.escape(kanji), run_may_continue=not run_ends_word)
+            )
+        cursor = match.end()
+    literal_suffix = word[cursor:]
+    if literal_suffix:
+        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+    return "".join(pattern_parts)
 
 
 def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
@@ -50,6 +103,9 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
     The generated pattern keeps kanji and separators strict, but allows the furigana
     inside brackets to vary. Captured furigana values can then be validated via
     check_reading_match (rendaku/small-tsu/vowel-change, etc.).
+
+    A text written without furigana has neither the brackets nor the space before a kanji, so
+    both are optional; a bracket that is there still has to agree with the word's reading.
     """
     word = re.sub(r"^ ", "", word)
     expected_readings: list[str] = []
@@ -58,10 +114,14 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
     for idx, match in enumerate(re.finditer(FURIGANA_TOKEN_RE, word)):
         literal_prefix = word[cursor : match.start()]
         if literal_prefix:
-            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            without_space = literal_prefix.rstrip(" ")
+            if without_space:
+                pattern_parts.append(replace_hiragana_in_pattern(re.escape(without_space)))
+            if without_space != literal_prefix:
+                pattern_parts.append(r"\s?")
         kanji = match.group(1)
         expected_readings.append(to_hiragana(match.group(2)))
-        pattern_parts.append(rf"{re.escape(kanji)}\[(?P<furi_{idx}>[^\]]+)\]")
+        pattern_parts.append(rf"{re.escape(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
@@ -73,9 +133,15 @@ def furigana_captures_match_readings(
     match: re.Match,
     expected_readings: list[str],
 ) -> bool:
-    """Validate captured furigana readings against expected readings with variants."""
+    """Validate captured furigana readings against expected readings with variants.
+
+    A kanji the text gave no reading for has nothing to disagree with the word about.
+    """
     for idx, expected in enumerate(expected_readings):
-        observed = to_hiragana(match.group(f"furi_{idx}"))
+        captured = match.group(f"furi_{idx}")
+        if captured is None:
+            continue
+        observed = to_hiragana(captured)
         _, reading_match_type = check_reading_match(
             reading=expected,
             mora_string=observed,
@@ -116,34 +182,96 @@ def split_furi_text_into_individual_kanji_furigana(furi_text: str) -> str:
     return furi_text
 
 
-def merge_consecutive_furigana(split_furi_text: str) -> str:
+def kanji_run_continuations(text: str) -> list[bool]:
+    """Tell for each kanji of the text whether the run it stands in goes on after it.
+
+    Splitting the text gives every kanji a bracket of its own, so the runs the text was
+    written with are only visible in the text itself. The kanji keep their order through the
+    splitting, so the answer is looked up by counting them.
+    """
+    bare_text = re.sub(rf"{TAG_AND_BARE_DOT_PART_RE}|{FURIGANA_PART_RE}", "", text)
+    return [
+        bool(re.match(KANJI_RUN_CHAR_RE, bare_text[index + 1 : index + 2]))
+        for index, char in enumerate(bare_text)
+        if re.match(KANJI_RUN_CHAR_RE, char)
+    ]
+
+
+def kanji_index_at(text: str, position: int) -> int:
+    """Count the kanji before the position, the tags, dots and readings not counted."""
+    before = re.sub(rf"{TAG_AND_BARE_DOT_PART_RE}|{FURIGANA_PART_RE}", "", text[:position])
+    return len(re.findall(KANJI_RUN_CHAR_RE, before))
+
+
+def merge_consecutive_furigana(split_furi_text: str, text: str) -> str:
     """Merges consecutive kanji-furigana parts back into a single furigana text.
+
+    Only what the splitting took apart is put back: two furigana words the text was written
+    with a space between are not one run and stay apart, so a part of the text the highlight
+    did not touch comes back as it was written.
 
     Args:
         split_furi_text (str): The split furigana text.
+        text (str): The text as it was written, whose kanji runs say what may merge.
     Returns:
         str: The merged furigana text.
     """
+    run_continues_after_kanji = kanji_run_continuations(text)
     pattern = re.compile(CONSECUTIVE_FURI_WORD_RE)
-    while match := pattern.search(split_furi_text):
+    search_start = 0
+    while match := pattern.search(split_furi_text, search_start):
         first_kanji = match.group(1)
         first_furi = match.group(2)
         second_kanji = match.group(3)
         second_furi = match.group(4)
+        last_kanji_index = kanji_index_at(split_furi_text, match.start(1) + len(first_kanji) - 1)
+        if run_continues_after_kanji[last_kanji_index : last_kanji_index + 1] != [True]:
+            # The text has these two as words of its own; the second one can still have a
+            # part of its own run after it
+            logger.debug(
+                "Not merging '%s' and '%s': the text has them apart", first_kanji, second_kanji
+            )
+            search_start = match.start(3) - 1
+            continue
         merged_kanji = first_kanji + second_kanji
         merged_furi = first_furi + second_furi
         merged_text = f" {merged_kanji}[{merged_furi}]"
         split_furi_text = (
             split_furi_text[: match.start(0)] + merged_text + split_furi_text[match.end(0) :]
         )
+        # The merged part can have another part of the same run after it
+        search_start = match.start(0)
     return split_furi_text
+
+
+def adnominal_na_okuri(word_okurigana: str, maybe_okuri: str) -> str:
+    """Give the okurigana an i-adjective's な form has in the text, if the text has that form.
+
+    大きい's adnominal form is 大きな and its stem 大き is the word as much as 大きく is, so the
+    stem is taken; the な is not, except when the word to match was written with it (大きいな).
+    Returns "" when the text does not have the word's な form.
+    """
+    word_ends_in_na = word_okurigana.endswith("な")
+    dictionary_okuri = word_okurigana[:-1] if word_ends_in_na else word_okurigana
+    stem = dictionary_okuri[:-1]
+    # Only an i-adjective with a stem of its own has a な form; 良[い]い's な is the particle
+    if not stem or not dictionary_okuri.endswith("い"):
+        return ""
+    if not maybe_okuri.startswith(f"{stem}な"):
+        return ""
+    return f"{stem}な" if word_ends_in_na else stem
 
 
 def word_highlight(text: str, word: str) -> str:
     """
     Takes a japanese word or phrase in dictionary form and finds any inflected occurrences of
     it in the given text. The word and text is expected to be in furigana syntax; with brackets
-    containing the reading of the kanji words.
+    containing the reading of the kanji words. A word written without furigana still matches a
+    text that has it, but then the text's reading cannot be split, so a word that covers only
+    part of a kanji run highlights the whole run and its reading:
+
+    word_highlight("私は 日本語[にほんご]を", "語") --> "私は<b> 日本語[にほんご]</b>を"
+    word_highlight("私は 日本語[にほんご]を", "語[ご]") --> "私は 日本[にほん]<b> 語[ご]</b>を"
 
     Furigana syntax in text includes a space before the word begins, e.g "この 家[いえ]は" with the
     exception that the beginning of the string can omit the space, e.g "家[いえ]で 居[い]る".
@@ -158,7 +286,7 @@ def word_highlight(text: str, word: str) -> str:
     negation forms like ない, させない, せない, な but not すぎる, すぎない.
     For example:
     word_highlight("私は 食[た]べている", "食[た]べる") --> "私は<b> 食[た]べている</b>"
-    word_highlight() --> "<b>食[た]べさせる</b>な!"
+    word_highlight("食[た]べさせるな!", "食[た]べる") --> "<b>食[た]べさせる</b>な!"
 
     For adjectives, the inflected forms are found up to and including the い form, but not
     the な form except when な is included in the word to match.
@@ -188,14 +316,36 @@ def word_highlight(text: str, word: str) -> str:
         pattern = make_word_pattern(word)
         logger.debug("Using pattern: %s", pattern)
 
+        # Remove tags from the text temporarily, so that a word a tag splits is found here too
+        # and not only on the mecab path below. Only the tags are stored: the pattern matches
+        # the space before a word, and the furigana brackets have to stay for the readings in
+        # them to be recognized as readings.
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
+            text, part_regex=TAG_PART_RE
+        )
+        logger.debug("html_free_text for matching: '%s'", html_free_text)
+        furigana_spans = [m.span() for m in re.finditer(FURIGANA_PART_RE, html_free_text)]
+
+        # re.sub reports every match's position in its input, which has none of the b tags the
+        # earlier matches got, so their length is added on to get the current position.
+        b_tags_inserted = 0
+
         def replace_match(match: re.Match) -> str:
+            nonlocal b_tags_inserted
+            if any(start < match.start(0) < end for start, end in furigana_spans):
+                # A reading inside [...] is not the word occurring in the text, so a kana word
+                # must not match one
+                return match.group(0)
+            increment_tag_indexes(match.start(0) + b_tags_inserted, match.end(0) + b_tags_inserted)
+            b_tags_inserted += len("<b></b>")
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, text)
+        result = re.sub(pattern, replace_match, html_free_text)
 
-        if result != text:
+        if result != html_free_text:
             # If that worked, return the result
-            return result
+            logger.debug("Intermediate result with <b> tags: '%s'", result)
+            return restore_tags(result)
 
         # Otherwise, use MeCab to find inflected forms
         return highlight_inflected_words_with_mecab(text, word)
@@ -237,33 +387,24 @@ def word_highlight(text: str, word: str) -> str:
         # Most simple case, we can regex search for the word directly
         pattern = make_word_pattern(word)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text
+            text, part_regex=TAG_AND_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
 
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text)
+        # re.sub reports every match's position in its input, which has none of the b tags the
+        # earlier matches got, so their length is added on to get the current position.
+        b_tags_inserted = 0
 
         def replace_match(match: re.Match) -> str:
-            split_start = match.start(0)
-            split_end = match.end(0)
-            increment_tag_indexes(
-                split_free_to_original_index(split_start),
-                split_free_to_original_index(split_end),
-            )
-            increment_splitter_indexes(split_start, split_end)
+            nonlocal b_tags_inserted
+            increment_tag_indexes(match.start(0) + b_tags_inserted, match.end(0) + b_tags_inserted)
+            b_tags_inserted += len("<b></b>")
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, splitter_free_text)
+        result = re.sub(pattern, replace_match, html_free_text)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         result = restore_tags(result)
         return result
     elif not ending_okurigana and furigana:
@@ -290,28 +431,24 @@ def word_highlight(text: str, word: str) -> str:
             logger.debug("Appended fixed katakana suffix pattern: '%s'", katakana_suffix_pattern)
         logger.debug("Using pattern: %s", pattern)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text_with_readings_split
+            text_with_readings_split, part_regex=TAG_AND_BARE_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
 
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(
-            html_free_text,
-            splitter_regex=r"・",
-        )
-        logger.debug("splitter_free_text for matching: '%s'", splitter_free_text)
+        # As above: the positions re.sub reports know nothing of the b tags already inserted
+        b_tags_inserted = 0
 
         def replace_match(match: re.Match) -> str:
+            nonlocal b_tags_inserted
             has_variant = False
             for idx, expected in enumerate(expected_readings):
-                observed = to_hiragana(match.group(f"furi_{idx}"))
+                captured = match.group(f"furi_{idx}")
+                if captured is None:
+                    # No furigana in the text for this kanji, so nothing to disagree about
+                    continue
+                observed = to_hiragana(captured)
                 _, reading_match_type = check_reading_match(
                     reading=expected,
                     mora_string=observed,
@@ -334,27 +471,24 @@ def word_highlight(text: str, word: str) -> str:
             if not match_text:
                 return match.group(0)
 
-            increment_tag_indexes(
-                split_free_to_original_index(split_start),
-                split_free_to_original_index(split_end),
-            )
-            increment_splitter_indexes(split_start, split_end)
+            increment_tag_indexes(split_start + b_tags_inserted, split_end + b_tags_inserted)
+            b_tags_inserted += len("<b></b>")
             return f"{leading_ws}<b>{match_text}</b>"
 
-        result = re.sub(pattern, replace_match, splitter_free_text)
+        result = re.sub(pattern, replace_match, html_free_text)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-
-        result = restore_splitters(result)
 
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
 
         # Re-merge any consecutive furigana parts that were split earlier
-        result = merge_consecutive_furigana(result)
+        result = merge_consecutive_furigana(result, text)
 
-        # Remove space from beginning as it's not required
-        result = re.sub(r"^(<b>)? ", r"\1", result)
+        # Remove the space the furigana splitting puts at the beginning, unless the text was
+        # written with one there
+        if not text[:1].isspace():
+            result = re.sub(r"^(<b>)? ", r"\1", result)
         return result
 
     # Getting more complicated, need to handle possible inflections
@@ -369,27 +503,15 @@ def word_highlight(text: str, word: str) -> str:
 
     if not furigana:
         logger.debug("No furigana but have kanji with okuri, use get_conjugated_okuri_with_mecab")
-        pattern = make_word_pattern(word)
+        pattern = make_word_pattern(word, followed_by_okurigana=True)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text
+            text, part_regex=TAG_AND_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
-
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(
-            html_free_text,
-            splitter_regex=r"・",
-        )
-        logger.debug("splitter_free_text for matching: '%s'", splitter_free_text)
-        matches = list(re.finditer(pattern, splitter_free_text))
+        matches = list(re.finditer(pattern, html_free_text))
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             maybe_okuri = m.group(1)
@@ -403,6 +525,13 @@ def word_highlight(text: str, word: str) -> str:
                 # Exact match, no need to check inflection
                 logger.debug("Exact match found, no inflection check needed")
                 result_indices.append((m.start(0), m.end(0)))
+                continue
+            na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
+            if na_okuri:
+                # MeCab reads the whole な form as one adnominal word, so the stem is checked
+                # against the word's own okurigana instead
+                logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
+                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
                 continue
             # Check if the maybe_okuri contains a valid inflection for the ending_okurigana
             okuri_result, _ = get_conjugated_okuri_with_mecab(
@@ -430,16 +559,12 @@ def word_highlight(text: str, word: str) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
-        result = splitter_free_text
+        result = html_free_text
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
             # Increment for tags inside (but not on exact same position) or after the opening tag
-            increment_tag_indexes(
-                split_free_to_original_index(start),
-                split_free_to_original_index(end),
-            )
-            increment_splitter_indexes(start, end)
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             logger.debug("Result after %s <b> insertions: '%s'", idx + 1, result)
             # Adjust subsequent indices due to added tag lengths
@@ -447,7 +572,6 @@ def word_highlight(text: str, word: str) -> str:
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
         return result
@@ -495,26 +619,16 @@ def word_highlight(text: str, word: str) -> str:
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
         if last_kanji:
-            pattern += rf"{last_kanji}{repeater}\[(?P<furigana>[^\]]+)\]"
+            pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text_with_readings_split
+            text_with_readings_split, part_regex=TAG_AND_BARE_DOT_PART_RE
         )
-
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text)
-        logger.debug(
-            "splitter_free_text for matching: '%s', pattern: '%s'", splitter_free_text, pattern
-        )
-        matches = list(re.finditer(pattern, splitter_free_text))
+        logger.debug("html_free_text for matching: '%s', pattern: '%s'", html_free_text, pattern)
+        matches = list(re.finditer(pattern, html_free_text))
         logger.debug("Found %s matches", len(matches))
         result_indices = []
         for m in matches:
@@ -524,8 +638,10 @@ def word_highlight(text: str, word: str) -> str:
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
-            matched_text = splitter_free_text[m.start(0) : m.end(0)]
-            furigana = m.group("furigana")
+            matched_text = html_free_text[m.start(0) : m.end(0)]
+            # Where the text writes the last kanji without furigana, the word's own
+            # reading for it is the one to inflect with
+            furigana = m.group("furigana") or last_kanji_furigana
             maybe_okuri = m.group("maybe_okuri")
             reading_match_type = "plain"
             if last_kanji and furigana:
@@ -551,6 +667,13 @@ def word_highlight(text: str, word: str) -> str:
                 )
                 result_indices.append((m.start(0), m.end(0)))
                 continue
+            na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
+            if na_okuri and reading_match_type != "none":
+                # MeCab reads the whole な form as one adnominal word, so the stem is checked
+                # against the word's own okurigana instead
+                logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
+                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
+                continue
             logger.debug(
                 "Matched text for kana_highlight inflection check: '%s', maybe_okuri: '%s', match:"
                 " %s",
@@ -572,14 +695,13 @@ def word_highlight(text: str, word: str) -> str:
                 okurigana="",
                 rest_kana="",
             )
-            if last_kanji and furigana:
-                if reading_match_type != "none":
-                    kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
-                        word=last_kanji,
-                        reading=last_kanji_furigana,
-                        maybe_okuri=to_hiragana(maybe_okuri),
-                        okuri_prefix="word",
-                    )
+            if last_kanji and furigana and reading_match_type != "none":
+                kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
+                    word=last_kanji,
+                    reading=last_kanji_furigana,
+                    maybe_okuri=to_hiragana(maybe_okuri),
+                    okuri_prefix="word",
+                )
             if kanji_okuri_result.result != "no_okuri":
                 okuri_result = kanji_okuri_result
                 logger.debug(
@@ -616,10 +738,12 @@ def word_highlight(text: str, word: str) -> str:
                     okuri_result.okurigana,
                     maybe_okuri,
                 )
-                result_indices.append((
-                    m.start(0),
-                    m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
-                ))
+                result_indices.append(
+                    (
+                        m.start(0),
+                        m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
+                    )
+                )
             else:
                 logger.debug("No valid inflected form found with kana_highlight")
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
@@ -637,30 +761,25 @@ def word_highlight(text: str, word: str) -> str:
             result_indices = [
                 (start, end + suffix_len)
                 for start, end in result_indices
-                if re.match(katakana_suffix_re, splitter_free_text[end:])
+                if re.match(katakana_suffix_re, html_free_text[end:])
             ]
-        result = splitter_free_text
+        result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
-            increment_tag_indexes(
-                split_free_to_original_index(start),
-                split_free_to_original_index(end),
-            )
-            increment_splitter_indexes(start, end)
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
         # Re-merge any consecutive furigana parts that were split earlier
-        result = merge_consecutive_furigana(result)
-        # Remove space from beginning as it's not required
-        result = re.sub(r"^(<b>)? ", r"\1", result)
+        result = merge_consecutive_furigana(result, text)
+        # Remove the space the furigana splitting puts at the beginning, unless the text was
+        # written with one there
+        if not text[:1].isspace():
+            result = re.sub(r"^(<b>)? ", r"\1", result)
         return result
-
-    return text

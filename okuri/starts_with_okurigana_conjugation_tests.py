@@ -18,7 +18,6 @@ import pytest
 
 from .starts_with_okurigana_conjugation import starts_with_okurigana_conjugation
 
-
 CASES = [
     # full okuri tests
     pytest.param(
@@ -144,6 +143,33 @@ CASES = [
         ("たい", "", "full_okuri", "v1"),
         id="見[み]る + たい",
     ),
+    pytest.param(
+        "った",
+        "る",
+        "去",
+        "さ",
+        ("った", "", "full_okuri", "v5r"),
+        id="去[さ]る + った",
+    ),
+    # partial okuri tests
+    pytest.param(
+        # 聞[き]い is only the start of 聞[き]いて/聞[き]いた, the text ends mid-conjugation
+        "い",
+        "く",
+        "聞",
+        "き",
+        ("い", "", "partial_okuri", "v5k"),
+        id="聞[き]く + い",
+    ),
+    pytest.param(
+        # 泳[およ]ぐ takes いで/いだ, so た is not a continuation and 泳[およ]い is left partial
+        "いた",
+        "ぐ",
+        "泳",
+        "およ",
+        ("い", "た", "partial_okuri", "v5g"),
+        id="泳[およ]ぐ + いた",
+    ),
     # empty okuri tests
     pytest.param(
         # 恥[は]ずかしげな is an i-adjective, not na-adjective!
@@ -154,14 +180,24 @@ CASES = [
         ("", "げな", "empty_okuri", "adj-i"),
         id="恥[は]ずかしい + げな",
     ),
-    # partial okuri tests
+    # no okuri tests
     pytest.param(
-        "った",
+        # only an i-adjective stem can stand bare; 見方 is the noun 見 plus かた, not 見る
+        # with an empty conjugation
+        "かた",
         "る",
-        "去",
-        "さ",
-        ("った", "", "full_okuri", "v5r"),
-        id="去[さ]る + った",
+        "見",
+        "み",
+        ("", "かた", "no_okuri", None),
+        id="見[み]る + かた",
+    ),
+    pytest.param(
+        "こむ",
+        "む",
+        "読",
+        "よ",
+        ("", "こむ", "no_okuri", None),
+        id="読[よ]む + こむ",
     ),
 ]
 

@@ -1,19 +1,18 @@
 import logging
 
+from ..all_types.main_types import (
+    OkuriResults,
+    OkuriType,
+)
+from ..mecab_controller.basic_types import (
+    MecabParsedToken,
+)
+from ..utils.logger import package_logger as logger
 from .mecab_common import (
     OkuriPrefix,
     get_all_conjugation_conditions,
     get_word_type_from_mecab_token,
     mecab,
-)
-from ..all_types.main_types import (
-    OkuriResults,
-    OkuriType,
-)
-from ..utils.logger import package_logger as logger
-
-from ..mecab_controller.basic_types import (
-    MecabParsedToken,
 )
 
 
@@ -159,7 +158,7 @@ def get_conjugated_okuri_with_mecab(
         logger.debug(
             "Detected okuri for noun: %s, rest: %s",
             conjugated_okuri,
-            maybe_okuri[len(conjugated_okuri):],
+            maybe_okuri[len(conjugated_okuri) :],
         )
         return (
             OkuriResults(conjugated_okuri, maybe_okuri[len(conjugated_okuri) :], okuri_type, None),

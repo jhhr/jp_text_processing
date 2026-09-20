@@ -1,19 +1,15 @@
 import re
-from typing import Optional
 
-from .construct_wrapped_furi_word import (
-    construct_wrapped_furi_word,
-    FuriReconstruct,
+from ..all_types.main_types import (
+    FinalResult,
+    MatchType,
+    MoraAlignment,
+    WithTagsDef,
+    WrapMatchEntry,
+    WrapTag,
 )
-
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-from .katakana_positions import get_katakana_positions
-from .orphaned_repeater_cleaning import (
-    ORPHANED_REPEATER_CLEANING_REC,
-    orphaned_repeater_cleaning_replacer,
-)
-from ..utils.logger import package_logger as logger
 from ..kanji.number_to_kanji import number_to_kanji
+from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
 from ..okuri.okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
     OKURIGANA_MIX_CLEANING_REC,
@@ -21,34 +17,32 @@ from ..okuri.okurigana_mix_cleaning_replacer import (
     okurigana_mix_cleaning_replacer,
 )
 from ..regex.kanji_furi import (
-    KANJI_RE,
     DOUBLE_KANJI_REC,
     KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+    KANJI_RE,
     NON_KANA_REC,
 )
-from ..all_types.main_types import (
-    MatchType,
-    WithTagsDef,
-    FinalResult,
-    MoraAlignment,
-    WrapMatchEntry,
-    WrapTag,
+from ..utils.logger import package_logger as logger
+from .construct_wrapped_furi_word import (
+    FuriReconstruct,
+    construct_wrapped_furi_word,
 )
 from .furigana_exceptions import check_exception
-from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
 from .furigana_normalizer import normalize_furigana_for_matching
-from .mora_alignment import find_first_complete_alignment
 from .jukujikun_processor import process_jukujikun_positions
-
-
-# Bold tags the text already carries: the caller's own emphasis, or what a previous run of the
-# highlighter left behind when its output is fed back in. Highlighting adds its own <b> tags, so
-# these have to go before any of it or the two nest.
-EXISTING_BOLD_TAGS_REC = re.compile(r"</?b>", re.IGNORECASE)
+from .katakana_positions import get_katakana_positions
+from .mora_alignment import find_first_complete_alignment
+from .mora_splitter import normalize_long_vowel_marks, split_to_mora_list
+from .orphaned_repeater_cleaning import (
+    ORPHANED_REPEATER_CLEANING_REC,
+    orphaned_repeater_cleaning_replacer,
+)
 
 # Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
-# before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
-KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[(.+?)\]")
+# before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana. The
+# furigana may be empty: a lazy .+? would read an empty bracket's ] as furigana and run on into
+# the next word's bracket.
+KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[([^\]]*)\]")
 
 
 def kana_filter(text):
@@ -67,15 +61,22 @@ def kana_filter(text):
         if match.group(2).startswith("sound:"):
             # [sound:...] should not be replaced
             return match.group(0)
-        # Return the furigana inside the brackets, dropping the kanji and the leading space
-        return match.group(2)
+        # Return the furigana inside the brackets, dropping the kanji and the leading space. An
+        # empty furigana gets the placeholder the kana-only mode of kana_highlight uses, so the
+        # kanji stay hidden but the word does not vanish without a trace.
+        return match.group(2) or "□"
 
-    # First turn mixed okurigana furigana like 消え去[きえさ]る into 消[き]え去[さ]る, so that
-    # every kanji is directly followed by its own furigana, then replace each kanji[furigana]
-    # with the furigana
-    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(
-        okurigana_mix_cleaning_replacer, text.replace("&nbsp;", " ")
+    # Run the same cleaning passes kana_highlight does, in the same order: put a separated 々
+    # back into its word's furigana group, so that 人 々[ひとびと] is not left with an unread 人,
+    # then give back the kana a word opens with, so that お前[おまえ] does not spell its お twice,
+    # then turn mixed okurigana furigana like 消え去[きえさ]る into 消[き]え去[さ]る, so that every
+    # kanji is directly followed by its own furigana. Then replace each kanji[furigana] with the
+    # furigana.
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(
+        orphaned_repeater_cleaning_replacer, text.replace("&nbsp;", " ")
     )
+    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
+    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     return KANA_FILTER_REC.sub(bracket_replace, clean_text)
 
 
@@ -196,7 +197,7 @@ def reconstruct_furigana(
         rest_kana,
     )
     if rendered_segments and okurigana:
-        last_segment_part: Optional[WrapMatchEntry] = segments[-1][-1] if segments[-1] else None
+        last_segment_part: WrapMatchEntry | None = segments[-1][-1] if segments[-1] else None
         okuri_out_of_highlight = (
             not with_tags_def.include_suru_okuri
             and last_segment_part is not None
@@ -321,13 +322,20 @@ def reconstruct_from_alignment(
         reading = ""
         tag: WrapTag = "mix"
         is_num = False
-        is_noun_suru_verb: Optional[bool] = False
+        is_noun_suru_verb: bool | None = False
         if i in juku_parts:
             part = juku_parts[i]
             reading = part["furigana"]
             tag = part["tag"]
             is_num = part["is_num"]
             is_noun_suru_verb = part.get("is_noun_suru_verb", False)
+            if surface_kanji.isdigit():
+                # The jukujikun processor is handed the converted word, where the digits read as
+                # kanji numerals, so the surface is what still knows this position is a number.
+                # A number's reading is a reading, not jukujikun, the same call the processor
+                # makes for a digit of its own.
+                tag = "kun"
+                is_num = True
         elif match_info := alignment["kanji_matches"][i]:
             # The alignment is what decides a doubled kanji is really the repeater, so where it
             # says 々, 々 is what gets written - even if the word came in spelled out.
@@ -341,9 +349,7 @@ def reconstruct_from_alignment(
             if with_tags_def.onyomi_to_katakana and match_type == "onyomi":
                 reading = to_katakana(reading)
 
-            tag = (
-                "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
-            )
+            tag = "on" if match_type == "onyomi" else "kun" if match_type == "kunyomi" else "juk"
             is_num = surface_kanji.isdigit()
         else:
             logger.error(
@@ -352,14 +358,16 @@ def reconstruct_from_alignment(
                 i,
             )
 
-        entries.append({
-            "kanji": surface_kanji,
-            "tag": tag,
-            "furigana": reading,
-            "highlight": False,
-            "is_num": is_num,
-            "is_noun_suru_verb": is_noun_suru_verb,
-        })
+        entries.append(
+            {
+                "kanji": surface_kanji,
+                "tag": tag,
+                "furigana": reading,
+                "highlight": False,
+                "is_num": is_num,
+                "is_noun_suru_verb": is_noun_suru_verb,
+            }
+        )
     # Give back the kana that was taken off the front of the furigana for matching. The first
     # kanji's reading is what it sat in front of, so that is where it goes, and from here on the
     # readings line up with the original furigana again.
@@ -384,6 +392,25 @@ def reconstruct_from_alignment(
             if end < len(word_for_alignment) and word_for_alignment[end] == "々":
                 highlight_positions.append(end)
             start = highlight_lookup_word.find(kanji_to_highlight, end)
+
+    if reconstruct_type != "kana_only" and highlight_positions:
+        # A digit run converts into several kanji but renders as one chunk - only its first
+        # position carries the digits, the rest have no surface of their own - so a highlight on
+        # one of those kanji takes the whole run with it. Split at the kanji instead and the
+        # segment holding it has nothing to write, so its reading - and every reading after it -
+        # is dropped. The kana-only modes have no surface to keep together, so they keep the
+        # finer split.
+        digit_runs: list[list[int]] = []
+        for i, surface in enumerate(surface_slices):
+            if surface.isdigit():
+                digit_runs.append([i])
+            elif surface == "" and digit_runs and digit_runs[-1][-1] == i - 1:
+                digit_runs[-1].append(i)
+        marked = set(highlight_positions)
+        for run in digit_runs:
+            if marked.intersection(run):
+                marked.update(run)
+        highlight_positions = sorted(marked)
 
     for idx in highlight_positions:
         if idx < len(entries):
@@ -419,13 +446,15 @@ def reconstruct_from_alignment(
                 combined_furi += next_entry["furigana"]
                 j += 1
 
-            merged_entries.append({
-                "kanji": combined_kanji,
-                "tag": tag,
-                "furigana": combined_furi,
-                "highlight": highlight_flag,
-                "is_num": True,
-            })
+            merged_entries.append(
+                {
+                    "kanji": combined_kanji,
+                    "tag": tag,
+                    "furigana": combined_furi,
+                    "highlight": highlight_flag,
+                    "is_num": True,
+                }
+            )
             idx = j
 
         entries = merged_entries
@@ -450,7 +479,7 @@ def reconstruct_from_alignment(
         "reconstruct_from_alignment - match type from highlighted kanji at position %s,"
         " kanji_matches: %s,",
         kanji_to_highlight_pos,
-        alignment['kanji_matches'],
+        alignment["kanji_matches"],
     )
     # Determine match type of the highlight segment
     highlight_match_type: MatchType = "none"
@@ -502,22 +531,22 @@ def whole_word_mora_split(
 
 
 def kana_highlight(
-    kanji_to_highlight: Optional[str],
+    kanji_to_highlight: str | None,
     text: str,
     return_type: FuriReconstruct = "kana_only",
-    with_tags_def: Optional[WithTagsDef] = None,
+    with_tags_def: WithTagsDef | None = None,
 ) -> str:
-    if with_tags_def is None:
-        with_tags_def = WithTagsDef(
-            True,  # with_tags
-            True,  # merge_consecutive
-            True,  # onyomi_to_katakana
-            False,  # include_suru_okuri
-        )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
     onyomi or kunyomi reading. The furigana is then highlighted with<b> tags.
     Text received could be a sentence or a single word with furigana.
+
+    A run of digits is read as the kanji it converts into - 24 is 二十四, three readings for two
+    characters - and renders as one chunk, since its surface cannot be split per kanji. A
+    kanji_to_highlight that a run only converts into therefore bolds the whole run in the furigana
+    and furikanji modes: 十 in 24[にじゅうよん] gives<b><mix> 24[ニジュウよん]</mix></b>. The
+    kana-only modes have no surface to keep together and bold that one kanji's reading.
+
     :param kanji_to_highlight: the kanji to highlight, usually a single character but any run of
         kanji works; every occurrence of it in a word is highlighted
     :param text: The text to process
@@ -525,9 +554,17 @@ def kana_highlight(
         remove the kanji and return only the kana
     :param with_tags_def: tuple, with_tags and merge_consecutive keys. Whether to wrap the readings
         with tags and whether to merge consecutive tags
-    :return: The text cleaned from any previous<b> tags and<b> added around the furigana
-        when the furigana corresponds to the kanji_to_highlight
+    :return: The text with<b> added around the furigana when the furigana corresponds to the
+        kanji_to_highlight. Any<b> tags the text already carries are left as they are: the caller
+        either supplies text without<b> around the word to highlight, or accepts the nesting
     """
+    if with_tags_def is None:
+        with_tags_def = WithTagsDef(
+            True,  # with_tags
+            True,  # merge_consecutive
+            True,  # onyomi_to_katakana
+            False,  # include_suru_okuri
+        )
 
     def furigana_replacer(match: re.Match):
         """
@@ -565,9 +602,13 @@ def kana_highlight(
         if not full_furigana or not is_kana_str(full_furigana):
             logger.debug("furigana_replacer - empty or invalid furigana case: %s", full_furigana)
             if return_type == "kana_only":
-                # return furigana as is, since it's either empty or invalid
+                # return furigana as is, since it's invalid; an empty one would return nothing
+                # at all and the word would silently vanish, so the same placeholder the
+                # furikanji mode uses stands in for the missing reading
                 # Since the kanji are omitted, there's nothing to highlight
-                if not full_furigana or not with_tags_def.with_tags:
+                if not full_furigana:
+                    full_furigana = "□"
+                if not with_tags_def.with_tags:
                     return f"{full_furigana}{maybe_okuri}"
                 return f"<err>{full_furigana}</err>{maybe_okuri}"
             if kanji_to_highlight and kanji_to_highlight in full_word:
@@ -614,8 +655,8 @@ def kana_highlight(
                 "furigana_replacer - normalized furigana for matching: %s, prefix: %s,"
                 " restored_chars: %s",
                 full_furigana,
-                normalized['prefix'],
-                normalized['restored_chars'],
+                normalized["prefix"],
+                normalized["restored_chars"],
             )
 
         def build_restored_chars(long_vowel_positions: list[int]) -> dict[int, str]:
@@ -667,6 +708,8 @@ def kana_highlight(
             )
             use_okurigana = ""
             use_rest_kana = maybe_okuri
+            # process_jukujikun_positions updated the alignment in place, so this and the
+            # reconstruction below see the positions and mora it settled on.
             if len(full_word) - 1 in exception_alignment["jukujikun_positions"]:
                 use_okurigana = juku_okurigana
                 use_rest_kana = juku_rest_kana
@@ -688,7 +731,10 @@ def kana_highlight(
             return final_result
 
         # Steps 2-3: Handle mora split either as whole-word or partial-word and find alignment
-        # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七)
+        # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七).
+        # Everything from here to the reconstruction counts positions in this word, not in the
+        # digits: 24 is two characters but 二十四 is three readings to place. The reconstruction
+        # is the one that has to see the digits, and it maps the positions back to them itself.
         alignment_word = replace_numeric_substrings(full_word)
         alignment = None
         katakana_positions: list[int] = []
@@ -696,7 +742,7 @@ def kana_highlight(
 
         if is_whole_word_case:
             possible_whole_word_splits, katakana_positions, long_vowel_positions = (
-                whole_word_mora_split(full_word, full_furigana)
+                whole_word_mora_split(alignment_word, full_furigana)
             )
             logger.debug(
                 "furigana_replacer - whole_word_case possible_splits: %s, katakana_positions: %s,"
@@ -712,7 +758,7 @@ def kana_highlight(
                 possible_splits=possible_whole_word_splits,
             )
         else:
-            mora_result = split_to_mora_list(full_furigana, len(full_word))
+            mora_result = split_to_mora_list(full_furigana, len(alignment_word))
             katakana_positions = mora_result["katakana_positions"]
             long_vowel_positions = mora_result["long_vowel_positions"]
             logger.debug("furigana_replacer - partial_word_case mora_result: %s", mora_result)
@@ -723,7 +769,7 @@ def kana_highlight(
                 mora_list=mora_result["mora_list"],
             )
 
-        logger.debug("furigana_replacer - juku_positions: %s", alignment['jukujikun_positions'])
+        logger.debug("furigana_replacer - juku_positions: %s", alignment["jukujikun_positions"])
 
         # Step 4: Handle jukujikun positions if any
         final_okurigana = alignment["final_okurigana"]
@@ -735,7 +781,7 @@ def kana_highlight(
             # an otherwise complete alignment, to allow okurigana extraction for cases like
             # 清々しい.
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
-                word=full_word,
+                word=alignment_word,
                 furigana=full_furigana,
                 alignment=alignment,
                 remaining_kana=maybe_okuri,
@@ -746,7 +792,9 @@ def kana_highlight(
 
             # Use jukujikun okurigana when the last kanji is jukujikun. If we already have
             # okurigana from alignment, prefer the longer match from the juku extraction.
-            if len(full_word) - 1 in alignment["jukujikun_positions"]:
+            # process_jukujikun_positions updated the alignment in place, so this and the
+            # reconstruction below see the positions and mora it settled on.
+            if len(alignment_word) - 1 in alignment["jukujikun_positions"]:
                 if len(juku_okurigana) >= len(final_okurigana):
                     final_okurigana = juku_okurigana
                     final_rest_kana = juku_rest_kana
@@ -772,13 +820,9 @@ def kana_highlight(
         logger.debug("furigana_replacer - final_result: %s\n", final_result)
         return final_result
 
-    # Drop any <b> tags the text came in with, so the ones added below are the only ones in the
-    # output. Left in place they would nest, and one sitting inside a word would also hide that
-    # word from the cleaning passes and the furigana replacer below.
-    clean_text = EXISTING_BOLD_TAGS_REC.sub("", text)
     # Put a 々 that got separated from its word back into the same furigana group, so that what
     # follows sees one word rather than a 々 with no kanji in front of it to repeat
-    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, clean_text)
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
     clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
     # Clean any potential mixed okurigana cases, turning them normal

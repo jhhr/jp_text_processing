@@ -5,26 +5,23 @@ This module implements the combinatorial mora alignment algorithm that tries
 all possible ways to split mora among kanji, returning the first complete match.
 """
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
-from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
+from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
+from ..kanji.all_kanji_data import KanjiData, all_kanji_data
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from ..utils.logger import package_logger as logger
 from .get_ordered_sublists import get_ordered_sublists
 from .reading_matcher import (
     match_reading_to_mora,
 )
-from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-from ..kanji.all_kanji_data import KanjiData, all_kanji_data
-from ..utils.logger import package_logger as logger
 
 
 def contains_repeated_kanji(word: str) -> bool:
     """
     Check if the word contains a repeater (々).
     """
-    for i in range(1, len(word)):
-        if word[i] == "々":
-            return True
-    return False
+    return "々" in word[1:]
 
 
 def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> bool:
@@ -34,10 +31,9 @@ def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> b
     length as the mora split at position i-1 (the kanji being repeated)
     """
     for i, kanji in enumerate(word):
-        if kanji == "々" and i > 0:
-            # This is a repeater - check if mora count matches previous kanji
-            if len(split[i]) != len(split[i - 1]):
-                return False
+        # A repeater's mora count has to match the kanji being repeated
+        if kanji == "々" and i > 0 and len(split[i]) != len(split[i - 1]):
+            return False
     return True
 
 
@@ -45,8 +41,8 @@ def find_first_complete_alignment(
     word: str,
     furigana: str,
     maybe_okuri: str,
-    mora_list: Optional[list[str]] = None,
-    possible_splits: Optional[Sequence[Sequence[Sequence[str]]]] = None,
+    mora_list: list[str] | None = None,
+    possible_splits: Sequence[Sequence[Sequence[str]]] | None = None,
 ) -> MoraAlignment:
     """
     Find the first complete alignment of mora to kanji with early exit.
@@ -115,7 +111,7 @@ def find_first_complete_alignment(
         ["".join(mora) for mora in split] for split in possible_splits
     ]
 
-    best_alignment: Optional[MoraAlignment] = None
+    best_alignment: MoraAlignment | None = None
     best_jukujikun_count = kanji_count + 1  # Start with worst possible
     best_chars_matched_count = 0
 
@@ -124,7 +120,7 @@ def find_first_complete_alignment(
     def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
         nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
         logger.debug("find_first_complete_alignment - trying mora_split: %s", mora_split)
-        kanji_matches: list[Optional[ReadingMatchInfo]] = []
+        kanji_matches: list[ReadingMatchInfo | None] = []
         jukujikun_positions: list[int] = []
         final_okurigana = ""
         final_rest_kana = maybe_okuri
@@ -271,25 +267,52 @@ def find_first_complete_alignment(
             if match_info:
                 # For repeater, check if second occurrence has rendaku
                 if next_kanji_is_repeater:
-                    first_mora = "".join(mora_split[i])
-                    second_mora = "".join(mora_split[i + 1])
+                    # A split can come back with fewer parts than the word has kanji, so both
+                    # mora are guarded the same way repeater_mora_sequence is above
+                    first_mora = "".join(mora_split[i]) if i < len(mora_split) else ""
+                    second_mora = "".join(mora_split[i + 1]) if (i + 1) < len(mora_split) else ""
 
                     # Check for rendaku in second occurrence: the same reading again, but voiced,
-                    # the way 国々 reads くに+ぐに.
-                    rendaku_matched = any(
+                    # the way 国々 reads くに+ぐに. An empty chunk leaves nothing to voice.
+                    rendaku_matched = bool(first_mora) and any(
                         second_mora.startswith(rendaku_kana + first_mora[1:])
                         for rendaku_kana in RENDAKU_CONVERSION_DICT_HIRAGANA.get(first_mora[0], [])
                     )
 
+                    # 々 has no readings of its own, so it can only copy the first match, but a
+                    # kanji written out twice is as often two words meeting - the 月月 of 毎月月末
+                    # reads つき+ゲツ - so the second occurrence gets matched on its own readings.
+                    second_match = None
+                    if next_kanji != "々":
+                        second_kunyomi_match, second_onyomi_match = match_reading_to_mora(
+                            kanji=kanji,
+                            word=word,
+                            furigana=furigana,
+                            mora_sequence=second_mora,
+                            kanji_data=kanji_data,
+                            maybe_okuri=maybe_okuri if check_okurigana else "",
+                            is_last_kanji=(i + 1) == kanji_count - 1,
+                        )
+                        second_match = (
+                            second_onyomi_match if second_onyomi_match else second_kunyomi_match
+                        )
+
                     # Add duplicate match for 々 (copy reading but mark as second occurrence).
+                    # The copy is also the fallback for a doubled kanji whose second mora matches
+                    # nothing on its own, the way 各々 only lists the doubled reading.
                     # Mark it as the repeater only when the word gives us evidence of one: either
                     # it was written with 々, or the second reading is a rendaku of the first, which
                     # only happens inside a single word. Two identical readings prove nothing - the
                     # 物物 of 生物物理学 reads exactly like the 我我 of 我々 - so a kanji doubled
                     # with a plain repeat keeps its own spelling.
-                    repeater_match = match_info.copy()
-                    repeater_match["matched_mora"] = second_mora
-                    repeater_match["kanji"] = "々" if next_kanji == "々" or rendaku_matched else kanji
+                    if second_match is not None:
+                        repeater_match = second_match
+                    else:
+                        repeater_match = match_info.copy()
+                        repeater_match["matched_mora"] = second_mora
+                    repeater_match["kanji"] = (
+                        "々" if next_kanji == "々" or rendaku_matched else kanji
+                    )
 
                     # Add match for first kanji
                     # We'll remove the okurigana from the first match for now as it should only

@@ -16,6 +16,9 @@ import re
 
 import pytest
 
+from ..kana.make_furigana_from_reading import make_furigana_from_reading
+from ..mecab_controller.kana_conv import to_hiragana
+from ..utils.logger import LOGGER_NAME
 from .okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
     OKURIGANA_MIX_CLEANING_REC,
@@ -23,11 +26,6 @@ from .okurigana_mix_cleaning_replacer import (
     okurigana_mix_cleaning_replacer,
     unread_kanji_count,
 )
-
-from ..kana.make_furigana_from_reading import make_furigana_from_reading
-from ..mecab_controller.kana_conv import to_hiragana
-from ..utils.logger import LOGGER_NAME
-
 
 TAG_RE = re.compile(r"<[^>]+>")
 GROUP_RE = re.compile(r" ?([^ \[\]<>]+?)\[([^\]]*)\]")
@@ -156,7 +154,9 @@ CASES = [
     ),
     # The honorific is still given back when the kanji can account for neither spelling: 土産
     # reads みやげ as jukujikun either way, so the prefix itself has to decide.
-    pytest.param("お土産[おみやげ]", "お土産[みやげ]", id="honorific prefix before a jukujikun word"),
+    pytest.param(
+        "お土産[おみやげ]", "お土産[みやげ]", id="honorific prefix before a jukujikun word"
+    ),
     # A reading that spells a particle out belongs to the particle, not to the kanji.
     pytest.param(
         "と時間[とじかん]",
@@ -165,6 +165,100 @@ CASES = [
     ),
     pytest.param(
         "消[き]え去[さ]る", "消[き]え去[さ]る", id="an already cleaned word is not cleaned again"
+    ),
+    # --- more than one word in the text -----------------------------------------------------
+    # A reading stops at its own bracket. As `.+` the greedy first reading ran on past the `]`
+    # and stopped at the last place in the whole text where the okurigana sat in front of one,
+    # so 見え[みえ] took everything up to 消え[きえ]'s bracket for its reading and left 消え
+    # rewritten into a form nothing reads as furigana any more.
+    pytest.param(
+        "彼は 見え[みえ]ない 所[ところ]で 消え[きえ]た",
+        "彼は 見[み]えない 所[ところ]で 消[き]えた",
+        id="two words whose okurigana is the same kana",
+    ),
+    pytest.param(
+        "これは 上げ[あげ]て 下げ[さげ]る",
+        "これは 上[あ]げて 下[さ]げる",
+        id="two words whose okurigana and reading share a kana",
+    ),
+    pytest.param(
+        "食べ[たべ]たい 食べ[たべ]る",
+        "食[た]べたい 食[た]べる",
+        id="the same word twice in one text",
+    ),
+    # A line start marks where a word begins just as a space does. Fields written in the HTML
+    # editor break their lines with <br>, but fields pasted or imported as plain text carry \n,
+    # and the first word of every line after the first used to be left uncleaned.
+    pytest.param(
+        "行[い]く\n食べ[たべ]る", "行[い]く\n食[た]べる", id="a word opening a line is a word start"
+    ),
+    pytest.param(
+        "行[い]く\nお前[おまえ]",
+        "行[い]く\nお前[まえ]",
+        id="opening kana of a word opening a line",
+    ),
+    # A word can follow another word's bracket or a punctuation mark with nothing in between,
+    # and both are as much a word start as a space is: 歩き[あるき]出す[だす] left its second
+    # word uncleaned, and a sentence's words were cleaned only up to its first 。
+    pytest.param(
+        "歩き[あるき]出す[だす]",
+        "歩[ある]き出[だ]す",
+        id="a word right after another word's bracket",
+    ),
+    pytest.param("。食べ[たべ]る", "。食[た]べる", id="a word after a full stop"),
+    pytest.param("「食べ[たべ]る」", "「食[た]べる」", id="a word inside quote marks"),
+    pytest.param(
+        "行[い]く。食べ[たべ]る",
+        "行[い]く。食[た]べる",
+        id="a word after a full stop, with another before it",
+    ),
+    pytest.param(
+        "行[い]く。お前[おまえ]",
+        "行[い]く。お前[まえ]",
+        id="opening kana of a word after a full stop",
+    ),
+    pytest.param(
+        "[sound:a.mp3]食べ[たべ]る",
+        "[sound:a.mp3]食[た]べる",
+        id="a word after a sound tag's bracket",
+    ),
+    # Kana and kanji are still no word start: は is a particle, not the start of 食べる.
+    pytest.param("私は食べ[たべ]る", "私は食べ[たべ]る", id="a word after a particle is skipped"),
+    pytest.param(
+        "私はお前[おまえ]", "私はお前[おまえ]", id="opening kana after a particle is left alone"
+    ),
+    # --- whole sentences ---------------------------------------------------------------------
+    # What the passes get from a card: several words in one text, kept apart by a space, a <br>
+    # or a newline, one of them opening the text and one following a tag.
+    pytest.param(
+        "勿体無い[もったいない] 行き来[いきき]",
+        "勿体無[もったいな]い 行[い]き来[き]",
+        id="the greedy reading and the second reading in one text",
+    ),
+    pytest.param(
+        "見え[みえ]た<br>消え[きえ]た",
+        "見[み]えた<br>消[き]えた",
+        id="words sharing okurigana across a line break",
+    ),
+    pytest.param(
+        "<b>上げ[あげ]</b>て 下げ[さげ]る",
+        "<b>上[あ]げ</b>て 下[さ]げる",
+        id="a word right after a tag, with another after it",
+    ),
+    pytest.param(
+        "すり下ろす[すりおろす]\nかも知れない[かもしれない]",
+        "すり下[お]ろす\nかも知[し]れない",
+        id="two words opening with kana, the second opening a line",
+    ),
+    pytest.param(
+        "隣り合わせ[となりあわせ]の 歯止め[はどめ]",
+        "隣[とな]り合[あ]わせの 歯止[はど]め",
+        id="two kanji runs in the first word, one in the second",
+    ),
+    pytest.param(
+        "朝[あさ] 起き[おき]て<br>夜[よる] 寝る[ねる]",
+        "朝[あさ] 起[お]きて<br>夜[よる] 寝[ね]る",
+        id="a sentence of words with and without okurigana",
     ),
 ]
 

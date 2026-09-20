@@ -1,9 +1,6 @@
-from typing import Optional, Union, Tuple
-
 from ..all_types.main_types import PartOfSpeech
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger
-
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
@@ -134,7 +131,7 @@ def get_part_of_speech(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
-) -> Optional[PartOfSpeech]:
+) -> PartOfSpeech | None:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
     :param okurigana: Always required.
@@ -197,8 +194,8 @@ def get_okuri_dict_for_okurigana(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
-    part_of_speech: Optional[PartOfSpeech] = None,
-) -> tuple[Union[dict, None], Optional[PartOfSpeech]]:
+    part_of_speech: PartOfSpeech | None = None,
+) -> tuple[dict | None, PartOfSpeech | None]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.
@@ -232,7 +229,7 @@ def get_okuri_dict_for_okurigana(
 # in でしょう, ならば or です among others.
 # euphonic changes were also removed except for the last vs-s (47) vs vs-i (48)
 # suru verb classes
-ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] = [
+ALL_OKURI_BY_PART_OF_SPEECH: list[tuple[int, str] | tuple[int, str, str]] = [
     (1, "い"),
     (1, "くない"),
     # (1, "くないです"), # shouldn't include です in okurigana
@@ -1442,7 +1439,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (48, "せたり", "さ"),
     (48, "せます", "さ"),
     (48, "せました", "さ"),
-    (48, "せまましたら", "さ"),
+    (48, "せましたら", "さ"),
     (48, "せましたり", "さ"),
     (48, "します", "さ"),
     (48, "したい", "さ"),
@@ -1502,15 +1499,16 @@ for item in ALL_OKURI_BY_PART_OF_SPEECH:
         pos_num, okuri = item
         euph = ""
     # Get part of speech string id
-    # Get part of speech string id
     pos_id, pos_desc = PART_OF_SPEECH_NUM[pos_num]
     if pos_id not in POSSIBLE_OKURIGANA_PROGRESSION_DICT:
         POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id] = {}
     # Recursively add each kana character of the okurigana to the dict
     add_chars_to_dict(okuri, POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])
-    # Also add entry for blank okuri, which indicates no conjugation applied on the stem,
-    # e.g. 恥ずかし気な
-    add_char_dict("", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id], is_last=True)
+    if not okuri and not euph:
+        # A wholly blank entry marks a part of speech whose stem can stand with no
+        # conjugation on it at all, e.g. 恥ずかし気な; only adj-i has one. add_chars_to_dict
+        # has no character to hang that marker on, so it goes in here.
+        add_char_dict("", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id], is_last=True)
     # If this okuri had a euphonic change entry, add the same progression for it too
     if euph:
         add_chars_to_dict(f"{euph}{okuri}", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])

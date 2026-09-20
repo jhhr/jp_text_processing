@@ -7,11 +7,11 @@ exceptions now return a MoraAlignment dict that the main pipeline can feed into
 and word edge splitting.
 """
 
-from typing import TypedDict, Optional, List, Dict
+from typing import TypedDict
 
-from .mora_alignment import MoraAlignment
 from ..all_types.main_types import MatchType, ReadingMatchInfo
 from ..utils.logger import package_logger as logger
+from .mora_alignment import MoraAlignment
 
 
 class ExceptionAlignmentEntry(TypedDict):
@@ -26,7 +26,7 @@ class ExceptionAlignmentEntry(TypedDict):
     mora: str
 
 
-FURIGANA_EXCEPTION_ALIGNMENTS: Dict[str, List[ExceptionAlignmentEntry]] = {
+FURIGANA_EXCEPTION_ALIGNMENTS: dict[str, list[ExceptionAlignmentEntry]] = {
     # 麻雀[まーじゃん] - Both kanji are jukujikun
     "麻雀_まーじゃん": [
         {"type": "jukujikun", "mora": "まー"},
@@ -112,14 +112,14 @@ FURIGANA_EXCEPTION_ALIGNMENTS: Dict[str, List[ExceptionAlignmentEntry]] = {
 }
 
 
-def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAlignment:
+def _build_alignment(word: str, parts: list[ExceptionAlignmentEntry]) -> MoraAlignment:
     kanji_count = len(word)
-    assert kanji_count == len(
-        parts
-    ), f"Exception alignment parts length mismatch for '{word}': {len(parts)} vs {kanji_count}"
-    kanji_matches: List[Optional[ReadingMatchInfo]] = []
-    mora_split: List[str] = []
-    jukujikun_positions: List[int] = []
+    assert kanji_count == len(parts), (
+        f"Exception alignment parts length mismatch for '{word}': {len(parts)} vs {kanji_count}"
+    )
+    kanji_matches: list[ReadingMatchInfo | None] = []
+    mora_split: list[str] = []
+    jukujikun_positions: list[int] = []
 
     for idx, entry in enumerate(parts):
         mora_split.append(entry["mora"])
@@ -180,7 +180,7 @@ def _build_alignment(word: str, parts: List[ExceptionAlignmentEntry]) -> MoraAli
 def check_exception(
     word: str,
     furigana: str,
-) -> Optional[MoraAlignment]:
+) -> MoraAlignment | None:
     """
     Check if word+furigana combination is in the exception dictionary and return a
     MoraAlignment object so the main pipeline can reconstruct furigana consistently.

@@ -13,7 +13,6 @@ import pytest
 
 from .word_highlight import word_highlight
 
-
 CASES = [
     pytest.param(
         "",
@@ -44,6 +43,18 @@ CASES = [
         "   ",
         "何[なに]を しています か？",
         id="Crash test - word is just whitespace",
+    ),
+    pytest.param(
+        "これは犬です",
+        "ね",
+        "これは犬です",
+        id="Crash test - one-kana word not in the text",
+    ),
+    pytest.param(
+        "食べた",
+        "る",
+        "食べた",
+        id="Crash test - one-kana word not in the text /2",
     ),
     pytest.param(
         "私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
@@ -143,11 +154,75 @@ CASES = [
         "高[たか]いでも<b> 良[よ]かろう</b>",
         id="Furigana - adjective inflection /3",
     ),
+    # The な form: the adnominal 大きな has the stem of 大きい, so the stem is the word; the な
+    # is not, unless the word to match was written with it.
+    pytest.param(
+        "大[おお]きな 家[いえ]",
+        "大[おお]きい",
+        "<b>大[おお]き</b>な 家[いえ]",
+        id="Furigana - adjective in the な form",
+    ),
+    pytest.param(
+        "大[おお]きな 家[いえ]",
+        "大[おお]きいな",
+        "<b>大[おお]きな</b> 家[いえ]",
+        id="Furigana - adjective in the な form, the word written with the な",
+    ),
+    pytest.param(
+        "小[ちい]さな 家[いえ]",
+        "小[ちい]さい",
+        "<b>小[ちい]さ</b>な 家[いえ]",
+        id="Furigana - adjective in the な form /2",
+    ),
     pytest.param(
         "早読[はやよ]みするぜ",
         "早[はや]い",
         "<b>早[はや]</b> 読[よ]みするぜ",
         id="Furigana - adjective inflection with な /1",
+    ),
+    # A word with okurigana wants that okurigana after its last kanji, so a run going on past
+    # the kanji is another word: 出来事 is a noun. Only a word that gives no reading of its own
+    # needs the rule; a word that gives one has it to disagree with the text's reading, so
+    # 出来[でき]る splits the run the way any word with a reading does. A run that only begins
+    # before the word's kanji (花見 / 見る) stays the ambiguity it is on both paths.
+    pytest.param(
+        "今日の 出来事[できごと]",
+        "出来る",
+        "今日の 出来事[できごと]",
+        id="Okuri word - a run continuing past the word's kanji is not the word",
+    ),
+    pytest.param(
+        "今日の 出来事[できごと]",
+        "出来[でき]る",
+        "今日の<b> 出来[でき]</b> 事[ごと]",
+        id="Okuri word - a word with a reading still splits the run it is part of",
+    ),
+    pytest.param(
+        "花見[はなみ]に 行[い]く",
+        "見る",
+        "<b>花見[はなみ]</b>に 行[い]く",
+        id="Okuri word - a run ending at the word's kanji still matches",
+    ),
+    pytest.param(
+        "花見[はなみ]に 行[い]く",
+        "見[み]る",
+        "花[はな]<b> 見[み]</b>に 行[い]く",
+        id="Okuri word - a run ending at the word's kanji still matches, with furigana",
+    ),
+    # Matching against the text's readings splits them apart first, and only what that split
+    # took apart is put back together: a part of the text the highlight did not touch comes
+    # back as it was written, its own furigana words still its own.
+    pytest.param(
+        "出来[でき] 事[こと]が 好[す]きだ",
+        "好[す]き",
+        "出来[でき] 事[こと]が<b> 好[す]き</b>だ",
+        id="Furigana - furigana words the text wrote apart are not merged",
+    ),
+    pytest.param(
+        "花[はな] 見[み]に 行[い]く",
+        "行[い]く",
+        "花[はな] 見[み]に<b> 行[い]く</b>",
+        id="Furigana - furigana words the text wrote apart are not merged, word with okuri",
     ),
     pytest.param(
         "垂[タ]レ 込[コ]ミがあった、オイ！",
@@ -589,6 +664,26 @@ CASES = [
         "<b>はしらないで</b>歩く",
         id="Kana only - the word itself still highlights when MeCab knows it",
     ),
+    # Two occurrences with nothing between them: the token that ends the first highlight is
+    # the one that begins the second, so it gets looked at as a beginning too.
+    pytest.param(
+        "はしってはしって",
+        "はしる",
+        "<b>はしって</b><b>はしって</b>",
+        id="Kana only - two adjacent occurrences both highlight",
+    ),
+    pytest.param(
+        "たべたたべた",
+        "たべる",
+        "<b>たべた</b><b>たべた</b>",
+        id="Kana only - two adjacent occurrences both highlight /2",
+    ),
+    pytest.param(
+        "はしって はしって",
+        "はしる",
+        "<b>はしって</b> <b>はしって</b>",
+        id="Kana only - two occurrences separated by only a space both highlight",
+    ),
     pytest.param(
         "それはバズったね",
         "バズる",
@@ -612,6 +707,92 @@ CASES = [
         "バズる",
         "それは<b>バズった</b>",
         id="Kana only - stem parsed as a noun, conjugation at the end of the text",
+    ),
+    pytest.param(
+        "それはバズられたね",
+        "バズる",
+        "それは<b>バズられた</b>ね",
+        id="Kana only - stem parsed as a noun, passive read as a verb of its own",
+    ),
+    pytest.param(
+        "それはバズらせたね",
+        "バズる",
+        "それは<b>バズらせた</b>ね",
+        id="Kana only - stem parsed as a noun, causative in the past",
+    ),
+    pytest.param(
+        "それはバズらせないね",
+        "バズる",
+        "それは<b>バズらせない</b>ね",
+        id="Kana only - stem parsed as a noun, causative negative",
+    ),
+    pytest.param(
+        "それはバズらせられたね",
+        "バズる",
+        "それは<b>バズらせられた</b>ね",
+        id="Kana only - stem parsed as a noun, causative passive in the past",
+    ),
+    pytest.param(
+        "それはバズったね",
+        "バズり",
+        "それは<b>バズった</b>ね",
+        id="Kana only - stem parsed as a noun, word given in noun form",
+    ),
+    pytest.param(
+        "それはバズがすごいね",
+        "バズる",
+        "それはバズがすごいね",
+        id="Kana only - a particle after the stem is not a conjugation",
+    ),
+    pytest.param(
+        "それはバズらしいね",
+        "バズる",
+        "それはバズらしいね",
+        id="Kana only - a non-verb auxiliary after the stem is not a conjugation",
+    ),
+    pytest.param(
+        "きのうサボった",
+        "サボる",
+        "きのう<b>サボった</b>",
+        id="Kana only - katakana-stem verb MeCab knows",
+    ),
+    pytest.param(
+        "かれはサボっているよ",
+        "サボる",
+        "かれは<b>サボっている</b>よ",
+        id="Kana only - katakana-stem verb MeCab knows, conjugation spanning several tokens",
+    ),
+    pytest.param(
+        "サボらないでよ",
+        "サボる",
+        "<b>サボらないで</b>よ",
+        id="Kana only - katakana-stem verb MeCab knows, negative form",
+    ),
+    pytest.param(
+        "はしがある",
+        "はしる",
+        "はしがある",
+        id="Kana only - noun spelling the word's stem is not the word /3",
+    ),
+    # A reading inside [...] is not the word occurring in the text, so neither the plain
+    # search nor the mecab one may highlight inside a bracket.
+    pytest.param(
+        "この 家[いえ]は",
+        "いえ",
+        "この 家[いえ]は",
+        id="Kana only - a kana word is not the reading in a bracket",
+    ),
+    pytest.param(
+        "この 家[いえ]は いえ",
+        "いえ",
+        "この 家[いえ]は<b> いえ</b>",
+        id="Kana only - a kana word in the text highlights, the same reading does not",
+    ),
+    pytest.param(
+        "この 家[いえ]は いえた",
+        "いえる",
+        "この 家[いえ]は <b>いえた</b>",
+        id="Kana only - an inflected kana word highlights, the same reading does not",
     ),
     pytest.param(
         (
@@ -666,6 +847,216 @@ CASES = [
         # Might not always highlight correctly, though this one does, but at least shouldn't crash
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
         id="Shouldn't crash with mixture of furigana and non-furigana in word",
+    ),
+    # An Anki word field often has no furigana where the sentence field does, or the other way
+    # round. The highlight then covers the same occurrence as it would if both agreed, brackets
+    # and all, instead of closing between a kanji and its reading.
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "日本語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word written without the furigana the text has",
+    ),
+    pytest.param(
+        "食[た]べた",
+        "食べる",
+        "<b>食[た]べた</b>",
+        id="Furigana mismatch - word written without the furigana the text has, inflected",
+    ),
+    pytest.param(
+        "食べた",
+        "食[た]べる",
+        "<b>食べた</b>",
+        id="Furigana mismatch - text written without the furigana the word has, inflected",
+    ),
+    pytest.param(
+        "食[た]べた",
+        "食[た]べる",
+        "<b>食[た]べた</b>",
+        id="Furigana mismatch - neither side is missing furigana, inflected",
+    ),
+    pytest.param(
+        "その 人[ひと]が",
+        "人[じん]",
+        "その 人[ひと]が",
+        id="Furigana mismatch - a reading the word disagrees with is still not the word",
+    ),
+    # Without the word's own reading the text's reading cannot be split between the kanji it
+    # covers, so a word that is only part of a kanji run takes the whole run and its bracket.
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で",
+        "魚",
+        "この<b> 魚[さかな]</b>は<b> 魚市場[うおいちば]</b>で",
+        id="Furigana mismatch - word without furigana starting a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana ending a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "本語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana in the middle of a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "日本",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana at the start of a longer kanji run",
+    ),
+    pytest.param(
+        "魚市場で",
+        "魚",
+        "<b>魚</b>市場で",
+        id="Furigana mismatch - a kanji run with no reading is highlighted as far as the word",
+    ),
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で",
+        "魚[うお]",
+        "この 魚[さかな]は<b> 魚[うお]</b> 市場[いちば]で",
+        id="Furigana mismatch - a word with a reading still splits the run it is part of /1",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "語[ご]",
+        "私は 日本[にほん]<b> 語[ご]</b>を",
+        id="Furigana mismatch - a word with a reading still splits the run it is part of /2",
+    ),
+    # The caller's own html around the word: the highlight goes inside the element when the
+    # element holds the whole word, and around it when the word runs past the element's edge.
+    pytest.param(
+        "<span>はしって</span>",
+        "はしる",
+        "<span><b>はしって</b></span>",
+        id="Html shape - a tag around the whole word keeps the highlight inside it",
+    ),
+    pytest.param(
+        '<span class="x">はしって</span>',
+        "はしる",
+        '<span class="x"><b>はしって</b></span>',
+        id="Html shape - the space in a tag's attributes is part of the tag",
+    ),
+    pytest.param(
+        "<span>はし</span>って",
+        "はしる",
+        "<b><span>はし</span>って</b>",
+        id="Html shape - a tag around part of the word goes inside the highlight",
+    ),
+    # A kana word is searched for as it is written before the mecab path is tried, so that
+    # search has to see through the caller's tags the way the mecab one does.
+    pytest.param(
+        "この<i>い</i>えは",
+        "いえ",
+        "この<b><i>い</i>え</b>は",
+        id="Html shape - a tag splitting a kana word is still the word",
+    ),
+    pytest.param(
+        'この<span class="x">い</span>えは',
+        "いえ",
+        'この<b><span class="x">い</span>え</b>は',
+        id="Html shape - a tag with attributes splitting a kana word is still the word",
+    ),
+    pytest.param(
+        "この<i>い</i>え<i>で</i>す",
+        "いえで",
+        "この<b><i>い</i>え<i>で</i></b>す",
+        id="Html shape - two tags splitting a kana word are still the word",
+    ),
+    pytest.param(
+        "この<i>いえ</i>は",
+        "いえ",
+        "この<i><b>いえ</b></i>は",
+        id="Html shape - a tag around a whole kana word keeps the highlight inside it",
+    ),
+    pytest.param(
+        "<span>はしって</span><br>",
+        "はしる",
+        "<span><b>はしって</b></span><br>",
+        id="Html shape - an unpaired tag after the word stays outside the highlight",
+    ),
+    pytest.param(
+        "<k> 昨日[きのう]</k>は バズったね",
+        "バズる",
+        "<k> 昨日[きのう]</k>は <b>バズった</b>ね",
+        id="Html shape - the space before the word stays outside the highlight",
+    ),
+    pytest.param(
+        "<span>食[た]</span>べた",
+        "食[た]べる",
+        "<b><span> 食[た]</span>べた</b>",
+        id="Html shape - a tag around part of a furigana word",
+    ),
+    pytest.param(
+        "<span>食[た]べた</span><br>",
+        "食[た]べる",
+        "<span><b> 食[た]べた</b></span><br>",
+        id="Html shape - a furigana word in a tag with an unpaired tag after it",
+    ),
+    pytest.param(
+        "<span>家で居る、家出はしない</span>",
+        "家",
+        "<span><b>家</b>で居る、<b>家</b>出はしない</span>",
+        id="Html shape - several occurrences inside one tag",
+    ),
+    pytest.param(
+        "<span> 家[いえ]と 家[いえ]</span>",
+        "家[いえ]",
+        "<span><b> 家[いえ]</b>と<b> 家[いえ]</b></span>",
+        id="Html shape - several furigana occurrences inside one tag",
+    ),
+    # A splitter dot is stored like a tag: it is out of the way while the word is matched and
+    # comes back where it was, inside the highlight when the word is written across it and
+    # outside when it only separates two occurrences.
+    pytest.param(
+        "家出・家出",
+        "家出",
+        "<b>家出</b>・<b>家出</b>",
+        id="Splitter dot - between two occurrences, not inside either",
+    ),
+    pytest.param(
+        " 家出[いえで]・ 家出[いえで]",
+        "家出[いえで]",
+        "<b> 家出[いえで]</b>・<b> 家出[いえで]</b>",
+        id="Splitter dot - between two furigana occurrences",
+    ),
+    pytest.param(
+        " 家[いえ]・ 家[いえ]",
+        "家[いえ]",
+        "<b> 家[いえ]</b>・<b> 家[いえ]</b>",
+        id="Splitter dot - between two single-kanji furigana occurrences",
+    ),
+    pytest.param(
+        "<span> 家[いえ]・ 家[いえ]</span>",
+        "家[いえ]",
+        "<span><b> 家[いえ]</b>・<b> 家[いえ]</b></span>",
+        id="Splitter dot - between two furigana occurrences inside a tag",
+    ),
+    pytest.param(
+        "家・出でした",
+        "家出",
+        "<b>家・出</b>でした",
+        id="Splitter dot - inside the word, spanned by the highlight",
+    ),
+    pytest.param(
+        "毎日 報・ 連・ 相しています",
+        "報連相する",
+        "毎日<b> 報・ 連・ 相しています</b>",
+        id="Splitter dot - inside a word with okurigana",
+    ),
+    pytest.param(
+        "毎日[まいにち] 報[ほう]・ 連[れん]・ 相[そう]しています",
+        "報連相[ほうれんそう]する",
+        "毎日[まいにち]<b> 報[ほう]・ 連[れん]・ 相[そう]しています</b>",
+        id="Splitter dot - inside a furigana word with okurigana",
+    ),
+    pytest.param(
+        "<span></span>はしって",
+        "はしる",
+        "<span></span><b>はしって</b>",
+        id="Html shape - an empty element next to the word is the caller's and stays",
     ),
 ]
 

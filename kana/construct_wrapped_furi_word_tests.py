@@ -13,9 +13,8 @@ the mode's id.
 
 import pytest
 
-from .construct_wrapped_furi_word import FuriReconstruct, construct_wrapped_furi_word
-
 from ..all_types.main_types import WrapMatchEntry, WrapTag
+from .construct_wrapped_furi_word import FuriReconstruct, construct_wrapped_furi_word
 
 
 def entry(
@@ -164,6 +163,26 @@ CASES = [
             "furikanji merged": "<mix> よんじゅっ[40]</mix><on> ぷん[分]</on>",
         },
         id="40分",
+    ),
+    pytest.param(
+        # A number whose digits read as more kanji than it has digits: 24 is 二十四, so two of
+        # the three entries carry no kanji of their own. Merging the first two on their shared
+        # tag leaves a block that is no longer a number, and the よん of the 四 still belongs to
+        # it - dropped instead, the word came out reading ニジュウ.
+        [
+            entry("24", "on", "ニ", is_num=True),
+            entry("", "on", "ジュウ"),
+            entry("", "kun", "よん"),
+        ],
+        {
+            "kana_only": "<on>ニ</on><on>ジュウ</on><kun>よん</kun>",
+            "kana_only merged": "<on>ニジュウ</on><kun>よん</kun>",
+            "furigana": "<mix> 24[ニジュウよん]</mix>",
+            "furikanji": "<mix> ニジュウよん[24]</mix>",
+            "furigana merged": "<mix> 24[ニジュウよん]</mix>",
+            "furikanji merged": "<mix> ニジュウよん[24]</mix>",
+        },
+        id="24",
     ),
 ]
 

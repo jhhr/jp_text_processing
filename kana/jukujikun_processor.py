@@ -6,14 +6,12 @@ splitting mora evenly among consecutive jukujikun positions and extracting okuri
 when the last kanji is jukujikun.
 """
 
-from typing import Tuple
-
-from ..all_types.main_types import ReadingMatchInfo, WrapMatchEntry
-from .mora_splitter import split_to_mora_list
-from .mora_alignment import MoraAlignment
-from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
+from ..all_types.main_types import WrapMatchEntry
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 from ..utils.logger import package_logger as logger
+from .furigana_exceptions import FURIGANA_EXCEPTION_ALIGNMENTS
+from .mora_alignment import MoraAlignment
+from .mora_splitter import split_to_mora_list
 
 
 def should_reject_lexicalized_na_suffix(
@@ -44,9 +42,7 @@ def should_reject_lexicalized_na_suffix(
     if not has_non_juku_match:
         return False
     # Last jukujikun readings ending in い are especially prone to "Xない" lexicalized parsing.
-    if not last_juku_reading.endswith("い"):
-        return False
-    return True
+    return last_juku_reading.endswith("い")
 
 
 def split_mora_for_jukujikun(mora_list: list[str], kanji: list[str]) -> list[str]:
@@ -165,7 +161,7 @@ def process_jukujikun_positions(
     furigana: str,
     alignment: MoraAlignment,
     remaining_kana: str,
-) -> Tuple[dict[int, WrapMatchEntry], str, str]:
+) -> tuple[dict[int, WrapMatchEntry], str, str]:
     """
     Process jukujikun (unmatched) positions in the alignment.
 
@@ -176,8 +172,10 @@ def process_jukujikun_positions(
 
     :param word: The full word
     :param furigana: The full furigana reading for the word
-    :param alignment: The mora alignment result containing jukujikun positions
-    :param with_tags: Whether to wrap jukujikun portions in <juk> tags
+    :param alignment: The mora alignment result containing jukujikun positions. It is updated
+        in place: a furigana exception may add positions to ``jukujikun_positions``, and
+        ``recut_mora_around_exceptions`` rewrites ``mora_split``. The caller reads both again
+        after this returns.
     :param remaining_kana: The kana following the word (for okurigana extraction)
     :return: Tuple of (jukujikun_parts_dict, okurigana, rest_kana)
              jukujikun_parts_dict maps kanji_index → WrapMatchEntry describing the mora
@@ -225,21 +223,6 @@ def process_jukujikun_positions(
                         "furigana": mora_portion,
                         "is_num": word[pos].isdigit(),
                     }
-                # Special-case: when there is exactly one kanji before the first exception,
-                # set its matched mora to the furigana prefix before the exception reading.
-                if start_search == 0 and start == 1 and not alignment["kanji_matches"][0]:
-                    prefix_str = full_furigana.split(ex_furi, 1)[0]
-                    if prefix_str:
-                        alignment["kanji_matches"][0] = ReadingMatchInfo(
-                            reading=prefix_str,
-                            dict_form=prefix_str,
-                            match_type="onyomi",
-                            reading_variant="plain",
-                            matched_mora=prefix_str,
-                            kanji=word[0],
-                            okurigana="",
-                            rest_kana="",
-                        )
                 start_search = start + len(ex_word)
 
     # Redistribute over whatever the exception mapping left unclaimed. Claiming some positions
@@ -274,8 +257,7 @@ def process_jukujikun_positions(
             kanji_count=len(run),
         )["mora_list"]
         logger.debug(
-            "process_jukujikun_positions - jukujikun run %s gets mora %s,"
-            " alignment.mora_split: %s",
+            "process_jukujikun_positions - jukujikun run %s gets mora %s, alignment.mora_split: %s",
             run,
             run_mora_str,
             mora_split,
@@ -340,6 +322,7 @@ def process_jukujikun_positions(
             okuri_prefix="reading",
             strict_inflection=True,
         )
+
         # Whatever is taken as okurigana has to be spent out of the kana that follow the word:
         # okurigana + rest_kana == remaining_kana. A candidate claiming more than that has taken
         # the difference from the kanji's own reading, which stays in the furigana as well. For

@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from ..utils.logger import package_logger as logger
 
@@ -51,7 +52,7 @@ def make_diff_string_for_indexes(
         total_offset += offset
     logger.debug("Simulated edited text: \033[90m'%s'\033[0m", simulated_edited_text)
     # Then reconstruct the parts into the simulated edited text exactly as restore_parts
-    for start, end, part_str in indexes:
+    for start, _end, part_str in indexes:
         simulated_edited_text = (
             simulated_edited_text[:start] + part_str + simulated_edited_text[start:]
         )
@@ -93,30 +94,23 @@ def use_text_part_storage(
     logger.debug("Text after removal of parts: '%s'", cleaned_text)
     logger.debug("Indexes of removed parts stored: %s", part_indexes)
 
-    def part_free_to_original_index(part_free_index: int) -> int:
-        """Convert index in text after removal to index in original text."""
+    def part_free_to_original_index(part_free_index: int, strict: bool = False) -> int:
+        """Convert index in text after removal to index in the text the parts are restored into.
+
+        A part sitting exactly at the index is on one side of it or the other depending on what
+        is being inserted there: the opening <b> goes after it (strict), the closing one before.
+        """
         logger.debug("Converting part_free_index: %s to original index", part_free_index)
         # Calculate offset due to removed parts
         parts_offset = 0
         for start, end, _ in part_indexes:
-            if start <= part_free_index + parts_offset:
+            boundary = part_free_index + parts_offset
+            if start < boundary or (strict and start == boundary):
                 parts_offset += end - start
             else:
                 break
         logger.debug("original_index with parts_offset: %s", part_free_index + parts_offset)
-        # Now account for any offsets added during modifications
-        offsets_offset = 0
-        for index, offset in offset_indexes:
-            if index <= part_free_index:
-                offsets_offset += offset
-            else:
-                break
-        logger.debug(
-            "final original_index with offsets_offset: %s",
-            part_free_index + parts_offset - offsets_offset,
-        )
-
-        return part_free_index + parts_offset - offsets_offset
+        return part_free_index + parts_offset
 
     def increment_indexes(after_part_free_index: int, offset: int, strict: bool = False) -> None:
         """Increment indexes after the given index (in coordinates after removal) by the given offset.
@@ -127,7 +121,7 @@ def use_text_part_storage(
             strict: If True, only increment indexes strictly after the given index.
         """
         # Convert part-free index to original text index
-        after_original_index = part_free_to_original_index(after_part_free_index)
+        after_original_index = part_free_to_original_index(after_part_free_index, strict)
 
         # Find the first part at or after the calculated position
         # We want to include parts that are right at the boundary
@@ -167,7 +161,7 @@ def use_text_part_storage(
 
     def restore_parts(edited_text: str) -> str:
         """Restores the parts back into the text."""
-        for start, end, part_str in part_indexes:
+        for start, _end, part_str in part_indexes:
             edited_text = edited_text[:start] + part_str + edited_text[start:]
             logger.debug("Restored part: '%s' at index %s", part_str, start)
 

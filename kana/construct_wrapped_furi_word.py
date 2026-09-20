@@ -1,13 +1,10 @@
 import re
 from typing import Literal
 
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana
-
 from ..all_types.main_types import WrapMatchEntry
-
-from ..utils.logger import package_logger as logger
-
 from ..kanji.number_to_kanji import number_to_kanji
+from ..mecab_controller.kana_conv import to_hiragana, to_katakana
+from ..utils.logger import package_logger as logger
 
 IS_NUMBER_RE = re.compile(r"^[0-9０-９]+$")
 
@@ -84,9 +81,14 @@ def construct_wrapped_furi_word(
             ):
                 # Do not merge when switching between number blocks and regular kanji if the
                 # highlight differs (keep boundaries for targeted bolding). Otherwise allow
-                # merging so unhighlighted numeric+counter pairs combine.
-                if cur_tag_res["is_num"] != next_tag_res["is_num"] and (
-                    cur_tag_res["highlight"] or next_tag_res["highlight"]
+                # merging so unhighlighted numeric+counter pairs combine. A placeholder that
+                # expands a number is no kanji of the number's own to keep a boundary against:
+                # refusing it there left its reading in a block with no surface to render, and
+                # the highlighted 十 of 24 came out reading ニ.
+                if (
+                    cur_tag_res["is_num"] != next_tag_res["is_num"]
+                    and next_tag_res["kanji"] != ""
+                    and (cur_tag_res["highlight"] or next_tag_res["highlight"])
                 ):
                     do_merge = False
                 else:
@@ -111,6 +113,21 @@ def construct_wrapped_furi_word(
                 highlight = cur_tag_res["highlight"]
                 is_num = True
                 tag = "mix"
+            elif (
+                return_type != "kana_only"
+                and next_tag_res["kanji"] == ""
+                and next_tag_res["highlight"] == cur_tag_res["highlight"]
+            ):
+                # The same placeholder, after the number it expands has stopped counting as one:
+                # merging 24's ニ into the on tag of its 二 left a block that is no longer a number,
+                # so the branch above no longer took the よん of its 四 and furigana mode dropped it
+                # for having no kanji of its own. Whatever the block is tagged, the reading of a
+                # position with no surface belongs in it - and a block reading two ways is mixed.
+                logger.debug("Merging placeholder into the block before it: %s", next_tag_res)
+                do_merge = True
+                highlight = cur_tag_res["highlight"]
+                is_num = cur_tag_res["is_num"]
+                tag = cur_tag_res["tag"] if next_tag_res["tag"] == cur_tag_res["tag"] else "mix"
             elif (
                 return_type != "kana_only"
                 and next_tag_res["is_num"]
@@ -222,13 +239,7 @@ def construct_wrapped_furi_word(
             # kana_only: output kana even for empty kanji entries
             base = f"{kana}"
 
-        if with_tags:
-            if return_type == "kana_only":
-                with_furi = f"<{tag}>{base}</{tag}>"
-            else:
-                with_furi = f"<{tag}>{base}</{tag}>"
-        else:
-            with_furi = base
+        with_furi = f"<{tag}>{base}</{tag}>" if with_tags else base
 
         if apply_highlight and highlight:
             with_furi = f"<b>{with_furi}</b>"

@@ -5,17 +5,15 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
-from typing import Optional
-
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
-from ..mecab_controller.kana_conv import to_hiragana
 from ..kanji.all_kanji_data import KanjiData
-from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-from .mora_splitter import long_vowel_variants
+from ..mecab_controller.kana_conv import to_hiragana
 from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
-from ..okuri.okurigana_dict import get_verb_noun_form_okuri
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..okuri.okurigana_dict import get_verb_noun_form_okuri
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger
+from .mora_splitter import long_vowel_variants
 
 # Small tsu conversion possible endings
 SMALL_TSU_POSSIBLE_HIRAGANA = ["つ", "ち", "く", "き", "り", "ん", "う"]
@@ -164,7 +162,7 @@ def match_onyomi_to_mora(
     kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
-) -> Optional[ReadingMatchInfo]:
+) -> ReadingMatchInfo | None:
     """
     Try to match onyomi readings to a mora sequence.
 
@@ -232,8 +230,8 @@ def match_kunyomi_to_mora(
     kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
-    repeater_mora_sequence: Optional[str] = None,
-) -> Optional[ReadingMatchInfo]:
+    repeater_mora_sequence: str | None = None,
+) -> ReadingMatchInfo | None:
     """
     Try to match kunyomi readings to a mora sequence.
 
@@ -296,7 +294,7 @@ def match_kunyomi_to_mora(
 
     # When okurigana is present, prefer readings whose okurigana marker best matches the remaining
     # kana. Collect candidates and pick best.
-    best_candidate: Optional[ReadingMatchInfo] = None
+    best_candidate: ReadingMatchInfo | None = None
     # Higher is better: (result quality, matched okuri length, shorter rest kana)
     best_candidate_score: tuple[int, int, int] = (-1, -1, -1)
 
@@ -447,8 +445,8 @@ def match_reading_to_mora(
     kanji_data: KanjiData,
     maybe_okuri: str,
     is_last_kanji: bool,
-    repeater_mora_sequence: Optional[str] = None,
-) -> tuple[Optional[ReadingMatchInfo], Optional[ReadingMatchInfo]]:
+    repeater_mora_sequence: str | None = None,
+) -> tuple[ReadingMatchInfo | None, ReadingMatchInfo | None]:
     """
     Try to match any reading (onyomi or kunyomi) to a mora sequence.
 

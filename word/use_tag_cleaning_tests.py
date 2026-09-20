@@ -13,7 +13,6 @@ import pytest
 
 from .use_tag_cleaning import apply_tag_fixes
 
-
 CASES = [
     # An opening tag right before <b>, closed within the b span
     pytest.param(
@@ -43,6 +42,28 @@ CASES = [
         "<b><k> 何[なん]</k>でも</b>",
         "<b><k> 何[なん]</k>でも</b>",
         id="whole tag inside the span is left alone",
+    ),
+    # A crossed tag is reopened as it was written, attributes included
+    pytest.param(
+        '<span class="x"> 何[なん]<b>でも</span> 無[な]い</b>',
+        '<span class="x"> 何[なん]</span><b><span class="x">でも</span> 無[な]い</b>',
+        id="tag with attributes opened before the span keeps them when reopened",
+    ),
+    pytest.param(
+        '<b> 優劣[ゆうれつ]を<span class="x"> 付[つ]け</b> 難[がた]い</span>',
+        '<b> 優劣[ゆうれつ]を<span class="x"> 付[つ]け</span></b><span class="x"> 難[がた]い</span>',
+        id="tag with attributes opened inside the span keeps them when reopened",
+    ),
+    pytest.param(
+        '<span class="x">A<b>B</b>C<b>D</span>E</b>',
+        '<span class="x">A<b>B</b>C</span><b><span class="x">D</span>E</b>',
+        id="tag opened before an earlier span is found for the later one",
+    ),
+    # An empty element is only dropped when it is one a reordering here reopened
+    pytest.param(
+        "<k></k><b> 何[なん]でも</b>",
+        "<k></k><b> 何[なん]でも</b>",
+        id="empty tag next to the span with nothing to reorder is left alone",
     ),
 ]
 

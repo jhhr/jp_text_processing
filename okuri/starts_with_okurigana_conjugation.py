@@ -1,7 +1,5 @@
-from typing import Optional
-
-from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
+from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..utils.logger import package_logger as logger
 
 
@@ -10,7 +8,7 @@ def starts_with_okurigana_conjugation(
     kanji_okurigana: str,
     kanji: str,
     kanji_reading: str,
-    part_of_speech: Optional[PartOfSpeech] = None,
+    part_of_speech: PartOfSpeech | None = None,
 ) -> OkuriResults:
     """
     Determine if a kana text starts with okurigana and return that portion and the rest of the text.
@@ -45,7 +43,7 @@ def starts_with_okurigana_conjugation(
         kanji_reading,
     )
 
-    if not kana_text[0] in okuri_dict and not okuri_dict[""]:
+    if kana_text[0] not in okuri_dict and not okuri_dict.get(""):
         logger.debug("no okurigana found and no empty string okurigana")
         return OkuriResults("", kana_text, "no_okuri", None)
 
@@ -68,7 +66,7 @@ def starts_with_okurigana_conjugation(
             logger.debug(
                 "reached dict end, empty_dict: %s, is_last: %s",
                 not prev_dict,
-                prev_dict.get('is_last'),
+                prev_dict.get("is_last"),
             )
             okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
@@ -79,7 +77,7 @@ def starts_with_okurigana_conjugation(
             logger.debug("reached text end")
             okuri_result = "full_okuri" if prev_dict.get("is_last") else "partial_okuri"
             break
-    if not okurigana and okuri_dict[""]:
+    if not okurigana and okuri_dict.get(""):
         # If no okurigana was found, but this conjugation can be valid with no okurigana,
         # then we indicate that this empty string is a full okurigana
         okuri_result = "empty_okuri"

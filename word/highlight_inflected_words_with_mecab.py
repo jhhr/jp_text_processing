@@ -1,28 +1,45 @@
-from typing import Optional
+from collections.abc import Iterator
 
 from ..all_types.main_types import PartOfSpeech
 from ..mecab_controller.basic_types import MecabParsedToken
+from ..mecab_controller.kana_conv import (
+    is_hiragana_str,
+    is_katakana_str,
+    to_hiragana,
+    to_katakana,
+)
+from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.mecab_common import (
+    MecabWordType,
     get_all_conjugation_conditions,
     get_word_type_from_mecab_token,
     mecab,
-    MecabWordType,
 )
-from ..mecab_controller.kana_conv import (
-    to_hiragana,
-    to_katakana,
-    is_hiragana_str,
-    is_katakana_str,
-)
-from .use_text_part_storage import use_text_part_storage
-
-from .use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
-from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.okurigana_dict import (
     GODAN_FORM_VERB_STARTINGS,
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
 from ..utils.logger import package_logger as logger
+from .use_tag_cleaning import (
+    TAG_SPACE_AND_FURIGANA_PART_RE,
+    use_tag_cleaning_with_b_insertion,
+)
+
+
+def walk_okurigana_progression(
+    part_of_speech: PartOfSpeech, okurigana: str
+) -> Iterator[tuple[int, dict]]:
+    """Walk a part of speech's okurigana progression over the text, one character at a time.
+
+    Yields how much of the text the progression has read and the node that reading reached,
+    stopping where the progression cannot continue.
+    """
+    progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(part_of_speech)
+    for char_index, char in enumerate(okurigana):
+        progression = progression.get(char) if progression else None
+        if not progression:
+            return
+        yield char_index + 1, progression
 
 
 def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: int = 0) -> str:
@@ -43,24 +60,27 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         return text
 
     # Determine the word type from the base form word
-    word_type: Optional[MecabWordType] = None
+    word_type: MecabWordType | None = None
     base_form_word_ending = to_hiragana(base_form_word[-1])
+    word_stem = base_form_word[:-1]
+    if not word_stem:
+        # A one-character word has no stem to inflect and the verbatim search already failed
+        return text
     possible_parts_of_speech: list[PartOfSpeech] = []
     # Check if the last character is in the conjugatable okuri list
     if base_form_word_ending in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH:
         possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH[base_form_word_ending]
     elif base_form_word_ending in GODAN_FORM_VERB_STARTINGS:
-        # Or, if it's a godan verb in noun form, convert to dictionary form
+        # Or, if it's a godan verb in noun form, convert to dictionary form, so that
+        # token.headword can match it. Only here is the word rebuilt: a dictionary form is
+        # already what MeCab spells as the headword, katakana stem and all (サボる).
         base_form_word_ending = GODAN_FORM_VERB_STARTINGS[base_form_word_ending]
         possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(
             base_form_word_ending, []
         )
-
-    word_stem = base_form_word[:-1]
-    # Set noun form verbs to basic verb from, so that token.headword can match them
-    if is_katakana_str(word_stem):
-        base_form_word_ending = to_katakana(base_form_word_ending)
-    base_form_word = word_stem + base_form_word_ending
+        if is_katakana_str(word_stem):
+            base_form_word_ending = to_katakana(base_form_word_ending)
+        base_form_word = word_stem + base_form_word_ending
     for pos in possible_parts_of_speech:
         if pos.startswith("v"):
             word_type = "verb"
@@ -92,28 +112,40 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         following_text = "".join(t.word for t in tokens[index + 1 :])
         okurigana_len = 0
         for pos in possible_parts_of_speech:
-            progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(pos)
-            for char_index, char in enumerate(following_text):
-                progression = progression.get(char) if progression else None
-                if not progression:
-                    break
-                if progression.get("is_last"):
-                    okurigana_len = max(okurigana_len, char_index + 1)
+            for okuri_len, node in walk_okurigana_progression(pos, following_text):
+                if node.get("is_last"):
+                    okurigana_len = max(okurigana_len, okuri_len)
+                if not node.get("る", {}).get("is_last"):
+                    continue
+                # The causative, the passive and the potential turn the word into an ichidan
+                # verb of its own (バズる -> バズらせる) and the dict lists only a few of that
+                # verb's own forms, らせた not among them. Where the okurigana so far plus る
+                # is one of them, the rest of the text goes on as the ichidan okurigana it is.
+                for extra_len, extra_node in walk_okurigana_progression(
+                    "v1", following_text[okuri_len:]
+                ):
+                    if extra_node.get("is_last"):
+                        okurigana_len = max(okurigana_len, okuri_len + extra_len)
+        if not okurigana_len and index + 1 < len(tokens):
+            # MeCab can also read the conjugation as a verb of its own (バズ/られ/た, where
+            # られ is the verb られる), leaving the progression nothing to walk. An auxiliary
+            # verb that counts as this word's conjugated okurigana is the same evidence that
+            # the stem is the word's - and only a verb is: バズらしい is the noun plus らしい.
+            # The tokens after it are checked the usual way as the highlight goes on.
+            next_token = tokens[index + 1]
+            if (
+                get_word_type_from_mecab_token(next_token) == "verb"
+                and get_all_conjugation_conditions(next_token, tokens, word_type)[0]
+            ):
+                okurigana_len = len(next_token.word)
         return okurigana_len
 
-    # Store indexes of all whitespace as mecab wipes them out
-    space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
-        text, part_regex=r"\s+"
+    # Clean the html tags from the text temporarily, and the whitespace with them as mecab wipes
+    # that out as well. The furigana brackets go with them: a reading is not the word occurring
+    # in the text, so MeCab must not read one as a word of the sentence.
+    html_and_space_free_text, increment_indexes_for_b, restore_tags_and_spaces, _ = (
+        use_tag_cleaning_with_b_insertion(text, part_regex=TAG_SPACE_AND_FURIGANA_PART_RE)
     )
-
-    # Clean html tags from the text temporarily
-    html_and_space_free_text, increment_tag_indexes, restore_tags, _ = (
-        use_tag_cleaning_with_b_insertion(space_free_text)
-    )
-
-    def increment_indexes_for_b(start: int, end: int) -> None:
-        increment_for_b_tag_insertion(increment_space_indexes, start, end)
-        increment_tag_indexes(start, end)
 
     all_tokens: list[MecabParsedToken] = list(mecab.translate(html_and_space_free_text))
     result = ""
@@ -151,22 +183,29 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
                 logger.debug("Continuing highlight for conjugated okuri: %s", token.word)
                 result += token.word
                 text_char_idx += len(token.word)
-            else:
-                logger.debug("Ending highlight for conjugated okuri: %s", token.word)
-                result += token.word[:highlighted_chars] + "</b>" + token.word[highlighted_chars:]
-                # We need to subtract the length of the opening tag because the text_char_idx
-                # is counting text including it
-                before_b_close_idx = text_char_idx + highlighted_chars - 3
-                text_char_idx += len(token.word) + 4
-                logger.debug(
-                    "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
-                )
-                increment_indexes_for_b(open_bold_idx, before_b_close_idx)
-                opened_bold = False
-                found_word = False
-        elif (
-            stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)
-        ) or (
+                continue
+            logger.debug("Ending highlight for conjugated okuri: %s", token.word)
+            result += token.word[:highlighted_chars] + "</b>"
+            # We need to subtract the length of the opening tag because the text_char_idx
+            # is counting text including it
+            before_b_close_idx = text_char_idx + highlighted_chars - 3
+            text_char_idx += highlighted_chars + 4
+            logger.debug(
+                "open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx
+            )
+            increment_indexes_for_b(open_bold_idx, before_b_close_idx)
+            opened_bold = False
+            found_word = False
+            if highlighted_chars:
+                # The highlight ended inside this token, so what is left of it is the tail of
+                # the word's own conjugation and cannot begin the next occurrence
+                result += token.word[highlighted_chars:]
+                text_char_idx += len(token.word) - highlighted_chars
+                continue
+            # The whole token is outside the highlight, so it gets the same look as any other
+            # token below: two occurrences can sit next to each other (はしってはしって) and the
+            # one ending the first highlight is then the start of the second.
+        if (stem_okuri_remaining := inflected_stem_okurigana_len(all_tokens, token_idx)) or (
             token.headword == base_form_word and get_word_type_from_mecab_token(token) == word_type
         ):
             logger.debug("Found beginning of word to highlight: %s", token.word)
@@ -195,6 +234,12 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
     if opened_bold:
         logger.debug("Closing bold tag at end of text")
         result += "</b>"
+        # The stored tags and spaces have to be told about this pair too, the same as the ones
+        # closed inside the loop; without it everything after the <b> is restored 3 characters
+        # short and lands inside the word
+        before_b_close_idx = text_char_idx - 3
+        logger.debug("open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx)
+        increment_indexes_for_b(open_bold_idx, before_b_close_idx)
         text_char_idx += 4
 
     if "<b>" not in result:
@@ -215,16 +260,7 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
             return highlight_inflected_words_with_mecab(text, to_hiragana(base_form_word), 0)
     logger.debug("Final highlighted result before restoring tags/spaces: '%s'", result)
 
-    # Restore removed parts in reverse order
-    # First tags
-    result = restore_tags(result)
-    logger.debug("Restored html tags result: '%s'", result)
-
-    # Then spaces
-    result = restore_spaces(result)
-    logger.debug("Restored spaces result: '%s'", result)
-
-    # Make some fixes to spaces
-    result = result.replace("</b >", "</b> ")
+    result = restore_tags_and_spaces(result)
+    logger.debug("Restored html tags and spaces result: '%s'", result)
 
     return result

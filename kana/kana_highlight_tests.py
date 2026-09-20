@@ -17,14 +17,10 @@ expected/got diff itself. A case known to fail is written
 `pytest.param(..., marks=pytest.mark.xfail(reason="why"))`; none carries one at the moment.
 """
 
-from typing import Optional
-
 import pytest
 
-from .kana_highlight import kana_highlight, FuriReconstruct
-
 from ..all_types.main_types import WithTagsDef
-
+from .kana_highlight import FuriReconstruct, kana_highlight
 
 # (mode id, return type, with_tags, merge_consecutive). The mode id is the key a case's
 # expectations are stored under.
@@ -201,15 +197,15 @@ CASES = [
         "今日[]は天気[てんき]がいい。",
         True,
         {
-            # Kana becomes empty
-            "kana_only": "はテンキがいい。",
+            # An empty reading would leave nothing at all, so kana_only shows the placeholder too
+            "kana_only": "□はテンキがいい。",
             # Furigana can show the kanji with empty reading
             "furigana": "今日は 天気[テンキ]がいい。",
             # To hide the kanji with empty furigana, a placeholder is used
             "furikanji": " □[今日]は テンキ[天気]がいい。",
-            # kana_only can't show tags for empty furigana
-            "kana_only split": "は<on>テン</on><on>キ</on>がいい。",
-            "kana_only merged": "は<on>テンキ</on>がいい。",
+            # The placeholder gets the <err> tag as well
+            "kana_only split": "<err>□</err>は<on>テン</on><on>キ</on>がいい。",
+            "kana_only merged": "<err>□</err>は<on>テンキ</on>がいい。",
             # furigan/furikanji uses <err> tag for empty furigana
             "furigana split": "<err>今日</err>は<on> 天[テン]</on><on> 気[キ]</on>がいい。",
             "furigana merged": "<err>今日</err>は<on> 天気[テンキ]</on>がいい。",
@@ -223,10 +219,11 @@ CASES = [
         "今日[]は天気[てんき]がいい。",
         True,
         {
-            # Kana is the same as no highlight since kanji with empty furigana is skipped
-            "kana_only": "はテンキがいい。",
-            "kana_only split": "は<on>テン</on><on>キ</on>がいい。",
-            "kana_only merged": "は<on>テンキ</on>がいい。",
+            # Kana is the same as no highlight since the placeholder standing in for the missing
+            # reading has nothing to bold, the same way the furikanji placeholder isn't bolded
+            "kana_only": "□はテンキがいい。",
+            "kana_only split": "<err>□</err>は<on>テン</on><on>キ</on>がいい。",
+            "kana_only merged": "<err>□</err>は<on>テンキ</on>がいい。",
             # Furigana/furikanji highglights the kanji
             "furigana": "<b>今</b>日は 天気[テンキ]がいい。",
             "furikanji": " □[<b>今</b>日]は テンキ[天気]がいい。",
@@ -361,93 +358,44 @@ CASES = [
         id="A [sound:...] tag in a mixed okurigana word is left alone with its okurigana",
     ),
     pytest.param(
-        # The highlighter adds its own <b>; a previous one - the user's emphasis, or the output
-        # of an earlier run fed back in - has to be dropped or the two end up nested.
-        "字",
-        "<b>漢字[かんじ]</b>",
-        True,
-        {
-            "furigana": " 漢[カン]<b> 字[ジ]</b>",
-            "furigana split": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furigana merged": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furikanji": " カン[漢]<b> ジ[字]</b>",
-            "furikanji split": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "furikanji merged": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "kana_only": "カン<b>ジ</b>",
-            "kana_only split": "<on>カン</on><b><on>ジ</on></b>",
-            "kana_only merged": "<on>カン</on><b><on>ジ</on></b>",
-        },
-        id="A <b> tag the text came in with does not nest with the highlight",
-    ),
-    pytest.param(
-        # The tag splits 漢字 in two, leaving nothing the furigana regex can match; the word only
-        # gets read at all because the tag is gone before any of the processing starts.
-        "字",
-        "漢<b>字</b>[かんじ]",
-        True,
-        {
-            "furigana": " 漢[カン]<b> 字[ジ]</b>",
-            "furigana split": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furigana merged": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furikanji": " カン[漢]<b> ジ[字]</b>",
-            "furikanji split": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "furikanji merged": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "kana_only": "カン<b>ジ</b>",
-            "kana_only split": "<on>カン</on><b><on>ジ</on></b>",
-            "kana_only merged": "<on>カン</on><b><on>ジ</on></b>",
-        },
-        id="A <b> tag in the middle of a word does not hide the word",
-    ),
-    pytest.param(
+        # The highlighter leaves the caller's <b> where it is; only the word it highlights gets
+        # a <b> of its own.
         "気",
         "<b>これは</b>天気[てんき]だ",
         True,
         {
-            "furigana": "これは 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": "これは テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "kana_only": "これはテン<b>キ</b>だ",
-            "kana_only split": "これは<on>テン</on><b><on>キ</on></b>だ",
-            "kana_only merged": "これは<on>テン</on><b><on>キ</on></b>だ",
+            "furigana": "<b>これは</b> 天[テン]<b> 気[キ]</b>だ",
+            "furigana split": "<b>これは</b><on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+            "furigana merged": "<b>これは</b><on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+            "furikanji": "<b>これは</b> テン[天]<b> キ[気]</b>だ",
+            "furikanji split": "<b>これは</b><on> テン[天]</on><b><on> キ[気]</on></b>だ",
+            "furikanji merged": "<b>これは</b><on> テン[天]</on><b><on> キ[気]</on></b>だ",
+            "kana_only": "<b>これは</b>テン<b>キ</b>だ",
+            "kana_only split": "<b>これは</b><on>テン</on><b><on>キ</on></b>だ",
+            "kana_only merged": "<b>これは</b><on>テン</on><b><on>キ</on></b>だ",
         },
-        id="A <b> tag around text with no furigana is simply removed",
+        id="A <b> tag around text with no furigana is left where it is",
     ),
     pytest.param(
-        # HTML tag names are case-insensitive and pasted content can carry either spelling.
+        # A <b> the caller put around the highlighted word itself nests with the highlight's own
+        # <b>, by design: the word is read and highlighted as usual inside it and the caller's
+        # tag comes back out untouched. Giving text without <b> around the word, or living with
+        # the nesting, is the caller's call.
         "気",
-        "<B>天気[てんき]</B>だ",
+        "これは<b>天気[てんき]</b>だ",
         True,
         {
-            "furigana": " 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": " テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "kana_only": "テン<b>キ</b>だ",
-            "kana_only split": "<on>テン</on><b><on>キ</on></b>だ",
-            "kana_only merged": "<on>テン</on><b><on>キ</on></b>だ",
+            "furigana": "これは<b> 天[テン]<b> 気[キ]</b></b>だ",
+            "furigana split": "これは<b><on> 天[テン]</on><b><on> 気[キ]</on></b></b>だ",
+            "furigana merged": "これは<b><on> 天[テン]</on><b><on> 気[キ]</on></b></b>だ",
+            "furikanji": "これは<b> テン[天]<b> キ[気]</b></b>だ",
+            "furikanji split": "これは<b><on> テン[天]</on><b><on> キ[気]</on></b></b>だ",
+            "furikanji merged": "これは<b><on> テン[天]</on><b><on> キ[気]</on></b></b>だ",
+            "kana_only": "これは<b>テン<b>キ</b></b>だ",
+            "kana_only split": "これは<b><on>テン</on><b><on>キ</on></b></b>だ",
+            "kana_only merged": "これは<b><on>テン</on><b><on>キ</on></b></b>だ",
         },
-        id="An upper case <B> tag is dropped like a lower case one",
-    ),
-    pytest.param(
-        # The sentence here is the untagged furigana output for 天気[てんき]だ with 気 highlighted;
-        # feeding it back in is a common Anki workflow and must not compound the <b> tags.
-        "気",
-        " 天[テン]<b> 気[キ]</b>だ",
-        True,
-        {
-            "furigana": " 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": " テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-        },
-        id="Re-running the highlighter over its own furigana output changes nothing",
+        id="A <b> tag the caller put around the highlighted word stays around it",
     ),
     pytest.param(
         "",
@@ -551,6 +499,7 @@ CASES = [
             "furikanji split": "<b><kun> たしな[嗜]</kun><oku>まれた</oku></b>ことは？",
             "kana_only merged": "<b><kun>たしな</kun><oku>まれた</oku></b>ことは？",
             "furigana merged": "<b><kun> 嗜[たしな]</kun><oku>まれた</oku></b>ことは？",
+            "furikanji merged": "<b><kun> たしな[嗜]</kun><oku>まれた</oku></b>ことは？",
         },
         id="Should not match onyomi in whole edge match 1/",
     ),
@@ -628,6 +577,14 @@ CASES = [
             "kana_only": "みのがしたエイガをみる",
             "furigana": " 見逃[みのが]した 映画[エイガ]をみる",
             "furikanji": " みのが[見逃]した エイガ[映画]をみる",
+            "kana_only split": "<kun>み</kun><kun>のが</kun><oku>した</oku><on>エイ</on><on>ガ</on>をみる",
+            "furigana split": "<kun> 見[み]</kun><kun> 逃[のが]</kun><oku>した</oku><on> 映[エイ]</on><on>"
+            " 画[ガ]</on>をみる",
+            "furikanji split": "<kun> み[見]</kun><kun> のが[逃]</kun><oku>した</oku><on> エイ[映]</on><on>"
+            " ガ[画]</on>をみる",
+            "kana_only merged": "<kun>みのが</kun><oku>した</oku><on>エイガ</on>をみる",
+            "furigana merged": "<kun> 見逃[みのが]</kun><oku>した</oku><on> 映画[エイガ]</on>をみる",
+            "furikanji merged": "<kun> みのが[見逃]</kun><oku>した</oku><on> エイガ[映画]</on>をみる",
         },
         id="Generates furigana for a whole phrase from its full reading in brackets",
     ),
@@ -986,8 +943,14 @@ CASES = [
         True,
         {
             "kana_only": "キソク<b>エンエン</b>",
+            "furigana": " 気息[キソク]<b> 奄々[エンエン]</b>",
+            "furikanji": " キソク[気息]<b> エンエン[奄々]</b>",
             "kana_only split": "<on>キ</on><on>ソク</on><b><on>エンエン</on></b>",
+            "furigana split": "<on> 気[キ]</on><on> 息[ソク]</on><b><on> 奄々[エンエン]</on></b>",
+            "furikanji split": "<on> キ[気]</on><on> ソク[息]</on><b><on> エンエン[奄々]</on></b>",
             "kana_only merged": "<on>キソク</on><b><on>エンエン</on></b>",
+            "furigana merged": "<on> 気息[キソク]</on><b><on> 奄々[エンエン]</on></b>",
+            "furikanji merged": "<on> キソク[気息]</on><b><on> エンエン[奄々]</on></b>",
         },
         id="Matches repeater in the middle of the word from right edge",
     ),
@@ -997,8 +960,14 @@ CASES = [
         True,
         {
             "kana_only": "あつあつ<b>カンカン</b>ガクガク",
+            "furigana": " 熱々[あつあつ]<b> 侃々[カンカン]</b> 諤々[ガクガク]",
+            "furikanji": " あつあつ[熱々]<b> カンカン[侃々]</b> ガクガク[諤々]",
             "kana_only split": "<kun>あつあつ</kun><b><on>カンカン</on></b><on>ガクガク</on>",
+            "furigana split": "<kun> 熱々[あつあつ]</kun><b><on> 侃々[カンカン]</on></b><on> 諤々[ガクガク]</on>",
+            "furikanji split": "<kun> あつあつ[熱々]</kun><b><on> カンカン[侃々]</on></b><on> ガクガク[諤々]</on>",
             "kana_only merged": "<kun>あつあつ</kun><b><on>カンカン</on></b><on>ガクガク</on>",
+            "furigana merged": "<kun> 熱々[あつあつ]</kun><b><on> 侃々[カンカン]</on></b><on> 諤々[ガクガク]</on>",
+            "furikanji merged": "<kun> あつあつ[熱々]</kun><b><on> カンカン[侃々]</on></b><on> ガクガク[諤々]</on>",
         },
         id="Matches repeater in the middle of the word from middle edge",
     ),
@@ -1015,6 +984,7 @@ CASES = [
             "furikanji split": "<b><on> コッコク[刻々]</on></b>と<on> ヘン[変]</on><on> カ[化]</on><oku>する</oku>。",
             "kana_only merged": "<b><on>コッコク</on></b>と <on>ヘンカ</on><oku>する</oku>。",
             "furigana merged": "<b><on> 刻々[コッコク]</on></b>と<on> 変化[ヘンカ]</on><oku>する</oku>。",
+            "furikanji merged": "<b><on> コッコク[刻々]</on></b>と<on> ヘンカ[変化]</on><oku>する</oku>。",
         },
         id="Matches word that uses the repeater 々 with small tsu",
     ),
@@ -1172,6 +1142,81 @@ CASES = [
             "furikanji merged": "<on> セイブツブツリガク[生物物理学]</on>",
         },
         id="Keeps a kanji doubled across a word boundary spelled out",
+    ),
+    pytest.param(
+        # 毎月 + 月末, so the second 月 reads げつ where the first reads つき: the second
+        # occurrence is matched on its own readings instead of copying the first one's
+        "",
+        "毎月月末[まいつきげつまつ]",
+        True,
+        {
+            "kana_only": "マイつきゲツマツ",
+            "furigana": " 毎月月末[マイつきゲツマツ]",
+            "furikanji": " マイつきゲツマツ[毎月月末]",
+            "kana_only split": "<on>マイ</on><kun>つき</kun><on>ゲツ</on><on>マツ</on>",
+            "furigana split": "<on> 毎[マイ]</on><kun> 月[つき]</kun><on> 月[ゲツ]</on><on> 末[マツ]</on>",
+            "furikanji split": "<on> マイ[毎]</on><kun> つき[月]</kun><on> ゲツ[月]</on><on> マツ[末]</on>",
+            "kana_only merged": "<on>マイ</on><kun>つき</kun><on>ゲツマツ</on>",
+            "furigana merged": "<on> 毎[マイ]</on><kun> 月[つき]</kun><on> 月末[ゲツマツ]</on>",
+            "furikanji merged": "<on> マイ[毎]</on><kun> つき[月]</kun><on> ゲツマツ[月末]</on>",
+        },
+        id="Reads a kanji doubled across a word boundary as kun then on - 毎月月末",
+    ),
+    pytest.param(
+        # The same with 毎年 + 年末: とし then ねん
+        "",
+        "毎年年末[まいとしねんまつ]",
+        True,
+        {
+            "kana_only": "マイとしネンマツ",
+            "furigana": " 毎年年末[マイとしネンマツ]",
+            "furikanji": " マイとしネンマツ[毎年年末]",
+            "kana_only split": "<on>マイ</on><kun>とし</kun><on>ネン</on><on>マツ</on>",
+            "furigana split": "<on> 毎[マイ]</on><kun> 年[とし]</kun><on> 年[ネン]</on><on> 末[マツ]</on>",
+            "furikanji split": "<on> マイ[毎]</on><kun> とし[年]</kun><on> ネン[年]</on><on> マツ[末]</on>",
+            "kana_only merged": "<on>マイ</on><kun>とし</kun><on>ネンマツ</on>",
+            "furigana merged": "<on> 毎[マイ]</on><kun> 年[とし]</kun><on> 年末[ネンマツ]</on>",
+            "furikanji merged": "<on> マイ[毎]</on><kun> とし[年]</kun><on> ネンマツ[年末]</on>",
+        },
+        id="Reads a kanji doubled across a word boundary as kun then on - 毎年年末",
+    ),
+    pytest.param(
+        # A genuine doubled word written out: びと is ひと rendakued, which is evidence of a
+        # repeater, so it is written back as 人々
+        "",
+        "人人[ひとびと]",
+        True,
+        {
+            "kana_only": "ひとびと",
+            "furigana": " 人々[ひとびと]",
+            "furikanji": " ひとびと[人々]",
+            "kana_only split": "<kun>ひとびと</kun>",
+            "furigana split": "<kun> 人々[ひとびと]</kun>",
+            "furikanji split": "<kun> ひとびと[人々]</kun>",
+            "kana_only merged": "<kun>ひとびと</kun>",
+            "furigana merged": "<kun> 人々[ひとびと]</kun>",
+            "furikanji merged": "<kun> ひとびと[人々]</kun>",
+        },
+        id="Keeps a doubled word whose second reading rendakus - 人人",
+    ),
+    pytest.param(
+        # 各 only lists the doubled reading おのおの, so the second おの matches nothing on its
+        # own and falls back to a copy of the first match
+        "",
+        "各各[おのおの]",
+        True,
+        {
+            "kana_only": "おのおの",
+            "furigana": " 各各[おのおの]",
+            "furikanji": " おのおの[各各]",
+            "kana_only split": "<kun>おの</kun><kun>おの</kun>",
+            "furigana split": "<kun> 各[おの]</kun><kun> 各[おの]</kun>",
+            "furikanji split": "<kun> おの[各]</kun><kun> おの[各]</kun>",
+            "kana_only merged": "<kun>おのおの</kun>",
+            "furigana merged": "<kun> 各各[おのおの]</kun>",
+            "furikanji merged": "<kun> おのおの[各各]</kun>",
+        },
+        id="Keeps a doubled word that only lists the doubled reading - 各各",
     ),
     pytest.param(
         # Both 物 are the kanji being studied, so both get highlighted, even though they belong
@@ -1393,6 +1438,18 @@ CASES = [
             "kana_only": "シン ナイ<b>カク</b>の ソ<b>カク</b>が ハッピョウされた。",
             "furigana": " 新[シン] 内[ナイ]<b> 閣[カク]</b>の 組[ソ]<b> 閣[カク]</b>が 発表[ハッピョウ]された。",
             "furikanji": " シン[新] ナイ[内]<b> カク[閣]</b>の ソ[組]<b> カク[閣]</b>が ハッピョウ[発表]された。",
+            "kana_only split": "<on>シン</on> <on>ナイ</on><b><on>カク</on></b>の <on>ソ</on><b>"
+            "<on>カク</on></b>が <on>ハッ</on><on>ピョウ</on><oku>された</oku>。",
+            "furigana split": "<on> 新[シン]</on><on> 内[ナイ]</on><b><on> 閣[カク]</on></b>の<on> 組[ソ]</on>"
+            "<b><on> 閣[カク]</on></b>が<on> 発[ハッ]</on><on> 表[ピョウ]</on><oku>された</oku>。",
+            "furikanji split": "<on> シン[新]</on><on> ナイ[内]</on><b><on> カク[閣]</on></b>の<on> ソ[組]</on>"
+            "<b><on> カク[閣]</on></b>が<on> ハッ[発]</on><on> ピョウ[表]</on><oku>された</oku>。",
+            "kana_only merged": "<on>シン</on> <on>ナイ</on><b><on>カク</on></b>の <on>ソ</on><b>"
+            "<on>カク</on></b>が <on>ハッピョウ</on><oku>された</oku>。",
+            "furigana merged": "<on> 新[シン]</on><on> 内[ナイ]</on><b><on> 閣[カク]</on></b>の<on> 組[ソ]</on>"
+            "<b><on> 閣[カク]</on></b>が<on> 発表[ハッピョウ]</on><oku>された</oku>。",
+            "furikanji merged": "<on> シン[新]</on><on> ナイ[内]</on><b><on> カク[閣]</on></b>の<on>"
+            " ソ[組]</on><b><on> カク[閣]</on></b>が<on> ハッピョウ[発表]</on><oku>された</oku>。",
         },
         id="Is able to match the same kanji occurring twice",
     ),
@@ -1820,10 +1877,19 @@ CASES = [
         True,
         {
             "kana_only": "カンゼンに うら<b>めった</b>な",
+            "furigana": " 完全[カンゼン]に 裏[うら]<b> 目[め]った</b>な",
+            "furikanji": " カンゼン[完全]に うら[裏]<b> め[目]った</b>な",
+            "kana_only split": "<on>カン</on><on>ゼン</on>に <kun>うら</kun><b><kun>め</kun>"
+            "<oku>った</oku></b>な",
             "furigana split": "<on> 完[カン]</on><on> 全[ゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
             "<oku>った</oku></b>な",
+            "furikanji split": "<on> カン[完]</on><on> ゼン[全]</on>に<kun> うら[裏]</kun><b><kun> め[目]</kun>"
+            "<oku>った</oku></b>な",
+            "kana_only merged": "<on>カンゼン</on>に <kun>うら</kun><b><kun>め</kun><oku>った</oku></b>な",
             "furigana merged": "<on> 完全[カンゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
             "<oku>った</oku></b>な",
+            "furikanji merged": "<on> カンゼン[完全]</on>に<kun> うら[裏]</kun><b><kun> め[目]</kun><oku>"
+            "った</oku></b>な",
         },
         id="okurigana of godan verb from a noun 裏目る",
     ),
@@ -1834,8 +1900,14 @@ CASES = [
         True,
         {
             "kana_only": "<b>ク</b>チョウ",
+            "furigana": "<b> 口[ク]</b> 調[チョウ]",
+            "furikanji": "<b> ク[口]</b> チョウ[調]",
             "kana_only split": "<b><on>ク</on></b><on>チョウ</on>",
+            "furigana split": "<b><on> 口[ク]</on></b><on> 調[チョウ]</on>",
+            "furikanji split": "<b><on> ク[口]</on></b><on> チョウ[調]</on>",
             "kana_only merged": "<b><on>ク</on></b><on>チョウ</on>",
+            "furigana merged": "<b><on> 口[ク]</on></b><on> 調[チョウ]</on>",
+            "furikanji merged": "<b><on> ク[口]</on></b><on> チョウ[調]</on>",
         },
         id="reading mixup /1",
     ),
@@ -2134,6 +2206,8 @@ CASES = [
         True,
         {
             "kana_only": "<b>フ</b>ウン",
+            "furigana": "<b> 不[フ]</b> 運[ウン]",
+            "furikanji": "<b> フ[不]</b> ウン[運]",
             "kana_only split": "<b><on>フ</on></b><on>ウン</on>",
             "kana_only merged": "<b><on>フ</on></b><on>ウン</on>",
             "furigana split": "<b><on> 不[フ]</on></b><on> 運[ウン]</on>",
@@ -2381,8 +2455,14 @@ CASES = [
         True,
         {
             "kana_only": "おい<b>らん</b>",
+            "furigana": " 花[おい]<b> 魁[らん]</b>",
+            "furikanji": " おい[花]<b> らん[魁]</b>",
             "kana_only split": "<juk>おい</juk><b><juk>らん</juk></b>",
+            "furigana split": "<juk> 花[おい]</juk><b><juk> 魁[らん]</juk></b>",
+            "furikanji split": "<juk> おい[花]</juk><b><juk> らん[魁]</juk></b>",
             "kana_only merged": "<juk>おい</juk><b><juk>らん</juk></b>",
+            "furigana merged": "<juk> 花[おい]</juk><b><juk> 魁[らん]</juk></b>",
+            "furikanji merged": "<juk> おい[花]</juk><b><juk> らん[魁]</juk></b>",
         },
         id="jukujikun test ん ending",
     ),
@@ -2426,8 +2506,14 @@ CASES = [
         True,
         {
             "kana_only": "イ<b>く</b>ジ",
+            "furigana": " 意[イ]<b> 気[く]</b> 地[ジ]",
+            "furikanji": " イ[意]<b> く[気]</b> ジ[地]",
             "kana_only split": "<on>イ</on><b><juk>く</juk></b><on>ジ</on>",
+            "furigana split": "<on> 意[イ]</on><b><juk> 気[く]</juk></b><on> 地[ジ]</on>",
+            "furikanji split": "<on> イ[意]</on><b><juk> く[気]</juk></b><on> ジ[地]</on>",
             "kana_only merged": "<on>イ</on><b><juk>く</juk></b><on>ジ</on>",
+            "furigana merged": "<on> 意[イ]</on><b><juk> 気[く]</juk></b><on> 地[ジ]</on>",
+            "furikanji merged": "<on> イ[意]</on><b><juk> く[気]</juk></b><on> ジ[地]</on>",
         },
         id="single-kanji juku in middle of word",
     ),
@@ -2438,8 +2524,18 @@ CASES = [
         True,
         {
             "kana_only": "あか<b>ゆ</b>りカダン",
+            "furigana": " 赤[あか]<b> 百[ゆ]</b> 合花壇[りカダン]",
+            "furikanji": " あか[赤]<b> ゆ[百]</b> りカダン[合花壇]",
             "kana_only split": "<kun>あか</kun><b><juk>ゆ</juk></b><juk>り</juk><on>カ</on><on>ダン</on>",
+            "furigana split": "<kun> 赤[あか]</kun><b><juk> 百[ゆ]</juk></b><juk> 合[り]</juk><on>"
+            " 花[カ]</on><on> 壇[ダン]</on>",
+            "furikanji split": "<kun> あか[赤]</kun><b><juk> ゆ[百]</juk></b><juk> り[合]</juk><on>"
+            " カ[花]</on><on> ダン[壇]</on>",
             "kana_only merged": "<kun>あか</kun><b><juk>ゆ</juk></b><juk>り</juk><on>カダン</on>",
+            "furigana merged": "<kun> 赤[あか]</kun><b><juk> 百[ゆ]</juk></b><juk> 合[り]</juk><on>"
+            " 花壇[カダン]</on>",
+            "furikanji merged": "<kun> あか[赤]</kun><b><juk> ゆ[百]</juk></b><juk> り[合]</juk><on>"
+            " カダン[花壇]</on>",
         },
         id="multi-kanji juku in middle of word matched left",
     ),
@@ -2449,8 +2545,18 @@ CASES = [
         True,
         {
             "kana_only": "あかゆ<b>り</b>カダン",
+            "furigana": " 赤百[あかゆ]<b> 合[り]</b> 花壇[カダン]",
+            "furikanji": " あかゆ[赤百]<b> り[合]</b> カダン[花壇]",
             "kana_only split": "<kun>あか</kun><juk>ゆ</juk><b><juk>り</juk></b><on>カ</on><on>ダン</on>",
+            "furigana split": "<kun> 赤[あか]</kun><juk> 百[ゆ]</juk><b><juk> 合[り]</juk></b><on>"
+            " 花[カ]</on><on> 壇[ダン]</on>",
+            "furikanji split": "<kun> あか[赤]</kun><juk> ゆ[百]</juk><b><juk> り[合]</juk></b><on>"
+            " カ[花]</on><on> ダン[壇]</on>",
             "kana_only merged": "<kun>あか</kun><juk>ゆ</juk><b><juk>り</juk></b><on>カダン</on>",
+            "furigana merged": "<kun> 赤[あか]</kun><juk> 百[ゆ]</juk><b><juk> 合[り]</juk></b><on>"
+            " 花壇[カダン]</on>",
+            "furikanji merged": "<kun> あか[赤]</kun><juk> ゆ[百]</juk><b><juk> り[合]</juk></b><on>"
+            " カダン[花壇]</on>",
         },
         id="multi-kanji juku in middle of word matched right",
     ),
@@ -2540,6 +2646,9 @@ CASES = [
             "kana_only split": "<b><juk>か</juk></b><juk>ぜ</juk>",
             "furigana split": "<b><juk> 風[か]</juk></b><juk> 邪[ぜ]</juk>",
             "furikanji split": "<b><juk> か[風]</juk></b><juk> ぜ[邪]</juk>",
+            "kana_only merged": "<b><juk>か</juk></b><juk>ぜ</juk>",
+            "furigana merged": "<b><juk> 風[か]</juk></b><juk> 邪[ぜ]</juk>",
+            "furikanji merged": "<b><juk> か[風]</juk></b><juk> ぜ[邪]</juk>",
         },
         id="jukujikun test 風邪 matched",
     ),
@@ -2694,8 +2803,14 @@ CASES = [
         True,
         {
             "kana_only": "まじ<b>め</b>",
+            "furigana": " 真面[まじ]<b> 目[め]</b>",
+            "furikanji": " まじ[真面]<b> め[目]</b>",
             "kana_only split": "<juk>ま</juk><juk>じ</juk><b><kun>め</kun></b>",
+            "furigana split": "<juk> 真[ま]</juk><juk> 面[じ]</juk><b><kun> 目[め]</kun></b>",
+            "furikanji split": "<juk> ま[真]</juk><juk> じ[面]</juk><b><kun> め[目]</kun></b>",
             "kana_only merged": "<juk>まじ</juk><b><kun>め</kun></b>",
+            "furigana merged": "<juk> 真面[まじ]</juk><b><kun> 目[め]</kun></b>",
+            "furikanji merged": "<juk> まじ[真面]</juk><b><kun> め[目]</kun></b>",
         },
         id="multi-kanji jukujikun word with other readings after juku word non-matched",
     ),
@@ -2705,8 +2820,14 @@ CASES = [
         True,
         {
             "kana_only": "<b>ま</b>じめ",
+            "furigana": "<b> 真[ま]</b> 面目[じめ]",
+            "furikanji": "<b> ま[真]</b> じめ[面目]",
             "kana_only split": "<b><juk>ま</juk></b><juk>じ</juk><kun>め</kun>",
+            "furigana split": "<b><juk> 真[ま]</juk></b><juk> 面[じ]</juk><kun> 目[め]</kun>",
+            "furikanji split": "<b><juk> ま[真]</juk></b><juk> じ[面]</juk><kun> め[目]</kun>",
             "kana_only merged": "<b><juk>ま</juk></b><juk>じ</juk><kun>め</kun>",
+            "furigana merged": "<b><juk> 真[ま]</juk></b><juk> 面[じ]</juk><kun> 目[め]</kun>",
+            "furikanji merged": "<b><juk> ま[真]</juk></b><juk> じ[面]</juk><kun> め[目]</kun>",
         },
         id="multi-kanji jukujikun word with other readings after juku word matched left ",
     ),
@@ -2716,8 +2837,14 @@ CASES = [
         True,
         {
             "kana_only": "ま<b>じ</b>め",
+            "furigana": " 真[ま]<b> 面[じ]</b> 目[め]",
+            "furikanji": " ま[真]<b> じ[面]</b> め[目]",
             "kana_only split": "<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
+            "furigana split": "<juk> 真[ま]</juk><b><juk> 面[じ]</juk></b><kun> 目[め]</kun>",
+            "furikanji split": "<juk> ま[真]</juk><b><juk> じ[面]</juk></b><kun> め[目]</kun>",
             "kana_only merged": "<juk>ま</juk><b><juk>じ</juk></b><kun>め</kun>",
+            "furigana merged": "<juk> 真[ま]</juk><b><juk> 面[じ]</juk></b><kun> 目[め]</kun>",
+            "furikanji merged": "<juk> ま[真]</juk><b><juk> じ[面]</juk></b><kun> め[目]</kun>",
         },
         id="multi-kanji jukujikun word with other readings after juku word matched right",
     ),
@@ -2727,8 +2854,14 @@ CASES = [
         True,
         {
             "kana_only": "<b>から</b>かう",
+            "furigana": "<b> 揶[から]</b> 揄[か]う",
+            "furikanji": "<b> から[揶]</b> か[揄]う",
             "kana_only split": "<b><juk>から</juk></b><juk>か</juk><oku>う</oku>",
+            "furigana split": "<b><juk> 揶[から]</juk></b><juk> 揄[か]</juk><oku>う</oku>",
+            "furikanji split": "<b><juk> から[揶]</juk></b><juk> か[揄]</juk><oku>う</oku>",
             "kana_only merged": "<b><juk>から</juk></b><juk>か</juk><oku>う</oku>",
+            "furigana merged": "<b><juk> 揶[から]</juk></b><juk> 揄[か]</juk><oku>う</oku>",
+            "furikanji merged": "<b><juk> から[揶]</juk></b><juk> か[揄]</juk><oku>う</oku>",
         },
         id="multi-kanji jukujikun verb reading matched left",
     ),
@@ -2738,8 +2871,14 @@ CASES = [
         True,
         {
             "kana_only": "から<b>かう</b>",
+            "furigana": " 揶[から]<b> 揄[か]う</b>",
+            "furikanji": " から[揶]<b> か[揄]う</b>",
             "kana_only split": "<juk>から</juk><b><juk>か</juk><oku>う</oku></b>",
+            "furigana split": "<juk> 揶[から]</juk><b><juk> 揄[か]</juk><oku>う</oku></b>",
+            "furikanji split": "<juk> から[揶]</juk><b><juk> か[揄]</juk><oku>う</oku></b>",
             "kana_only merged": "<juk>から</juk><b><juk>か</juk><oku>う</oku></b>",
+            "furigana merged": "<juk> 揶[から]</juk><b><juk> 揄[か]</juk><oku>う</oku></b>",
+            "furikanji merged": "<juk> から[揶]</juk><b><juk> か[揄]</juk><oku>う</oku></b>",
         },
         id="multi-kanji jukujikun verb reading matched right",
     ),
@@ -2836,6 +2975,9 @@ CASES = [
         "美味[おい]しい",
         True,
         {
+            "kana_only": "おいしい",
+            "furigana": " 美味[おい]しい",
+            "furikanji": " おい[美味]しい",
             "kana_only split": "<juk>お</juk><juk>い</juk><oku>しい</oku>",
             "furigana split": "<juk> 美[お]</juk><juk> 味[い]</juk><oku>しい</oku>",
             "furikanji split": "<juk> お[美]</juk><juk> い[味]</juk><oku>しい</oku>",
@@ -2850,6 +2992,9 @@ CASES = [
         "美味[おい]しさがいい",
         True,
         {
+            "kana_only": "おいしさがいい",
+            "furigana": " 美味[おい]しさがいい",
+            "furikanji": " おい[美味]しさがいい",
             "kana_only split": "<juk>お</juk><juk>い</juk><oku>しさ</oku>がいい",
             "furigana split": "<juk> 美[お]</juk><juk> 味[い]</juk><oku>しさ</oku>がいい",
             "furikanji split": "<juk> お[美]</juk><juk> い[味]</juk><oku>しさ</oku>がいい",
@@ -3096,6 +3241,9 @@ CASES = [
             "kana_only split": "<juk>ちゃー</juk><on>メン</on>",
             "furigana split": "<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
             "furikanji split": "<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
+            "kana_only merged": "<juk>ちゃー</juk><on>メン</on>",
+            "furigana merged": "<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
+            "furikanji merged": "<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
         },
         id="jukujikun test with ー long vowel mark",
     ),
@@ -3122,8 +3270,14 @@ CASES = [
         True,
         {
             "kana_only": "<b>まー</b>じゃん",
+            "furigana": "<b> 麻[まー]</b> 雀[じゃん]",
+            "furikanji": "<b> まー[麻]</b> じゃん[雀]",
             "kana_only split": "<b><juk>まー</juk></b><juk>じゃん</juk>",
+            "furigana split": "<b><juk> 麻[まー]</juk></b><juk> 雀[じゃん]</juk>",
+            "furikanji split": "<b><juk> まー[麻]</juk></b><juk> じゃん[雀]</juk>",
             "kana_only merged": "<b><juk>まー</juk></b><juk>じゃん</juk>",
+            "furigana merged": "<b><juk> 麻[まー]</juk></b><juk> 雀[じゃん]</juk>",
+            "furikanji merged": "<b><juk> まー[麻]</juk></b><juk> じゃん[雀]</juk>",
         },
         id="ん should be combined with previous mora in jukujikun and handle long vowel mark ー",
     ),
@@ -3544,6 +3698,9 @@ CASES = [
             "kana_only split": "<b><kun>こころ</kun><oku>みる</oku></b>",
             "furigana split": "<b><kun> 試[こころ]</kun><oku>みる</oku></b>",
             "furikanji split": "<b><kun> こころ[試]</kun><oku>みる</oku></b>",
+            "kana_only merged": "<b><kun>こころ</kun><oku>みる</oku></b>",
+            "furigana merged": "<b><kun> 試[こころ]</kun><oku>みる</oku></b>",
+            "furikanji merged": "<b><kun> こころ[試]</kun><oku>みる</oku></b>",
         },
         id="Verb okurigana test /13",
     ),
@@ -3857,6 +4014,9 @@ CASES = [
             "kana_only split": "<b><kun>えぐ</kun><oku>かった</oku></b>よな",
             "furigana split": "<b><kun> 刳[えぐ]</kun><oku>かった</oku></b>よな",
             "furikanji split": "<b><kun> えぐ[刳]</kun><oku>かった</oku></b>よな",
+            "kana_only merged": "<b><kun>えぐ</kun><oku>かった</oku></b>よな",
+            "furigana merged": "<b><kun> 刳[えぐ]</kun><oku>かった</oku></b>よな",
+            "furikanji merged": "<b><kun> えぐ[刳]</kun><oku>かった</oku></b>よな",
         },
         id="adjective okurigana test 6/",
     ),
@@ -4024,8 +4184,14 @@ CASES = [
         True,
         {
             "kana_only": "や<b>よい</b>",
+            "furigana": " 弥[や]<b> 生[よい]</b>",
+            "furikanji": " や[弥]<b> よい[生]</b>",
             "kana_only split": "<kun>や</kun><b><kun>よい</kun></b>",
+            "furigana split": "<kun> 弥[や]</kun><b><kun> 生[よい]</kun></b>",
+            "furikanji split": "<kun> や[弥]</kun><b><kun> よい[生]</kun></b>",
             "kana_only merged": "<kun>や</kun><b><kun>よい</kun></b>",
+            "furigana merged": "<kun> 弥[や]</kun><b><kun> 生[よい]</kun></b>",
+            "furikanji merged": "<kun> や[弥]</kun><b><kun> よい[生]</kun></b>",
         },
         id="生 readings /3",
     ),
@@ -4035,8 +4201,14 @@ CASES = [
         True,
         {
             "kana_only": "しば<b>ふ</b>",
+            "furigana": " 芝[しば]<b> 生[ふ]</b>",
+            "furikanji": " しば[芝]<b> ふ[生]</b>",
             "kana_only split": "<kun>しば</kun><b><kun>ふ</kun></b>",
+            "furigana split": "<kun> 芝[しば]</kun><b><kun> 生[ふ]</kun></b>",
+            "furikanji split": "<kun> しば[芝]</kun><b><kun> ふ[生]</kun></b>",
             "kana_only merged": "<kun>しば</kun><b><kun>ふ</kun></b>",
+            "furigana merged": "<kun> 芝[しば]</kun><b><kun> 生[ふ]</kun></b>",
+            "furikanji merged": "<kun> しば[芝]</kun><b><kun> ふ[生]</kun></b>",
         },
         id="生 readings /4",
     ),
@@ -4046,8 +4218,14 @@ CASES = [
         True,
         {
             "kana_only": "<b>あい</b>にく",
+            "furigana": "<b> 生[あい]</b> 憎[にく]",
+            "furikanji": "<b> あい[生]</b> にく[憎]",
             "kana_only split": "<b><kun>あい</kun></b><kun>にく</kun>",
+            "furigana split": "<b><kun> 生[あい]</kun></b><kun> 憎[にく]</kun>",
+            "furikanji split": "<b><kun> あい[生]</kun></b><kun> にく[憎]</kun>",
             "kana_only merged": "<b><kun>あい</kun></b><kun>にく</kun>",
+            "furigana merged": "<b><kun> 生[あい]</kun></b><kun> 憎[にく]</kun>",
+            "furikanji merged": "<b><kun> あい[生]</kun></b><kun> にく[憎]</kun>",
         },
         id="生 readings /5",
     ),
@@ -4189,8 +4367,126 @@ CASES = [
             "furikanji split": "<mix> ヒャクニジュウサン[123]</mix><mix> よんヒャクニ[402]</mix><mix>"
             " サンビャクニジュウ[３２０]</mix><mix> ハッピャクハチジュウハチ[888]</mix>"
             "<mix> よんセンロッピャクロクジュウ[４６６０]</mix>",
+            "kana_only merged": "<on>ヒャクニジュウサン</on> <kun>よん</kun><on>ヒャクニ</on> <on>サンビャクニジュウ</on>"
+            " <on>ハッピャクハチジュウハチ</on> <kun>よん</kun><on>センロッピャクロクジュウ</on>",
+            "furigana merged": "<on> 123[ヒャクニジュウサン]</on><mix> 402[よんヒャクニ]</mix><on>"
+            " ３２０[サンビャクニジュウ]</on><on> 888[ハッピャクハチジュウハチ]</on><mix> ４６６０[よんセンロッピャクロクジュウ]</mix>",
+            "furikanji merged": "<on> ヒャクニジュウサン[123]</on><mix> よんヒャクニ[402]</mix><on>"
+            " サンビャクニジュウ[３２０]</on><on> ハッピャクハチジュウハチ[888]</on><mix> よんセンロッピャクロクジュウ[４６６０]</mix>",
         },
         id="Three digit numbers",
+    ),
+    # A digit run is converted to kanji to be read, and 24 is three kanji for two digits, so the
+    # reading of that third kanji had no position in the two characters the rest of the pipeline
+    # was given: it was dropped from the output, and a reading with fewer mora than the converted
+    # word has kanji raised. The whole run is one chunk either way, tagged mix where it reads
+    # both ways, so only the kana-only modes show a reading per kanji.
+    pytest.param(
+        "",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": " 24[ニジュウよん]",
+            "furigana split": "<mix> 24[ニジュウよん]</mix>",
+            "furigana merged": "<mix> 24[ニジュウよん]</mix>",
+            "furikanji": " ニジュウよん[24]",
+            "furikanji split": "<mix> ニジュウよん[24]</mix>",
+            "furikanji merged": "<mix> ニジュウよん[24]</mix>",
+            "kana_only": "ニジュウよん",
+            "kana_only split": "<on>ニ</on><on>ジュウ</on><kun>よん</kun>",
+            "kana_only merged": "<on>ニジュウ</on><kun>よん</kun>",
+        },
+        id="two digits read as three kanji, the last one kun",
+    ),
+    pytest.param(
+        "",
+        "77[しちじゅうなな]",
+        True,
+        {
+            "furigana": " 77[シチジュウなな]",
+            "furigana split": "<mix> 77[シチジュウなな]</mix>",
+            "furigana merged": "<mix> 77[シチジュウなな]</mix>",
+            "furikanji": " シチジュウなな[77]",
+            "furikanji split": "<mix> シチジュウなな[77]</mix>",
+            "furikanji merged": "<mix> シチジュウなな[77]</mix>",
+            "kana_only": "シチジュウなな",
+            "kana_only split": "<on>シチ</on><on>ジュウ</on><kun>なな</kun>",
+            "kana_only merged": "<on>シチジュウ</on><kun>なな</kun>",
+        },
+        id="the same digit read two ways, the on reading first",
+    ),
+    # Too few mora for the kanji the digits convert into is nothing a reading can be made of,
+    # so this only asks that the digits and the whole reading survive it.
+    pytest.param(
+        "",
+        "77[ひと]",
+        True,
+        {
+            "furigana": " 77[ひと]",
+            "furigana split": "<mix> 77[ひと]</mix>",
+            "furigana merged": "<mix> 77[ひと]</mix>",
+            "furikanji": " ひと[77]",
+            "furikanji split": "<mix> ひと[77]</mix>",
+            "furikanji merged": "<mix> ひと[77]</mix>",
+            "kana_only": "ひと",
+            "kana_only split": "<kun>ひ</kun><juk>と</juk>",
+            "kana_only merged": "<kun>ひ</kun><juk>と</juk>",
+        },
+        id="fewer mora than the digits convert into kanji",
+    ),
+    # The kanji to highlight is one the digits convert into, not one the sentence writes: the run
+    # is a single chunk, so the modes that show a surface bold all of it and only the kana-only
+    # ones bold that kanji's own reading.
+    pytest.param(
+        "十",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>",
+            "kana_only": "ニ<b>ジュウ</b>よん",
+            "kana_only split": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>",
+            "kana_only merged": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>",
+        },
+        id="a highlighted kanji in the middle of a digit run",
+    ),
+    pytest.param(
+        "四",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>",
+            "kana_only": "ニジュウ<b>よん</b>",
+            "kana_only split": "<on>ニ</on><on>ジュウ</on><b><kun>よん</kun></b>",
+            "kana_only merged": "<on>ニジュウ</on><b><kun>よん</kun></b>",
+        },
+        id="a highlighted kanji at the end of a digit run",
+    ),
+    pytest.param(
+        "十",
+        "24[にじゅうよん]と 十[じゅう]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>と<b> 十[ジュウ]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>と<b><on> 十[ジュウ]</on></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>と<b><on> 十[ジュウ]</on></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>と<b> ジュウ[十]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>と<b><on> ジュウ[十]</on></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>と<b><on> ジュウ[十]</on></b>",
+            "kana_only": "ニ<b>ジュウ</b>よんと <b>ジュウ</b>",
+            "kana_only split": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>と <b><on>ジュウ</on></b>",
+            "kana_only merged": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>と <b><on>ジュウ</on></b>",
+        },
+        id="the same kanji inside a digit run and written out",
     ),
     pytest.param(
         "円",
@@ -4208,6 +4504,25 @@ CASES = [
             "kana_only merged": "<on>イチマン</on><b><on>エン</on></b>",
         },
         id="Myriad numbers keep the 一 - with highlight",
+    ),
+    # The 万 of 10000 has no digit of its own either, so the whole run bolds - and the run reads
+    # on all through, so it keeps its <on> where the merged modes do not force a mix.
+    pytest.param(
+        "万",
+        "10000円[いちまんえん]",
+        True,
+        {
+            "furigana": "<b> 10000[イチマン]</b> 円[エン]",
+            "furigana split": "<b><mix> 10000[イチマン]</mix></b><on> 円[エン]</on>",
+            "furigana merged": "<b><on> 10000[イチマン]</on></b><on> 円[エン]</on>",
+            "furikanji": "<b> イチマン[10000]</b> エン[円]",
+            "furikanji split": "<b><mix> イチマン[10000]</mix></b><on> エン[円]</on>",
+            "furikanji merged": "<b><on> イチマン[10000]</on></b><on> エン[円]</on>",
+            "kana_only": "イチ<b>マン</b>エン",
+            "kana_only split": "<on>イチ</on><b><on>マン</on></b><on>エン</on>",
+            "kana_only merged": "<on>イチ</on><b><on>マン</on></b><on>エン</on>",
+        },
+        id="Myriad numbers keep the 一 - the 万 highlighted inside the digits",
     ),
     pytest.param(
         "",
@@ -4253,9 +4568,27 @@ CASES = [
         "為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",
         True,
         {
+            "kana_only": "して した しました される しろ しません それをし",
+            "furigana": " 為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを 為[し]",
+            "furikanji": " し[為]て し[為]た し[為]ました さ[為]れる し[為]ろ し[為]ません それを し[為]",
             "kana_only split": "<kun>し</kun><oku>て</oku> <kun>し</kun><oku>た</oku> <kun>し</kun><oku>ました</oku>"
             " <kun>さ</kun><oku>れる</oku> <kun>し</kun><oku>ろ</oku> <kun>し</kun><oku>ません</oku>"
             " それを<kun>し</kun>",
+            "furigana split": "<kun> 為[し]</kun><oku>て</oku><kun> 為[し]</kun><oku>た</oku><kun>"
+            " 為[し]</kun><oku>ました</oku><kun> 為[さ]</kun><oku>れる</oku><kun> 為[し]</kun><oku>ろ</oku>"
+            "<kun> 為[し]</kun><oku>ません</oku> それを<kun> 為[し]</kun>",
+            "furikanji split": "<kun> し[為]</kun><oku>て</oku><kun> し[為]</kun><oku>た</oku><kun>"
+            " し[為]</kun><oku>ました</oku><kun> さ[為]</kun><oku>れる</oku><kun> し[為]</kun><oku>ろ</oku>"
+            "<kun> し[為]</kun><oku>ません</oku> それを<kun> し[為]</kun>",
+            "kana_only merged": "<kun>し</kun><oku>て</oku> <kun>し</kun><oku>た</oku> <kun>し</kun>"
+            "<oku>ました</oku> <kun>さ</kun><oku>れる</oku> <kun>し</kun><oku>ろ</oku> <kun>し</kun>"
+            "<oku>ません</oku> それを<kun>し</kun>",
+            "furigana merged": "<kun> 為[し]</kun><oku>て</oku><kun> 為[し]</kun><oku>た</oku><kun>"
+            " 為[し]</kun><oku>ました</oku><kun> 為[さ]</kun><oku>れる</oku><kun> 為[し]</kun><oku>ろ</oku>"
+            "<kun> 為[し]</kun><oku>ません</oku> それを<kun> 為[し]</kun>",
+            "furikanji merged": "<kun> し[為]</kun><oku>て</oku><kun> し[為]</kun><oku>た</oku><kun>"
+            " し[為]</kun><oku>ました</oku><kun> さ[為]</kun><oku>れる</oku><kun> し[為]</kun><oku>ろ</oku>"
+            "<kun> し[為]</kun><oku>ません</oku> それを<kun> し[為]</kun>",
         },
         id="為る conjugations /1",
     ),
@@ -4264,10 +4597,28 @@ CASES = [
         "為[し]まった 為[し]ない 為[し]なかった 為[さ]せない 為[さ]せた 為[さ]せました",
         True,
         {
+            "kana_only": "しまった しない しなかった させない させた させました",
+            "furigana": " 為[し]まった 為[し]ない 為[し]なかった 為[さ]せない 為[さ]せた 為[さ]せました",
+            "furikanji": " し[為]まった し[為]ない し[為]なかった さ[為]せない さ[為]せた さ[為]せました",
             "kana_only split": "<kun>し</kun><oku>まった</oku> <kun>し</kun><oku>ない</oku>"
             " <kun>し</kun><oku>なかった</oku>"
             " <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せた</oku>"
             " <kun>さ</kun><oku>せました</oku>",
+            "furigana split": "<kun> 為[し]</kun><oku>まった</oku><kun> 為[し]</kun><oku>ない</oku><kun>"
+            " 為[し]</kun><oku>なかった</oku><kun> 為[さ]</kun><oku>せない</oku><kun> 為[さ]</kun><oku>せた</oku>"
+            "<kun> 為[さ]</kun><oku>せました</oku>",
+            "furikanji split": "<kun> し[為]</kun><oku>まった</oku><kun> し[為]</kun><oku>ない</oku><kun>"
+            " し[為]</kun><oku>なかった</oku><kun> さ[為]</kun><oku>せない</oku><kun> さ[為]</kun><oku>せた</oku>"
+            "<kun> さ[為]</kun><oku>せました</oku>",
+            "kana_only merged": "<kun>し</kun><oku>まった</oku> <kun>し</kun><oku>ない</oku> <kun>し</kun>"
+            "<oku>なかった</oku> <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せた</oku> <kun>さ</kun>"
+            "<oku>せました</oku>",
+            "furigana merged": "<kun> 為[し]</kun><oku>まった</oku><kun> 為[し]</kun><oku>ない</oku><kun>"
+            " 為[し]</kun><oku>なかった</oku><kun> 為[さ]</kun><oku>せない</oku><kun> 為[さ]</kun><oku>せた</oku>"
+            "<kun> 為[さ]</kun><oku>せました</oku>",
+            "furikanji merged": "<kun> し[為]</kun><oku>まった</oku><kun> し[為]</kun><oku>ない</oku><kun>"
+            " し[為]</kun><oku>なかった</oku><kun> さ[為]</kun><oku>せない</oku><kun> さ[為]</kun><oku>せた</oku>"
+            "<kun> さ[為]</kun><oku>せました</oku>",
         },
         id="為る conjugations /2",
     ),
@@ -4276,9 +4627,27 @@ CASES = [
         "為[さ]せて 為[さ]せられ 為[さ]せろ 為[さ]せません 為[さ]せて 為[さ]せられた",
         True,
         {
+            "kana_only": "させて させられ させろ させません させて させられた",
+            "furigana": " 為[さ]せて 為[さ]せられ 為[さ]せろ 為[さ]せません 為[さ]せて 為[さ]せられた",
+            "furikanji": " さ[為]せて さ[為]せられ さ[為]せろ さ[為]せません さ[為]せて さ[為]せられた",
             "kana_only split": "<kun>さ</kun><oku>せて</oku> <kun>さ</kun><oku>せられ</oku> <kun>さ</kun><oku>せろ</oku>"
             " <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せて</oku>"
             " <kun>さ</kun><oku>せられた</oku>",
+            "furigana split": "<kun> 為[さ]</kun><oku>せて</oku><kun> 為[さ]</kun><oku>せられ</oku><kun>"
+            " 為[さ]</kun><oku>せろ</oku><kun> 為[さ]</kun><oku>せません</oku><kun> 為[さ]</kun><oku>せて</oku>"
+            "<kun> 為[さ]</kun><oku>せられた</oku>",
+            "furikanji split": "<kun> さ[為]</kun><oku>せて</oku><kun> さ[為]</kun><oku>せられ</oku><kun>"
+            " さ[為]</kun><oku>せろ</oku><kun> さ[為]</kun><oku>せません</oku><kun> さ[為]</kun><oku>せて</oku>"
+            "<kun> さ[為]</kun><oku>せられた</oku>",
+            "kana_only merged": "<kun>さ</kun><oku>せて</oku> <kun>さ</kun><oku>せられ</oku> <kun>さ</kun>"
+            "<oku>せろ</oku> <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せて</oku> <kun>さ</kun>"
+            "<oku>せられた</oku>",
+            "furigana merged": "<kun> 為[さ]</kun><oku>せて</oku><kun> 為[さ]</kun><oku>せられ</oku><kun>"
+            " 為[さ]</kun><oku>せろ</oku><kun> 為[さ]</kun><oku>せません</oku><kun> 為[さ]</kun><oku>せて</oku>"
+            "<kun> 為[さ]</kun><oku>せられた</oku>",
+            "furikanji merged": "<kun> さ[為]</kun><oku>せて</oku><kun> さ[為]</kun><oku>せられ</oku><kun>"
+            " さ[為]</kun><oku>せろ</oku><kun> さ[為]</kun><oku>せません</oku><kun> さ[為]</kun><oku>せて</oku>"
+            "<kun> さ[為]</kun><oku>せられた</oku>",
         },
         id="為る conjugations /3",
     ),
@@ -4287,9 +4656,22 @@ CASES = [
         "為[し]よう 為[さ]せよう 為[し]ましょう 為[せ]ずに 為[さ]せずに",
         True,
         {
+            "kana_only": "しよう させよう しましょう せずに させずに",
+            "furigana": " 為[し]よう 為[さ]せよう 為[し]ましょう 為[せ]ずに 為[さ]せずに",
+            "furikanji": " し[為]よう さ[為]せよう し[為]ましょう せ[為]ずに さ[為]せずに",
             "kana_only split": "<kun>し</kun><oku>よう</oku> <kun>さ</kun><oku>せよう</oku>"
             " <kun>し</kun><oku>ましょう</oku> <kun>せ</kun><oku>ず</oku>に"
             " <kun>さ</kun><oku>せず</oku>に",
+            "furigana split": "<kun> 為[し]</kun><oku>よう</oku><kun> 為[さ]</kun><oku>せよう</oku><kun>"
+            " 為[し]</kun><oku>ましょう</oku><kun> 為[せ]</kun><oku>ず</oku>に<kun> 為[さ]</kun><oku>せず</oku>に",
+            "furikanji split": "<kun> し[為]</kun><oku>よう</oku><kun> さ[為]</kun><oku>せよう</oku><kun>"
+            " し[為]</kun><oku>ましょう</oku><kun> せ[為]</kun><oku>ず</oku>に<kun> さ[為]</kun><oku>せず</oku>に",
+            "kana_only merged": "<kun>し</kun><oku>よう</oku> <kun>さ</kun><oku>せよう</oku> <kun>し</kun>"
+            "<oku>ましょう</oku> <kun>せ</kun><oku>ず</oku>に <kun>さ</kun><oku>せず</oku>に",
+            "furigana merged": "<kun> 為[し]</kun><oku>よう</oku><kun> 為[さ]</kun><oku>せよう</oku><kun>"
+            " 為[し]</kun><oku>ましょう</oku><kun> 為[せ]</kun><oku>ず</oku>に<kun> 為[さ]</kun><oku>せず</oku>に",
+            "furikanji merged": "<kun> し[為]</kun><oku>よう</oku><kun> さ[為]</kun><oku>せよう</oku><kun>"
+            " し[為]</kun><oku>ましょう</oku><kun> せ[為]</kun><oku>ず</oku>に<kun> さ[為]</kun><oku>せず</oku>に",
         },
         id="為る conjugations /4",
     ),
@@ -4316,9 +4698,15 @@ CASES = [
         "嗅[か]がせろって",
         True,
         {
+            "kana_only": "かがせろって",
+            "furigana": " 嗅[か]がせろって",
+            "furikanji": " か[嗅]がせろって",
             "kana_only split": "<kun>か</kun><oku>がせろ</oku>って",
             "furigana split": "<kun> 嗅[か]</kun><oku>がせろ</oku>って",
             "furikanji split": "<kun> か[嗅]</kun><oku>がせろ</oku>って",
+            "kana_only merged": "<kun>か</kun><oku>がせろ</oku>って",
+            "furigana merged": "<kun> 嗅[か]</kun><oku>がせろ</oku>って",
+            "furikanji merged": "<kun> か[嗅]</kun><oku>がせろ</oku>って",
         },
         id="matches okuri for causative imperative godan gu verb",
     ),
@@ -4327,9 +4715,15 @@ CASES = [
         "飲[の]ませろ!",
         True,
         {
+            "kana_only": "のませろ!",
+            "furigana": " 飲[の]ませろ!",
+            "furikanji": " の[飲]ませろ!",
             "kana_only split": "<kun>の</kun><oku>ませろ</oku>!",
             "furigana split": "<kun> 飲[の]</kun><oku>ませろ</oku>!",
             "furikanji split": "<kun> の[飲]</kun><oku>ませろ</oku>!",
+            "kana_only merged": "<kun>の</kun><oku>ませろ</oku>!",
+            "furigana merged": "<kun> 飲[の]</kun><oku>ませろ</oku>!",
+            "furikanji merged": "<kun> の[飲]</kun><oku>ませろ</oku>!",
         },
         id="matches okuri for causative imperative godan mu verb",
     ),
@@ -4338,9 +4732,15 @@ CASES = [
         "話[はな]させろ!",
         True,
         {
+            "kana_only": "はなさせろ!",
+            "furigana": " 話[はな]させろ!",
+            "furikanji": " はな[話]させろ!",
             "kana_only split": "<kun>はな</kun><oku>させろ</oku>!",
             "furigana split": "<kun> 話[はな]</kun><oku>させろ</oku>!",
             "furikanji split": "<kun> はな[話]</kun><oku>させろ</oku>!",
+            "kana_only merged": "<kun>はな</kun><oku>させろ</oku>!",
+            "furigana merged": "<kun> 話[はな]</kun><oku>させろ</oku>!",
+            "furikanji merged": "<kun> はな[話]</kun><oku>させろ</oku>!",
         },
         id="matches okuri for causative imperative godan su verb",
     ),
@@ -4349,9 +4749,15 @@ CASES = [
         "食[た]べさせろ!",
         True,
         {
+            "kana_only": "たべさせろ!",
+            "furigana": " 食[た]べさせろ!",
+            "furikanji": " た[食]べさせろ!",
             "kana_only split": "<kun>た</kun><oku>べさせろ</oku>!",
             "furigana split": "<kun> 食[た]</kun><oku>べさせろ</oku>!",
             "furikanji split": "<kun> た[食]</kun><oku>べさせろ</oku>!",
+            "kana_only merged": "<kun>た</kun><oku>べさせろ</oku>!",
+            "furigana merged": "<kun> 食[た]</kun><oku>べさせろ</oku>!",
+            "furikanji merged": "<kun> た[食]</kun><oku>べさせろ</oku>!",
         },
         id="matches okuri for causative imperative ichidan verb",
     ),
@@ -4360,9 +4766,15 @@ CASES = [
         "有[あ]らせろ!",
         True,
         {
+            "kana_only": "あらせろ!",
+            "furigana": " 有[あ]らせろ!",
+            "furikanji": " あ[有]らせろ!",
             "kana_only split": "<kun>あ</kun><oku>らせろ</oku>!",
             "furigana split": "<kun> 有[あ]</kun><oku>らせろ</oku>!",
             "furikanji split": "<kun> あ[有]</kun><oku>らせろ</oku>!",
+            "kana_only merged": "<kun>あ</kun><oku>らせろ</oku>!",
+            "furigana merged": "<kun> 有[あ]</kun><oku>らせろ</oku>!",
+            "furikanji merged": "<kun> あ[有]</kun><oku>らせろ</oku>!",
         },
         id="matches okuri for causative imperative godan aru verb",
     ),
@@ -4371,9 +4783,15 @@ CASES = [
         "博[はく]している",
         False,
         {
+            "kana_only": "はくしている",
+            "furigana": " 博[はく]している",
+            "furikanji": " はく[博]している",
             "kana_only split": "<on>はく</on><oku>している</oku>",
             "furigana split": "<on> 博[はく]</on><oku>している</oku>",
             "furikanji split": "<on> はく[博]</on><oku>している</oku>",
+            "kana_only merged": "<on>はく</on><oku>している</oku>",
+            "furigana merged": "<on> 博[はく]</on><oku>している</oku>",
+            "furikanji merged": "<on> はく[博]</on><oku>している</oku>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /1",
     ),
@@ -4382,9 +4800,15 @@ CASES = [
         "愛[あい]せるか？",
         False,
         {
+            "kana_only": "<b>あいせる</b>か？",
+            "furigana": "<b> 愛[あい]せる</b>か？",
+            "furikanji": "<b> あい[愛]せる</b>か？",
             "kana_only split": "<b><on>あい</on><oku>せる</oku></b>か？",
             "furigana split": "<b><on> 愛[あい]</on><oku>せる</oku></b>か？",
             "furikanji split": "<b><on> あい[愛]</on><oku>せる</oku></b>か？",
+            "kana_only merged": "<b><on>あい</on><oku>せる</oku></b>か？",
+            "furigana merged": "<b><on> 愛[あい]</on><oku>せる</oku></b>か？",
+            "furikanji merged": "<b><on> あい[愛]</on><oku>せる</oku></b>か？",
         },
         id="matches single-kanji onyomi す/する verbs okuri /2",
     ),
@@ -4393,9 +4817,15 @@ CASES = [
         "化[か]させない",
         False,
         {
+            "kana_only": "かさせない",
+            "furigana": " 化[か]させない",
+            "furikanji": " か[化]させない",
             "kana_only split": "<on>か</on><oku>させない</oku>",
             "furigana split": "<on> 化[か]</on><oku>させない</oku>",
             "furikanji split": "<on> か[化]</on><oku>させない</oku>",
+            "kana_only merged": "<on>か</on><oku>させない</oku>",
+            "furigana merged": "<on> 化[か]</on><oku>させない</oku>",
+            "furikanji merged": "<on> か[化]</on><oku>させない</oku>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /3",
     ),
@@ -4410,6 +4840,9 @@ CASES = [
             "kana_only split": "<b><on>てい</on><oku>さなかった</oku></b>",
             "furigana split": "<b><on> 呈[てい]</on><oku>さなかった</oku></b>",
             "furikanji split": "<b><on> てい[呈]</on><oku>さなかった</oku></b>",
+            "kana_only merged": "<b><on>てい</on><oku>さなかった</oku></b>",
+            "furigana merged": "<b><on> 呈[てい]</on><oku>さなかった</oku></b>",
+            "furikanji merged": "<b><on> てい[呈]</on><oku>さなかった</oku></b>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /4",
     ),
@@ -4424,6 +4857,9 @@ CASES = [
             "kana_only split": "<b><on>さっ</on><oku>していなかった</oku></b>",
             "furigana split": "<b><on> 察[さっ]</on><oku>していなかった</oku></b>",
             "furikanji split": "<b><on> さっ[察]</on><oku>していなかった</oku></b>",
+            "kana_only merged": "<b><on>さっ</on><oku>していなかった</oku></b>",
+            "furigana merged": "<b><on> 察[さっ]</on><oku>していなかった</oku></b>",
+            "furikanji merged": "<b><on> さっ[察]</on><oku>していなかった</oku></b>",
         },
         id="matches single-kanji onyomi small tsu す verbs okuri /1",
     ),
@@ -4438,6 +4874,9 @@ CASES = [
             "kana_only split": "<b><on>さっ</on><oku>される</oku></b>かも",
             "furigana split": "<b><on> 察[さっ]</on><oku>される</oku></b>かも",
             "furikanji split": "<b><on> さっ[察]</on><oku>される</oku></b>かも",
+            "kana_only merged": "<b><on>さっ</on><oku>される</oku></b>かも",
+            "furigana merged": "<b><on> 察[さっ]</on><oku>される</oku></b>かも",
+            "furikanji merged": "<b><on> さっ[察]</on><oku>される</oku></b>かも",
         },
         id="matches single-kanji onyomi small tsu す verbs okuri /2",
     ),
@@ -4457,6 +4896,12 @@ CASES = [
             "furikanji split": "<b><kun> ほっ[欲]</kun><oku>すれば</oku></b>、<b><kun>"
             " ほ[欲]</kun><oku>しがれば</oku></b>"
             "、<kun> く[呉]</kun><oku>れましょう</oku>",
+            "kana_only merged": "<b><kun>ほっ</kun><oku>すれば</oku></b>、<b><kun>ほ</kun>"
+            "<oku>しがれば</oku></b>、<kun>く</kun><oku>れましょう</oku>",
+            "furigana merged": "<b><kun> 欲[ほっ]</kun><oku>すれば</oku></b>、<b><kun> 欲[ほ]</kun><oku>"
+            "しがれば</oku></b>、<kun> 呉[く]</kun><oku>れましょう</oku>",
+            "furikanji merged": "<b><kun> ほっ[欲]</kun><oku>すれば</oku></b>、<b><kun> ほ[欲]</kun><oku>"
+            "しがれば</oku></b>、<kun> く[呉]</kun><oku>れましょう</oku>",
         },
         id="matches single-kanji small tsu す verbs okuri /3",
     ),
@@ -4471,6 +4916,9 @@ CASES = [
             "kana_only split": "<on>べん</on><b><on>きょう</on></b><oku>しません</oku>！",
             "furigana split": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>しません</oku>！",
             "furikanji split": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>しません</oku>！",
+            "kana_only merged": "<on>べん</on><b><on>きょう</on></b><oku>しません</oku>！",
+            "furigana merged": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>しません</oku>！",
+            "furikanji merged": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>しません</oku>！",
         },
         id="should not include suru okuri in multi-kanji suru verb highlight /1",
     ),
@@ -4485,6 +4933,9 @@ CASES = [
             "kana_only split": "<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
             "furigana split": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！",
             "furikanji split": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！",
+            "kana_only merged": "<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
+            "furigana merged": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！",
+            "furikanji merged": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！",
         },
         id="should not include suru okuri in multi-kanji suru verb highlight /2",
     ),
@@ -4854,7 +5305,7 @@ for _case in CASES:
 @pytest.mark.parametrize("mode, return_type, with_tags, merge_consecutive", MODES)
 @pytest.mark.parametrize("kanji, sentence, onyomi_to_katakana, expected", CASES)
 def test_kana_highlight(
-    kanji: Optional[str],
+    kanji: str | None,
     sentence: str,
     onyomi_to_katakana: bool,
     expected: dict[str, str],

@@ -40,3 +40,20 @@ ignore_errors = true
 python_files = ["*_tests.py"]
 addopts = "-p no:anki"
 disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true
+
+# Ruff is the linter here; this section is the rule set a check has to pass. `E`/`F` are the
+# pycodestyle and pyflakes base, `UP` keeps the syntax at the 3.10 floor declared above, `I`
+# the import order, `B` the bugbear traps and `SIM` the obvious simplifications.
+# `mecab_controller/` is vendored from upstream and not ours to reformat, same as for mypy.
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["mecab_controller"]
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "I", "B", "SIM"]
+# E501 measures a line in display columns and counts a Japanese character as two of them, so
+# two thirds of what it flags here are lines well under 100 characters that happen to be kana,
+# and the rest are the reading strings the test cases are made of. The line length above still
+# applies to `ruff format`, which is what actually wraps the code.
+ignore = ["E501"]

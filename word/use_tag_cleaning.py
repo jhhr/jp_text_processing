@@ -1,13 +1,13 @@
 import re
 
+from ..utils.logger import package_logger as logger
 from .use_text_part_storage import (
-    use_text_part_storage,
     BTagIndexIncrementer,
     IndexIncrementer,
     TextPartIndexes,
     TextPartRestorer,
+    use_text_part_storage,
 )
-from ..utils.logger import package_logger as logger
 
 
 def increment_for_b_tag_insertion(
@@ -43,7 +43,9 @@ EMPTY_PAIR = r"<([a-zA-Z][^\s/>]*)[^>]*></\1>"
 UNPAIRED_TAGS = {"br", "hr", "img", "wbr", "b"}
 
 
-def crossed_tags(text: str, b_open: int, b_close: int) -> tuple[list[str], list[str]]:
+def crossed_tags(
+    text: str, b_open: int, b_close: int
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """
     Find the tags that a <b>...</b> span crosses instead of enclosing.
 
@@ -55,20 +57,47 @@ def crossed_tags(text: str, b_open: int, b_close: int) -> tuple[list[str], list[
         A tuple of:
             - the tags opened inside the span and closed after it, outermost first
             - the tags opened before the span and closed inside it, innermost first
+        each as (name, opening tag as written), so a reopened tag keeps its attributes. A tag
+        closed inside the span whose opening isn't found before it gets a bare opening tag.
     """
-    opened: list[str] = []
+    opened: list[tuple[str, str]] = []
     closed_from_before: list[str] = []
     for m in TAG_RE.finditer(text, b_open + len("<b>"), b_close):
         tag = m.group(2)
         if tag in UNPAIRED_TAGS:
             continue
         if not m.group(1):
-            opened.append(tag)
-        elif opened and opened[-1] == tag:
+            opened.append((tag, m.group(0)))
+        elif opened and opened[-1][0] == tag:
             opened.pop()
         else:
             closed_from_before.append(tag)
-    return opened, closed_from_before
+    if not closed_from_before:
+        return opened, []
+    # The tags still open where the span starts, innermost last
+    open_before: list[tuple[str, str]] = []
+    for m in TAG_RE.finditer(text, 0, b_open):
+        tag = m.group(2)
+        if tag in UNPAIRED_TAGS:
+            continue
+        if not m.group(1):
+            open_before.append((tag, m.group(0)))
+        else:
+            remove_innermost(open_before, tag)
+    closed_from_before_as_written: list[tuple[str, str]] = []
+    for tag in closed_from_before:
+        closed_from_before_as_written.append(
+            remove_innermost(open_before, tag) or (tag, f"<{tag}>")
+        )
+    return opened, closed_from_before_as_written
+
+
+def remove_innermost(open_tags: list[tuple[str, str]], tag: str) -> tuple[str, str] | None:
+    """Remove and return the last entry for the tag name, the one a closing tag closes."""
+    for idx in range(len(open_tags) - 1, -1, -1):
+        if open_tags[idx][0] == tag:
+            return open_tags.pop(idx)
+    return None
 
 
 def balance_b_tags(text: str) -> str:
@@ -76,6 +105,7 @@ def balance_b_tags(text: str) -> str:
     Close and reopen the tags that a <b>...</b> crosses, which the reorderings in
     apply_tag_fixes can only do when the tag sits right next to a b tag:
     '<b><k>A</k>を<k>B</b>C</k>' becomes '<b><k>A</k>を<k>B</k></b><k>C</k>'.
+    A reopened tag keeps its attributes.
 
     Args:
         text: The text after restoring tags.
@@ -89,18 +119,22 @@ def balance_b_tags(text: str) -> str:
         b_close = rest.find("</b>", b_open + 3) if b_open != -1 else -1
         if b_close == -1:
             return result + rest
-        opened, closed_from_before = crossed_tags(rest, b_open, b_close)
+        # A tag the span crosses may have been opened before an earlier span, so the whole
+        # text handled so far is in view for finding its opening
+        opened, closed_from_before = crossed_tags(
+            result + rest, len(result) + b_open, len(result) + b_close
+        )
         result += (
             rest[:b_open]
             # Tags the span started inside of are closed before it and reopened within it
-            + "".join(f"</{tag}>" for tag in closed_from_before)
+            + "".join(f"</{tag}>" for tag, _ in closed_from_before)
             + "<b>"
-            + "".join(f"<{tag}>" for tag in reversed(closed_from_before))
+            + "".join(opening for _, opening in reversed(closed_from_before))
             + rest[b_open + 3 : b_close]
             # Tags the span opened are closed within it and reopened after it
-            + "".join(f"</{tag}>" for tag in reversed(opened))
+            + "".join(f"</{tag}>" for tag, _ in reversed(opened))
             + "</b>"
-            + "".join(f"<{tag}>" for tag in opened)
+            + "".join(opening for _, opening in opened)
         )
         rest = rest[b_close + 4 :]
 
@@ -122,16 +156,39 @@ def apply_tag_fixes(restored_text: str) -> str:
     result = re.sub(r"(<([^>]+)>[^<]*)(</b>)(<\/\2>)", r"\1\4\3", result)
     # Any remaining tag the b span crosses instead of enclosing
     result = balance_b_tags(result)
-    # The reopened tags can end up empty, e.g. when the reordering above already handled them
-    result = re.sub(rf"{EMPTY_PAIR}(?=<b>)", "", result)
-    result = re.sub(rf"(?<=<b>){EMPTY_PAIR}", "", result)
-    result = re.sub(rf"{EMPTY_PAIR}(?=</b>)", "", result)
-    result = re.sub(rf"(?<=</b>){EMPTY_PAIR}", "", result)
+    if result != restored_text:
+        # The reopened tags can end up empty, e.g. when the reordering above already handled
+        # them. Only what the reorderings left behind is cleaned up: an empty element the
+        # caller wrote next to the word is theirs and stays.
+        result = re.sub(rf"{EMPTY_PAIR}(?=<b>)", "", result)
+        result = re.sub(rf"(?<=<b>){EMPTY_PAIR}", "", result)
+        result = re.sub(rf"{EMPTY_PAIR}(?=</b>)", "", result)
+        result = re.sub(rf"(?<=</b>){EMPTY_PAIR}", "", result)
     return result
+
+
+TAG_PART_RE = r"<\/?[^>]+>"
+# A splitter dot between the parts of a word (報・連・相) is stored like a tag as well, so the
+# word matches without it and it comes back where it was.
+SPLITTER_DOT_RE = r"・\s*"
+# Whitespace and dots go into the same storage as the tags for a caller that loses them, rather
+# than into a storage of their own: two storages each index a text the other one still has its
+# parts in, so neither can place a <b> that the other's parts sit around. The tag comes first in
+# the alternation, so the space inside <span class="x"> is part of that tag and stays in it.
+TAG_AND_DOT_PART_RE = rf"{TAG_PART_RE}|{SPLITTER_DOT_RE}"
+# The furigana paths match the space before a kanji as part of the word, so there the dot has to
+# leave the space where it is.
+TAG_AND_BARE_DOT_PART_RE = rf"{TAG_PART_RE}|・"
+TAG_AND_SPACE_PART_RE = rf"{TAG_PART_RE}|\s+|{SPLITTER_DOT_RE}"
+# A reading in brackets is not text the word occurs in, so the mecab path stores it away with
+# the tags instead of letting MeCab read it as part of the sentence and highlight inside it.
+FURIGANA_PART_RE = r"\[[^\]]*\]"
+TAG_SPACE_AND_FURIGANA_PART_RE = rf"{TAG_PART_RE}|\s+|{SPLITTER_DOT_RE}|{FURIGANA_PART_RE}"
 
 
 def use_tag_cleaning_with_b_insertion(
     text: str,
+    part_regex: str = TAG_PART_RE,
 ) -> tuple[str, BTagIndexIncrementer, TextPartRestorer, TextPartIndexes]:
     """
     Stores indexes of all HTML tags and removes them temporarily, to
@@ -139,6 +196,8 @@ def use_tag_cleaning_with_b_insertion(
 
     Args:
         text: The original text containing parts to be stored.
+        part_regex: What to store; one of the TAG_AND_* alternations to take the whitespace
+            or the splitter dots with the tags.
     Returns:
         A tuple containing:
             - The cleaned text with parts removed.
@@ -147,7 +206,7 @@ def use_tag_cleaning_with_b_insertion(
             - The indexes of the stored tags.
     """
     cleaned_text, increment_indexes, restore_parts, indexes = use_text_part_storage(
-        text, part_regex=r"<\/?[^>]+>"
+        text, part_regex=part_regex
     )
 
     def custom_incrementer(

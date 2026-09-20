@@ -1,14 +1,12 @@
-from typing import Optional
+from ..all_types.main_types import (
+    PartOfSpeech,
+)
+from ..utils.logger import package_logger as logger
 from .get_conjugatable_okurigana_stem import get_conjugatable_okurigana_stem
 from .starts_with_okurigana_conjugation import (
     OkuriResults,
     starts_with_okurigana_conjugation,
 )
-
-from ..all_types.main_types import (
-    PartOfSpeech,
-)
-from ..utils.logger import package_logger as logger
 
 
 def check_okurigana_for_inflection(
@@ -16,7 +14,7 @@ def check_okurigana_for_inflection(
     reading: str,
     maybe_okuri: str,
     kanji_to_match: str,
-    part_of_speech: Optional[PartOfSpeech] = None,
+    part_of_speech: PartOfSpeech | None = None,
 ) -> OkuriResults:
     """
     Function that checks the okurigana for a match with the okurigana
@@ -30,7 +28,6 @@ def check_okurigana_for_inflection(
     """
     # Kana text occurring after the kanji in the word, may not be okurigana and can
     # contain other kana after the okurigana
-    maybe_okuri
     logger.debug(
         "check okurigana 0 - reading_okurigana: %s, maybe_okuri: %s, reading: %s, part_of_speech:"
         " %s",

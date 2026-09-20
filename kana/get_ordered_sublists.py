@@ -1,12 +1,11 @@
+from collections.abc import Sequence
 from itertools import combinations
-from typing import Sequence, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
 
-def get_ordered_sublists(
-    list_to_split: Sequence[T], split_count: int
-) -> list[list[Sequence[T]]]:
+def get_ordered_sublists(list_to_split: Sequence[T], split_count: int) -> list[list[Sequence[T]]]:
     """
     Splits a sequence into all possible combinations of N subsequences while preserving order.
 

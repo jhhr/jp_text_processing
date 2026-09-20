@@ -1,4 +1,4 @@
-from typing import Optional, Literal, TypedDict, NamedTuple
+from typing import Literal, NamedTuple, TypedDict
 
 
 class WithTagsDef(NamedTuple):
@@ -25,7 +25,7 @@ WrapTag = Literal["on", "kun", "juk", "mix"]
 class _WrapMatchEntryOptional(TypedDict, total=False):
     """Keys of WrapMatchEntry the builders may leave out. (NotRequired needs Python 3.11.)"""
 
-    is_noun_suru_verb: Optional[bool]
+    is_noun_suru_verb: bool | None
 
 
 class WrapMatchEntry(_WrapMatchEntryOptional):
@@ -138,7 +138,7 @@ class OkuriResults(NamedTuple):
     okurigana: str
     rest_kana: str
     result: OkuriType
-    part_of_speech: Optional[PartOfSpeech] = None
+    part_of_speech: PartOfSpeech | None = None
 
 
 ReadingType = Literal[
@@ -149,7 +149,7 @@ ReadingType = Literal[
 class _ReadingMatchInfoOptional(TypedDict, total=False):
     """Keys of ReadingMatchInfo the builders may leave out. (NotRequired needs Python 3.11.)"""
 
-    is_noun_suru_verb: Optional[bool]
+    is_noun_suru_verb: bool | None
 
 
 class ReadingMatchInfo(_ReadingMatchInfoOptional):
@@ -190,7 +190,7 @@ class MoraAlignment(TypedDict):
     :param final_rest_kana: Remaining kana after okurigana extraction
     """
 
-    kanji_matches: list[Optional[ReadingMatchInfo]]
+    kanji_matches: list[ReadingMatchInfo | None]
     mora_split: list[str]
     jukujikun_positions: list[int]
     final_okurigana: str
