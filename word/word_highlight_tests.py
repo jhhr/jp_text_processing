@@ -209,6 +209,21 @@ CASES = [
         "花[はな]<b> 見[み]</b>に 行[い]く",
         id="Okuri word - a run ending at the word's kanji still matches, with furigana",
     ),
+    # Matching against the text's readings splits them apart first, and only what that split
+    # took apart is put back together: a part of the text the highlight did not touch comes
+    # back as it was written, its own furigana words still its own.
+    pytest.param(
+        "出来[でき] 事[こと]が 好[す]きだ",
+        "好[す]き",
+        "出来[でき] 事[こと]が<b> 好[す]き</b>だ",
+        id="Furigana - furigana words the text wrote apart are not merged",
+    ),
+    pytest.param(
+        "花[はな] 見[み]に 行[い]く",
+        "行[い]く",
+        "花[はな] 見[み]に<b> 行[い]く</b>",
+        id="Furigana - furigana words the text wrote apart are not merged, word with okuri",
+    ),
     pytest.param(
         "垂[タ]レ 込[コ]ミがあった、オイ！",
         "垂[た]れ 込[こ]み",

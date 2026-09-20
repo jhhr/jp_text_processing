@@ -195,26 +195,65 @@ def split_furi_text_into_individual_kanji_furigana(furi_text: str) -> str:
     return furi_text
 
 
-def merge_consecutive_furigana(split_furi_text: str) -> str:
+def kanji_run_continuations(text: str) -> list[bool]:
+    """Tell for each kanji of the text whether the run it stands in goes on after it.
+
+    Splitting the text gives every kanji a bracket of its own, so the runs the text was
+    written with are only visible in the text itself. The kanji keep their order through the
+    splitting, so the answer is looked up by counting them.
+    """
+    bare_text = re.sub(rf"{TAG_AND_BARE_DOT_PART_RE}|{FURIGANA_PART_RE}", "", text)
+    return [
+        bool(re.match(KANJI_RUN_CHAR_RE, bare_text[index + 1 : index + 2]))
+        for index, char in enumerate(bare_text)
+        if re.match(KANJI_RUN_CHAR_RE, char)
+    ]
+
+
+def kanji_index_at(text: str, position: int) -> int:
+    """Count the kanji before the position, the tags, dots and readings not counted."""
+    before = re.sub(rf"{TAG_AND_BARE_DOT_PART_RE}|{FURIGANA_PART_RE}", "", text[:position])
+    return len(re.findall(KANJI_RUN_CHAR_RE, before))
+
+
+def merge_consecutive_furigana(split_furi_text: str, text: str) -> str:
     """Merges consecutive kanji-furigana parts back into a single furigana text.
+
+    Only what the splitting took apart is put back: two furigana words the text was written
+    with a space between are not one run and stay apart, so a part of the text the highlight
+    did not touch comes back as it was written.
 
     Args:
         split_furi_text (str): The split furigana text.
+        text (str): The text as it was written, whose kanji runs say what may merge.
     Returns:
         str: The merged furigana text.
     """
+    run_continues_after_kanji = kanji_run_continuations(text)
     pattern = re.compile(CONSECUTIVE_FURI_WORD_RE)
-    while match := pattern.search(split_furi_text):
+    search_start = 0
+    while match := pattern.search(split_furi_text, search_start):
         first_kanji = match.group(1)
         first_furi = match.group(2)
         second_kanji = match.group(3)
         second_furi = match.group(4)
+        last_kanji_index = kanji_index_at(split_furi_text, match.start(1) + len(first_kanji) - 1)
+        if run_continues_after_kanji[last_kanji_index : last_kanji_index + 1] != [True]:
+            # The text has these two as words of its own; the second one can still have a
+            # part of its own run after it
+            logger.debug(
+                "Not merging '%s' and '%s': the text has them apart", first_kanji, second_kanji
+            )
+            search_start = match.start(3) - 1
+            continue
         merged_kanji = first_kanji + second_kanji
         merged_furi = first_furi + second_furi
         merged_text = f" {merged_kanji}[{merged_furi}]"
         split_furi_text = (
             split_furi_text[: match.start(0)] + merged_text + split_furi_text[match.end(0) :]
         )
+        # The merged part can have another part of the same run after it
+        search_start = match.start(0)
     return split_furi_text
 
 
@@ -435,7 +474,7 @@ def word_highlight(text: str, word: str) -> str:
         logger.debug("Restored html tags result: '%s'", result)
 
         # Re-merge any consecutive furigana parts that were split earlier
-        result = merge_consecutive_furigana(result)
+        result = merge_consecutive_furigana(result, text)
 
         # Remove the space the furigana splitting puts at the beginning, unless the text was
         # written with one there
@@ -727,7 +766,7 @@ def word_highlight(text: str, word: str) -> str:
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
         # Re-merge any consecutive furigana parts that were split earlier
-        result = merge_consecutive_furigana(result)
+        result = merge_consecutive_furigana(result, text)
         # Remove the space the furigana splitting puts at the beginning, unless the text was
         # written with one there
         if not text[:1].isspace():
