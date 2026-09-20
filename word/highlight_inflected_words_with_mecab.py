@@ -57,6 +57,9 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         )
 
     word_stem = base_form_word[:-1]
+    if not word_stem:
+        # A one-character word has no stem to inflect and the verbatim search already failed
+        return text
     # Set noun form verbs to basic verb from, so that token.headword can match them
     if is_katakana_str(word_stem):
         base_form_word_ending = to_katakana(base_form_word_ending)

@@ -46,6 +46,18 @@ CASES = [
         id="Crash test - word is just whitespace",
     ),
     pytest.param(
+        "これは犬です",
+        "ね",
+        "これは犬です",
+        id="Crash test - one-kana word not in the text",
+    ),
+    pytest.param(
+        "食べた",
+        "る",
+        "食べた",
+        id="Crash test - one-kana word not in the text /2",
+    ),
+    pytest.param(
         "私[わたし]は 日本語[にほんご]を 勉強[べんきょう]しています。",
         "日本語[にほんご]",
         "私[わたし]は<b> 日本語[にほんご]</b>を 勉強[べんきょう]しています。",
