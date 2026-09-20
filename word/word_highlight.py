@@ -251,14 +251,24 @@ def word_highlight(text: str, word: str) -> str:
             split_free_to_original_index,
         ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text)
 
+        # re.sub reports every match's position in its input, which has none of the b tags the
+        # earlier matches got. The splitter bookkeeping works in those same positions, but the
+        # tag bookkeeping counts the inserted tags, so they are added on for it - once to get
+        # from the reported position to the current one, and once more because converting
+        # through the splitter indexes takes them back off.
+        b_tags_inserted = 0
+
+        def to_tag_index(split_free_index: int) -> int:
+            edited_index = split_free_index + b_tags_inserted
+            return split_free_to_original_index(edited_index) + b_tags_inserted
+
         def replace_match(match: re.Match) -> str:
+            nonlocal b_tags_inserted
             split_start = match.start(0)
             split_end = match.end(0)
-            increment_tag_indexes(
-                split_free_to_original_index(split_start),
-                split_free_to_original_index(split_end),
-            )
+            increment_tag_indexes(to_tag_index(split_start), to_tag_index(split_end))
             increment_splitter_indexes(split_start, split_end)
+            b_tags_inserted += len("<b></b>")
             return f"<b>{match.group(0)}</b>"
 
         result = re.sub(pattern, replace_match, splitter_free_text)
@@ -308,7 +318,15 @@ def word_highlight(text: str, word: str) -> str:
         )
         logger.debug("splitter_free_text for matching: '%s'", splitter_free_text)
 
+        # As above: the positions re.sub reports know nothing of the b tags already inserted
+        b_tags_inserted = 0
+
+        def to_tag_index(split_free_index: int) -> int:
+            edited_index = split_free_index + b_tags_inserted
+            return split_free_to_original_index(edited_index) + b_tags_inserted
+
         def replace_match(match: re.Match) -> str:
+            nonlocal b_tags_inserted
             has_variant = False
             for idx, expected in enumerate(expected_readings):
                 observed = to_hiragana(match.group(f"furi_{idx}"))
@@ -334,11 +352,9 @@ def word_highlight(text: str, word: str) -> str:
             if not match_text:
                 return match.group(0)
 
-            increment_tag_indexes(
-                split_free_to_original_index(split_start),
-                split_free_to_original_index(split_end),
-            )
+            increment_tag_indexes(to_tag_index(split_start), to_tag_index(split_end))
             increment_splitter_indexes(split_start, split_end)
+            b_tags_inserted += len("<b></b>")
             return f"{leading_ws}<b>{match_text}</b>"
 
         result = re.sub(pattern, replace_match, splitter_free_text)

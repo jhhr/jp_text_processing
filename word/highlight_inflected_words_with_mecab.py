@@ -14,9 +14,7 @@ from ..mecab_controller.kana_conv import (
     is_hiragana_str,
     is_katakana_str,
 )
-from .use_text_part_storage import use_text_part_storage
-
-from .use_tag_cleaning import use_tag_cleaning_with_b_insertion, increment_for_b_tag_insertion
+from .use_tag_cleaning import TAG_AND_SPACE_PART_RE, use_tag_cleaning_with_b_insertion
 from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.okurigana_dict import (
     GODAN_FORM_VERB_STARTINGS,
@@ -116,19 +114,11 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
                 okurigana_len = len(next_token.word)
         return okurigana_len
 
-    # Store indexes of all whitespace as mecab wipes them out
-    space_free_text, increment_space_indexes, restore_spaces, _ = use_text_part_storage(
-        text, part_regex=r"\s+"
+    # Clean the html tags from the text temporarily, and the whitespace with them as mecab wipes
+    # that out as well
+    html_and_space_free_text, increment_indexes_for_b, restore_tags_and_spaces, _ = (
+        use_tag_cleaning_with_b_insertion(text, part_regex=TAG_AND_SPACE_PART_RE)
     )
-
-    # Clean html tags from the text temporarily
-    html_and_space_free_text, increment_tag_indexes, restore_tags, _ = (
-        use_tag_cleaning_with_b_insertion(space_free_text)
-    )
-
-    def increment_indexes_for_b(start: int, end: int) -> None:
-        increment_for_b_tag_insertion(increment_space_indexes, start, end)
-        increment_tag_indexes(start, end)
 
     all_tokens: list[MecabParsedToken] = list(mecab.translate(html_and_space_free_text))
     result = ""
@@ -210,6 +200,12 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
     if opened_bold:
         logger.debug("Closing bold tag at end of text")
         result += "</b>"
+        # The stored tags and spaces have to be told about this pair too, the same as the ones
+        # closed inside the loop; without it everything after the <b> is restored 3 characters
+        # short and lands inside the word
+        before_b_close_idx = text_char_idx - 3
+        logger.debug("open_bold_idx: %s, before_b_close_idx: %s", open_bold_idx, before_b_close_idx)
+        increment_indexes_for_b(open_bold_idx, before_b_close_idx)
         text_char_idx += 4
 
     if "<b>" not in result:
@@ -230,16 +226,7 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
             return highlight_inflected_words_with_mecab(text, to_hiragana(base_form_word), 0)
     logger.debug("Final highlighted result before restoring tags/spaces: '%s'", result)
 
-    # Restore removed parts in reverse order
-    # First tags
-    result = restore_tags(result)
-    logger.debug("Restored html tags result: '%s'", result)
-
-    # Then spaces
-    result = restore_spaces(result)
-    logger.debug("Restored spaces result: '%s'", result)
-
-    # Make some fixes to spaces
-    result = result.replace("</b >", "</b> ")
+    result = restore_tags_and_spaces(result)
+    logger.debug("Restored html tags and spaces result: '%s'", result)
 
     return result

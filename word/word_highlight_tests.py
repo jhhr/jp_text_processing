@@ -727,6 +727,62 @@ CASES = [
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
         id="Shouldn't crash with mixture of furigana and non-furigana in word",
     ),
+    # The caller's own html around the word: the highlight goes inside the element when the
+    # element holds the whole word, and around it when the word runs past the element's edge.
+    pytest.param(
+        "<span>はしって</span>",
+        "はしる",
+        "<span><b>はしって</b></span>",
+        id="Html shape - a tag around the whole word keeps the highlight inside it",
+    ),
+    pytest.param(
+        '<span class="x">はしって</span>',
+        "はしる",
+        '<span class="x"><b>はしって</b></span>',
+        id="Html shape - the space in a tag's attributes is part of the tag",
+    ),
+    pytest.param(
+        "<span>はし</span>って",
+        "はしる",
+        "<b><span>はし</span>って</b>",
+        id="Html shape - a tag around part of the word goes inside the highlight",
+    ),
+    pytest.param(
+        "<span>はしって</span><br>",
+        "はしる",
+        "<span><b>はしって</b></span><br>",
+        id="Html shape - an unpaired tag after the word stays outside the highlight",
+    ),
+    pytest.param(
+        "<k> 昨日[きのう]</k>は バズったね",
+        "バズる",
+        "<k> 昨日[きのう]</k>は <b>バズった</b>ね",
+        id="Html shape - the space before the word stays outside the highlight",
+    ),
+    pytest.param(
+        "<span>食[た]</span>べた",
+        "食[た]べる",
+        "<b><span> 食[た]</span>べた</b>",
+        id="Html shape - a tag around part of a furigana word",
+    ),
+    pytest.param(
+        "<span>食[た]べた</span><br>",
+        "食[た]べる",
+        "<span><b> 食[た]べた</b></span><br>",
+        id="Html shape - a furigana word in a tag with an unpaired tag after it",
+    ),
+    pytest.param(
+        "<span>家で居る、家出はしない</span>",
+        "家",
+        "<span><b>家</b>で居る、<b>家</b>出はしない</span>",
+        id="Html shape - several occurrences inside one tag",
+    ),
+    pytest.param(
+        "<span> 家[いえ]と 家[いえ]</span>",
+        "家[いえ]",
+        "<span><b> 家[いえ]</b>と<b> 家[いえ]</b></span>",
+        id="Html shape - several furigana occurrences inside one tag",
+    ),
 ]
 
 

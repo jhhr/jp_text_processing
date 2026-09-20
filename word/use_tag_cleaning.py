@@ -130,8 +130,17 @@ def apply_tag_fixes(restored_text: str) -> str:
     return result
 
 
+TAG_PART_RE = r"<\/?[^>]+>"
+# Whitespace goes into the same storage as the tags for a caller that loses both, rather than
+# into a storage of its own: two storages each index a text the other one still has its parts
+# in, so neither can place a <b> that the other's parts sit around. The tag comes first in the
+# alternation, so the space inside <span class="x"> is part of that tag and stays in it.
+TAG_AND_SPACE_PART_RE = rf"{TAG_PART_RE}|\s+"
+
+
 def use_tag_cleaning_with_b_insertion(
     text: str,
+    part_regex: str = TAG_PART_RE,
 ) -> tuple[str, BTagIndexIncrementer, TextPartRestorer, TextPartIndexes]:
     """
     Stores indexes of all HTML tags and removes them temporarily, to
@@ -139,6 +148,7 @@ def use_tag_cleaning_with_b_insertion(
 
     Args:
         text: The original text containing parts to be stored.
+        part_regex: What to store; TAG_AND_SPACE_PART_RE to take the whitespace with the tags.
     Returns:
         A tuple containing:
             - The cleaned text with parts removed.
@@ -147,7 +157,7 @@ def use_tag_cleaning_with_b_insertion(
             - The indexes of the stored tags.
     """
     cleaned_text, increment_indexes, restore_parts, indexes = use_text_part_storage(
-        text, part_regex=r"<\/?[^>]+>"
+        text, part_regex=part_regex
     )
 
     def custom_incrementer(
