@@ -158,6 +158,14 @@ CASES = [
         "あさおきて<br>よるねる",
         id="a sentence of words with and without okurigana",
     ),
+    # An empty furigana hides its kanji behind a placeholder, and reads no further than its
+    # own bracket
+    pytest.param(
+        "今日[]は天気[てんき]がいい。",
+        "□はてんきがいい。",
+        id="empty furigana followed by another word",
+    ),
+    pytest.param("食[]べる", "□べる", id="empty furigana with okurigana"),
 ]
 
 

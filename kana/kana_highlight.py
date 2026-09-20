@@ -39,8 +39,10 @@ from .orphaned_repeater_cleaning import (
 )
 
 # Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
-# before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
-KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[(.+?)\]")
+# before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana. The
+# furigana may be empty: a lazy .+? would read an empty bracket's ] as furigana and run on into
+# the next word's bracket.
+KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[([^\]]*)\]")
 
 
 def kana_filter(text):
@@ -59,8 +61,10 @@ def kana_filter(text):
         if match.group(2).startswith("sound:"):
             # [sound:...] should not be replaced
             return match.group(0)
-        # Return the furigana inside the brackets, dropping the kanji and the leading space
-        return match.group(2)
+        # Return the furigana inside the brackets, dropping the kanji and the leading space. An
+        # empty furigana gets the placeholder the kana-only mode of kana_highlight uses, so the
+        # kanji stay hidden but the word does not vanish without a trace.
+        return match.group(2) or "□"
 
     # Run the same cleaning passes kana_highlight does, in the same order: put a separated 々
     # back into its word's furigana group, so that 人 々[ひとびと] is not left with an unread 人,
