@@ -47,6 +47,8 @@ KANJI_UNITS = {
 # before the latter.
 SUB_MYRIAD_UNITS = "".join(kanji for unit, kanji in KANJI_UNITS.items() if 1 < unit < 10000)
 MYRIAD_UNITS = "".join(kanji for unit, kanji in KANJI_UNITS.items() if unit >= 10000)
+# What can sit between a 千 heading a myriad group and that group's unit: digits and 十/百.
+WITHIN_MYRIAD_GROUP = "".join(KANJI_NUMERALS[digit] for digit in range(1, 10)) + "十百"
 
 NUMBER_TO_KANJI = {}
 for num, kanji in KANJI_NUMERALS.items():
@@ -138,8 +140,7 @@ def number_to_kanji(num_str: str) -> str:
     """
 
     # Normalize the input string to handle full-width characters
-    clean_num_str = num_str.strip()
-    clean_num_str = "".join(str(JPN_NUMBER_TO_NUM.get(char, char)) for char in num_str)
+    clean_num_str = "".join(str(JPN_NUMBER_TO_NUM.get(char, char)) for char in num_str.strip())
 
     if not clean_num_str.isdigit():
         logger.debug("Input string '%s' is not a valid number.", num_str)
@@ -159,9 +160,13 @@ def number_to_kanji(num_str: str) -> str:
     result.reverse()
     kanji_result = "".join(result)
     # Remove the 一 in front of 十, 百 and 千 (十, 二百, 千二百) but never in front of 万 and
-    # above, which always keep it (一万, 一億). A 千 that tops a 万-group keeps it too, so
-    # 10000000 is 一千万 and not 千万.
-    kanji_result = re.sub(rf"一(?=[{SUB_MYRIAD_UNITS}])(?!千[{MYRIAD_UNITS}])", "", kanji_result)
+    # above, which always keep it (一万, 一億). A 千 that tops a 万-group keeps it too whatever
+    # else that group holds, so 10000000 is 一千万 and 12000000 is 一千二百万.
+    kanji_result = re.sub(
+        rf"一(?=[{SUB_MYRIAD_UNITS}])(?!千[{WITHIN_MYRIAD_GROUP}]*[{MYRIAD_UNITS}])",
+        "",
+        kanji_result,
+    )
     logger.debug("Stripped leading '一' where droppable, result: %s", kanji_result)
 
     return kanji_result

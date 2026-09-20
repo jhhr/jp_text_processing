@@ -5,8 +5,8 @@
 Pass `--log-cli-level=debug` to see what a case logged; pytest captures the package logger on
 its own, so nothing here has to turn logging on.
 
-A case's id is the input string, which is what `-k` needs to select one; the two inputs that
-have no printable form are `(empty)` and `(space)`.
+A case's id is the input string, which is what `-k` needs to select one; the inputs whose
+whitespace would not show in an id are `(empty)`, `(space)` and `(padded 12)`.
 """
 
 import pytest
@@ -62,6 +62,8 @@ CASES = [
     pytest.param("１０", "十", id="１０"),
     pytest.param("11", "十一", id="11"),
     pytest.param("１１", "十一", id="１１"),
+    # surrounding whitespace is stripped before parsing
+    pytest.param(" 12 ", "十二", id="(padded 12)"),
     pytest.param("20", "二十", id="20"),
     pytest.param("２０", "二十", id="２０"),
     pytest.param("21", "二十一", id="21"),
@@ -79,6 +81,7 @@ CASES = [
     pytest.param("1000", "千", id="1000"),
     pytest.param("１０００", "千", id="１０００"),
     pytest.param("1200", "千二百", id="1200"),
+    pytest.param("11200", "一万千二百", id="11200"),
     # 一 is kept in front of 万 and above, dropped in front of 十/百/千
     pytest.param("10000", "一万", id="10000"),
     pytest.param("１００００", "一万", id="１００００"),
@@ -87,9 +90,12 @@ CASES = [
     pytest.param("100000", "十万", id="100000"),
     pytest.param("1000000", "百万", id="1000000"),
     pytest.param("１００００００", "百万", id="１００００００"),
-    # a 千 that tops a 万-group keeps its 一: 一千万, not 千万
+    # a 千 that tops a 万-group keeps its 一: 一千万, not 千万, and it does so whatever else
+    # that group holds
     pytest.param("10000000", "一千万", id="10000000"),
     pytest.param("１０００００００", "一千万", id="１０００００００"),
+    pytest.param("12000000", "一千二百万", id="12000000"),
+    pytest.param("1203000000000000", "一千二百三兆", id="1203000000000000"),
     pytest.param("100000000", "一億", id="100000000"),
     pytest.param("１００００００００", "一億", id="１００００００００"),
     pytest.param("100000000000", "一千億", id="100000000000"),
