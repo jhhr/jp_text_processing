@@ -6,6 +6,7 @@ all possible ways to split mora among kanji, returning the first complete match.
 """
 
 from collections.abc import Sequence
+from typing import NamedTuple
 
 from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
 from ..kanji.all_kanji_data import KanjiData, all_kanji_data
@@ -37,6 +38,237 @@ def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> b
     return True
 
 
+class AlignContext(NamedTuple):
+    """The word-level constants every step of one alignment shares."""
+
+    word: str
+    furigana: str
+    maybe_okuri: str
+    kanji_count: int
+
+
+class StepResult(NamedTuple):
+    """
+    What one step of an alignment made of one kanji, or of a kanji and the repeater after it.
+
+    :param matches: One entry per kanji the step consumed, None where the kanji is jukujikun
+    :param consumed_kanji: 1, or 2 for a repeater pair
+    :param finals: The (okurigana, rest_kana) the step settles for the whole word, or None when
+        it leaves the word's okurigana as it was. A matched last kanji and a matched repeater pair
+        both set it, so the last step to set it wins.
+    """
+
+    matches: tuple[ReadingMatchInfo | None, ...]
+    consumed_kanji: int
+    finals: tuple[str, str] | None
+
+
+def repeater_follows(word: str, i: int) -> bool:
+    """Whether the kanji at ``i`` is followed by 々 or by itself, so the two are read as a pair."""
+    next_kanji = word[i + 1] if i < len(word) - 1 else ""
+    return next_kanji == "々" or next_kanji == word[i]
+
+
+def kanji_data_for(kanji: str) -> KanjiData:
+    kanji_data = all_kanji_data.get(kanji, None)
+    if kanji_data is None:
+        logger.error("Kanji data not found for '%s'", kanji)
+        kanji_data = KanjiData(onyomi="", kunyomi="")
+    return kanji_data
+
+
+def select_match(
+    kunyomi_match: ReadingMatchInfo | None,
+    onyomi_match: ReadingMatchInfo | None,
+    okurigana_to_check: str,
+) -> ReadingMatchInfo | None:
+    """
+    Pick between a kanji's kunyomi and onyomi match.
+
+    With no okurigana to check the onyomi wins when there is one. With okurigana, the match that
+    extracted the longer okurigana wins, the kunyomi on a tie, then the onyomi if neither
+    extracted any, then whichever exists.
+    """
+    if not okurigana_to_check:
+        return onyomi_match if onyomi_match else kunyomi_match
+
+    kunyomi_okuri = kunyomi_match["okurigana"] if kunyomi_match else ""
+    onyomi_okuri = onyomi_match["okurigana"] if onyomi_match else ""
+
+    if kunyomi_okuri and onyomi_okuri:
+        # Both extracted okurigana - use longer one, or kunyomi if same length
+        if len(kunyomi_okuri) >= len(onyomi_okuri):
+            return kunyomi_match
+        return onyomi_match
+    if kunyomi_okuri:
+        return kunyomi_match
+    if onyomi_okuri:
+        return onyomi_match
+    if onyomi_match:
+        # Neither extracted okurigana - prefer onyomi
+        return onyomi_match
+    return kunyomi_match
+
+
+def align_step(ctx: AlignContext, i: int, chunk: str, next_chunk: str | None) -> StepResult:
+    """
+    Match the kanji at ``i`` to ``chunk``, and the repeater after it to ``next_chunk`` when it
+    has one.
+
+    Pure in its arguments: nothing here depends on which split the chunks came from, which is
+    what lets a search memoise it and revisit a chunk without re-matching it.
+
+    :param ctx: The word being aligned
+    :param i: Index of the kanji in the word
+    :param chunk: The joined mora this kanji is given
+    :param next_chunk: The joined mora the next kanji is given, None when the split has none
+    """
+    word, furigana, maybe_okuri, kanji_count = ctx
+    kanji = word[i]
+    is_last_kanji = i == kanji_count - 1
+    next_kanji = word[i + 1] if i < kanji_count - 1 else ""
+    next_kanji_is_repeater = repeater_follows(word, i)
+    kanji_data = kanji_data_for(kanji)
+
+    repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
+    check_okurigana = is_last_kanji or repeater_is_last
+
+    logger.debug(
+        "align_step - processing kanji: %s, mora_sequence: %s, is_last_kanji: %s,"
+        " next_kanji_is_repeater: %s, check_okurigana: %s, okurigana: %s",
+        kanji,
+        chunk,
+        is_last_kanji,
+        next_kanji_is_repeater,
+        check_okurigana,
+        maybe_okuri,
+    )
+
+    # Try to match reading to either kunyomi or onyomi
+    repeater_mora_sequence = None
+    if next_kanji_is_repeater and next_chunk is not None:
+        repeater_mora_sequence = f"{chunk}{next_chunk}"
+
+    kunyomi_match, onyomi_match = match_reading_to_mora(
+        kanji=kanji,
+        word=word,
+        furigana=furigana,
+        mora_sequence=chunk,
+        kanji_data=kanji_data,
+        maybe_okuri=maybe_okuri if check_okurigana else "",
+        is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
+        repeater_mora_sequence=repeater_mora_sequence,
+    )
+
+    match_info = select_match(kunyomi_match, onyomi_match, maybe_okuri if check_okurigana else "")
+
+    logger.debug(
+        "align_step - kanji: %s, mora_sequence: %s, kunyomi_match: %s, onyomi_match: %s,"
+        " selected match_info: %s",
+        kanji,
+        chunk,
+        kunyomi_match,
+        onyomi_match,
+        match_info,
+    )
+
+    if match_info is None:
+        # No match - mark as jukujikun, and the repeater with it
+        if next_kanji_is_repeater:
+            return StepResult((None, None), 2, None)
+        return StepResult((None,), 1, None)
+
+    if not next_kanji_is_repeater:
+        if is_last_kanji:
+            return StepResult((match_info,), 1, (match_info["okurigana"], match_info["rest_kana"]))
+        return StepResult((match_info,), 1, None)
+
+    # For repeater, check if second occurrence has rendaku. A split can come back with fewer
+    # parts than the word has kanji, so the second chunk is guarded the same way
+    # repeater_mora_sequence is above
+    first_mora = chunk
+    second_mora = next_chunk if next_chunk is not None else ""
+
+    # Check for rendaku in second occurrence: the same reading again, but voiced,
+    # the way 国々 reads くに+ぐに. An empty chunk leaves nothing to voice.
+    rendaku_matched = bool(first_mora) and any(
+        second_mora.startswith(rendaku_kana + first_mora[1:])
+        for rendaku_kana in RENDAKU_CONVERSION_DICT_HIRAGANA.get(first_mora[0], [])
+    )
+
+    # 々 has no readings of its own, so it can only copy the first match, but a
+    # kanji written out twice is as often two words meeting - the 月月 of 毎月月末
+    # reads つき+ゲツ - so the second occurrence gets matched on its own readings.
+    second_match = None
+    if next_kanji != "々":
+        second_kunyomi_match, second_onyomi_match = match_reading_to_mora(
+            kanji=kanji,
+            word=word,
+            furigana=furigana,
+            mora_sequence=second_mora,
+            kanji_data=kanji_data,
+            maybe_okuri=maybe_okuri if check_okurigana else "",
+            is_last_kanji=(i + 1) == kanji_count - 1,
+        )
+        second_match = second_onyomi_match if second_onyomi_match else second_kunyomi_match
+
+    # Add duplicate match for 々 (copy reading but mark as second occurrence).
+    # The copy is also the fallback for a doubled kanji whose second mora matches
+    # nothing on its own, the way 各々 only lists the doubled reading.
+    # Mark it as the repeater only when the word gives us evidence of one: either
+    # it was written with 々, or the second reading is a rendaku of the first, which
+    # only happens inside a single word. Two identical readings prove nothing - the
+    # 物物 of 生物物理学 reads exactly like the 我我 of 我々 - so a kanji doubled
+    # with a plain repeat keeps its own spelling.
+    if second_match is not None:
+        repeater_match = second_match
+    else:
+        repeater_match = match_info.copy()
+        repeater_match["matched_mora"] = second_mora
+    repeater_match["kanji"] = "々" if next_kanji == "々" or rendaku_matched else kanji
+
+    # We'll remove the okurigana from the first match for now as it should only
+    # apply to the last kanji in the word
+    match_info["okurigana"] = ""
+    match_info["rest_kana"] = ""
+
+    return StepResult(
+        (match_info, repeater_match),
+        2,
+        (repeater_match["okurigana"], repeater_match["rest_kana"]),
+    )
+
+
+def youon_small_kana_match(ctx: AlignContext, i: int, chunk: str) -> str | None:
+    """
+    The small kana of ``chunk`` when the chunk is exactly one yōon mora (きゃ, しゅ, ...) whose
+    small kana on its own reads the kanji at ``i``, else None.
+
+    A search uses it to try the split where the base kana belongs to the previous kanji and only
+    the small kana to this one.
+    """
+    if len(chunk) != 2 or chunk[1] not in ["ゃ", "ゅ", "ょ"]:
+        return None
+    word, furigana, maybe_okuri, kanji_count = ctx
+    kanji = word[i]
+    small = chunk[1]
+    is_last_kanji = i == kanji_count - 1 and not repeater_follows(word, i)
+    youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
+        kanji=kanji,
+        word=word,
+        furigana=furigana,
+        mora_sequence=small,
+        kanji_data=kanji_data_for(kanji),
+        maybe_okuri=maybe_okuri if is_last_kanji else "",
+        is_last_kanji=is_last_kanji,
+    )
+    youon_match_info = youon_onyomi_match if youon_onyomi_match else youon_kunyomi_match
+    if youon_match_info:
+        logger.debug("youon_small_kana_match - found youon match_info: %s", youon_match_info)
+        return small
+    return None
+
+
 def find_first_complete_alignment(
     word: str,
     furigana: str,
@@ -64,6 +296,7 @@ def find_first_complete_alignment(
     :return: MoraAlignment with the first complete match or best partial match
     """
     kanji_count = len(word)
+    ctx = AlignContext(word, furigana, maybe_okuri, kanji_count)
 
     # Handle edge case: empty word
     if kanji_count == 0:
@@ -128,13 +361,6 @@ def find_first_complete_alignment(
         # Try to match each kanji to its mora portion
         i = 0
         while i < kanji_count:
-            kanji = word[i]
-            is_last_kanji = i == kanji_count - 1
-
-            # Check if next kanji is repeated
-            next_kanji = word[i + 1] if i < kanji_count - 1 else ""
-            next_kanji_is_repeater = next_kanji == "々" or next_kanji == kanji
-
             # Join the mora sublist for this kanji position
             try:
                 mora_sequence = mora_split[i]
@@ -147,110 +373,22 @@ def find_first_complete_alignment(
                     mora_split,
                     kanji_count,
                 )
+            next_mora_sequence = mora_split[i + 1] if (i + 1) < len(mora_split) else None
 
-            # Get kanji data
-            kanji_data = all_kanji_data.get(kanji, None)
-            if kanji_data is None:
-                logger.error("Kanji data not found for '%s'", kanji)
-                kanji_data = KanjiData(onyomi="", kunyomi="")
-
-            repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
-            check_okurigana = is_last_kanji or (next_kanji_is_repeater and repeater_is_last)
-
-            logger.debug(
-                "find_first_complete_alignment - processing kanji: %s, mora_sequence: %s,"
-                " is_last_kanji: %s, next_kanji_is_repeater: %s, check_okurigana: %s, okurigana:"
-                " %s",
-                kanji,
-                mora_sequence,
-                is_last_kanji,
-                next_kanji_is_repeater,
-                check_okurigana,
-                maybe_okuri,
-            )
-
-            # Try to match reading to either kunyomi or onyomi
-            repeater_mora_sequence = None
-            if next_kanji_is_repeater and (i + 1) < len(mora_split):
-                repeater_mora_sequence = f"{mora_sequence}{mora_split[i + 1]}"
-
-            kunyomi_match, onyomi_match = match_reading_to_mora(
-                kanji=kanji,
-                word=word,
-                furigana=furigana,
-                mora_sequence=mora_sequence,
-                kanji_data=kanji_data,
-                maybe_okuri=maybe_okuri if check_okurigana else "",
-                is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
-                repeater_mora_sequence=repeater_mora_sequence,
-            )
-
-            # Select the appropriate match based on okurigana extraction
-            match_info = None
-
-            if not (check_okurigana and maybe_okuri):
-                # No okurigana to check - use whichever match exists but prefer onyomi
-                match_info = onyomi_match if onyomi_match else kunyomi_match
-            else:
-                # When there's okurigana to check, test both matches
-                kunyomi_okuri = kunyomi_match["okurigana"] if kunyomi_match else ""
-                onyomi_okuri = onyomi_match["okurigana"] if onyomi_match else ""
-
-                # Apply selection logic
-                if kunyomi_okuri and onyomi_okuri:
-                    # Both extracted okurigana - use longer one, or kunyomi if same length
-                    if len(kunyomi_okuri) >= len(onyomi_okuri):
-                        match_info = kunyomi_match
-                    else:
-                        match_info = onyomi_match
-                elif kunyomi_okuri:
-                    # Only kunyomi extracted okurigana
-                    match_info = kunyomi_match
-                elif onyomi_okuri:
-                    # Only onyomi extracted okurigana
-                    match_info = onyomi_match
-                elif onyomi_match:
-                    # Neither extracted okurigana - prefer onyomi
-                    match_info = onyomi_match
-                elif kunyomi_match:
-                    # Only kunyomi match available
-                    match_info = kunyomi_match
-
-            logger.debug(
-                "find_first_complete_alignment - kanji: %s, mora_sequence: %s, kunyomi_match: %s,"
-                " onyomi_match: %s, selected match_info: %s",
-                kanji,
-                mora_sequence,
-                kunyomi_match,
-                onyomi_match,
-                match_info,
-            )
+            step = align_step(ctx, i, mora_sequence, next_mora_sequence)
 
             # Test for possible youon match
             prev_mora_sequence = mora_split[i - 1] if i > 0 else None
             if (
                 not skip_youon_check
-                and not next_kanji_is_repeater
+                and step.consumed_kanji == 1
                 # yōon only possible if previous mora exists
                 and prev_mora_sequence is not None
-                # current mora must be a yōon type
-                and len(mora_sequence) == 2
-                and mora_sequence[1] in ["ゃ", "ゅ", "ょ"]
             ):
-                small = mora_sequence[1]
+                small = youon_small_kana_match(ctx, i, mora_sequence)
                 # If the current kanji matches the small kana as yōon, we'll make a new youon
                 # mora split to be tested fully after this loop
-                youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
-                    kanji=kanji,
-                    word=word,
-                    furigana=furigana,
-                    mora_sequence=small,
-                    kanji_data=kanji_data,
-                    maybe_okuri=maybe_okuri if is_last_kanji and not next_kanji_is_repeater else "",
-                    is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
-                )
-                youon_match_info = youon_onyomi_match if youon_onyomi_match else youon_kunyomi_match
-                if youon_match_info:
+                if small:
                     youon_mora_split = mora_split.copy()
                     # Adjust previous mora to include base kana
                     youon_mora_split[i - 1] = prev_mora_sequence + mora_sequence[0]
@@ -258,96 +396,17 @@ def find_first_complete_alignment(
                     youon_mora_split[i] = small
                     youon_mora_splits.append(youon_mora_split)
                     logger.debug(
-                        "find_first_complete_alignment - found youon match_info: %s,"
-                        " youon_mora_split: %s",
-                        youon_match_info,
+                        "find_first_complete_alignment - queued youon_mora_split: %s",
                         youon_mora_split,
                     )
 
-            if match_info:
-                # For repeater, check if second occurrence has rendaku
-                if next_kanji_is_repeater:
-                    # A split can come back with fewer parts than the word has kanji, so both
-                    # mora are guarded the same way repeater_mora_sequence is above
-                    first_mora = "".join(mora_split[i]) if i < len(mora_split) else ""
-                    second_mora = "".join(mora_split[i + 1]) if (i + 1) < len(mora_split) else ""
-
-                    # Check for rendaku in second occurrence: the same reading again, but voiced,
-                    # the way 国々 reads くに+ぐに. An empty chunk leaves nothing to voice.
-                    rendaku_matched = bool(first_mora) and any(
-                        second_mora.startswith(rendaku_kana + first_mora[1:])
-                        for rendaku_kana in RENDAKU_CONVERSION_DICT_HIRAGANA.get(first_mora[0], [])
-                    )
-
-                    # 々 has no readings of its own, so it can only copy the first match, but a
-                    # kanji written out twice is as often two words meeting - the 月月 of 毎月月末
-                    # reads つき+ゲツ - so the second occurrence gets matched on its own readings.
-                    second_match = None
-                    if next_kanji != "々":
-                        second_kunyomi_match, second_onyomi_match = match_reading_to_mora(
-                            kanji=kanji,
-                            word=word,
-                            furigana=furigana,
-                            mora_sequence=second_mora,
-                            kanji_data=kanji_data,
-                            maybe_okuri=maybe_okuri if check_okurigana else "",
-                            is_last_kanji=(i + 1) == kanji_count - 1,
-                        )
-                        second_match = (
-                            second_onyomi_match if second_onyomi_match else second_kunyomi_match
-                        )
-
-                    # Add duplicate match for 々 (copy reading but mark as second occurrence).
-                    # The copy is also the fallback for a doubled kanji whose second mora matches
-                    # nothing on its own, the way 各々 only lists the doubled reading.
-                    # Mark it as the repeater only when the word gives us evidence of one: either
-                    # it was written with 々, or the second reading is a rendaku of the first, which
-                    # only happens inside a single word. Two identical readings prove nothing - the
-                    # 物物 of 生物物理学 reads exactly like the 我我 of 我々 - so a kanji doubled
-                    # with a plain repeat keeps its own spelling.
-                    if second_match is not None:
-                        repeater_match = second_match
-                    else:
-                        repeater_match = match_info.copy()
-                        repeater_match["matched_mora"] = second_mora
-                    repeater_match["kanji"] = (
-                        "々" if next_kanji == "々" or rendaku_matched else kanji
-                    )
-
-                    # Add match for first kanji
-                    # We'll remove the okurigana from the first match for now as it should only
-                    # apply to the last kanji in the word
-                    match_info["okurigana"] = ""
-                    match_info["rest_kana"] = ""
-                    kanji_matches.append(match_info)
-
-                    final_okurigana = repeater_match["okurigana"]
-                    final_rest_kana = repeater_match["rest_kana"]
-
-                    kanji_matches.append(repeater_match)
-
-                    # Skip next position since we handled repeater
-                    i += 2
-                    continue
-                elif is_last_kanji:
-                    # This is the last kanji (and not repeater)
-                    final_okurigana = match_info["okurigana"]
-                    final_rest_kana = match_info["rest_kana"]
-                # Add match info to list
+            for offset, match_info in enumerate(step.matches):
                 kanji_matches.append(match_info)
-            else:
-                # No match - mark as jukujikun
-                kanji_matches.append(None)
-                jukujikun_positions.append(i)
-
-                # If this has a repeater, also mark repeater as jukujikun
-                if next_kanji_is_repeater:
-                    kanji_matches.append(None)
-                    jukujikun_positions.append(i + 1)
-                    i += 2
-                    continue
-
-            i += 1
+                if match_info is None:
+                    jukujikun_positions.append(i + offset)
+            if step.finals is not None:
+                final_okurigana, final_rest_kana = step.finals
+            i += step.consumed_kanji
 
         # Create alignment result
         alignment = MoraAlignment(
