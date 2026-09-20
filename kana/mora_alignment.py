@@ -13,7 +13,7 @@ matched once and remembered. A caller that already has one or two candidate spli
 whole-word case) hands them in as ``possible_splits`` and they are scored in the order given.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import NamedTuple
 
 from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
@@ -203,7 +203,7 @@ def align_step(ctx: AlignContext, i: int, chunk: str, next_chunk: str | None) ->
             maybe_okuri=maybe_okuri if check_okurigana else "",
             is_last_kanji=(i + 1) == kanji_count - 1,
         )
-        second_match = second_onyomi_match if second_onyomi_match else second_kunyomi_match
+        second_match = select_match(second_kunyomi_match, second_onyomi_match, "")
 
     # Add duplicate match for 々 (copy reading but mark as second occurrence).
     # The copy is also the fallback for a doubled kanji whose second mora matches
@@ -254,7 +254,7 @@ def youon_small_kana_match(ctx: AlignContext, i: int, chunk: str) -> str | None:
         maybe_okuri=maybe_okuri if is_last_kanji else "",
         is_last_kanji=is_last_kanji,
     )
-    youon_match_info = youon_onyomi_match if youon_onyomi_match else youon_kunyomi_match
+    youon_match_info = select_match(youon_kunyomi_match, youon_onyomi_match, "")
     if youon_match_info:
         logger.debug("youon_small_kana_match - found youon match_info: %s", youon_match_info)
         return small
@@ -344,10 +344,24 @@ def walk_split(
     return alignment
 
 
-def chars_matched(alignment: MoraAlignment) -> int:
-    return sum(
-        len(match["matched_mora"]) for match in alignment["kanji_matches"] if match is not None
-    )
+def path_cost(jukujikun: int, chars: int) -> tuple[int, int]:
+    """
+    What a path through the search costs; lower is better.
+
+    The most chars of the reading accounted for by listed readings win, then the fewest
+    jukujikun. Chars come first because a short reading is easy to match by accident - a
+    one-mora stem, a rendaku of it - and counting jukujikun first would let a kanji swallow the
+    unreadable part of the reading in one long chunk so that the kanji after it can each pick
+    up a mora that happens to fit: 趙清々しい came out as 趙[ちょうすが]清[す]々[が] that way,
+    against the 趙[ちょう]清々[すがすが] that explains more of the reading. Ranked on chars first,
+    the search agreed with the split enumeration it replaced on every input it was compared on.
+    """
+    return (-chars, jukujikun)
+
+
+def matched_chars(matches: Iterable[ReadingMatchInfo | None]) -> int:
+    """How many chars of the reading the matches account for; a jukujikun kanji accounts for none."""
+    return sum(len(match["matched_mora"]) for match in matches if match is not None)
 
 
 def align_given_splits(
@@ -355,11 +369,7 @@ def align_given_splits(
 ) -> MoraAlignment:
     """
     Score ready-made splits in the order given: the first complete one wins, then the yōon
-    variants they queued, else the best partial.
-
-    The best partial is chosen while iterating: a split replaces the best so far when it has
-    fewer jukujikun positions and at least as many matched characters, or at most as many
-    jukujikun positions and strictly more matched characters.
+    variants they queued, else the best partial under path_cost, the earliest on a tie.
     """
     word, _, _, kanji_count = ctx
 
@@ -384,30 +394,21 @@ def align_given_splits(
     ]
 
     best_alignment: MoraAlignment | None = None
-    best_jukujikun_count = kanji_count + 1  # Start with worst possible
-    best_chars_matched_count = 0
+    best_cost: tuple[int, int] | None = None
     youon_mora_splits: list[list[str]] = []
 
     def consider(alignment: MoraAlignment) -> None:
-        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
-        jukujikun_count = len(alignment["jukujikun_positions"])
-        chars_matched_count = chars_matched(alignment)
-        if (
-            jukujikun_count < best_jukujikun_count
-            and chars_matched_count >= best_chars_matched_count
-        ) or (
-            jukujikun_count <= best_jukujikun_count
-            and chars_matched_count > best_chars_matched_count
-        ):
+        nonlocal best_alignment, best_cost
+        cost = path_cost(
+            len(alignment["jukujikun_positions"]), matched_chars(alignment["kanji_matches"])
+        )
+        if best_cost is None or cost < best_cost:
             logger.debug(
-                "align_given_splits - new best partial alignment found with %s jukujikun"
-                " positions and %s chars matched: %s",
-                jukujikun_count,
-                chars_matched_count,
+                "align_given_splits - new best partial alignment with cost %s: %s",
+                cost,
                 alignment,
             )
-            best_chars_matched_count = chars_matched_count
-            best_jukujikun_count = jukujikun_count
+            best_cost = cost
             best_alignment = alignment
 
     for mora_split in joined_splits:
@@ -445,38 +446,26 @@ class Cut(NamedTuple):
     inside: bool
 
 
-def path_cost(jukujikun: int, chars: int) -> tuple[int, int]:
-    """
-    What a path through the search costs; lower is better.
-
-    The most chars of the reading accounted for by listed readings win, then the fewest
-    jukujikun. Chars come first because a short reading is easy to match by accident - a
-    one-mora stem, a rendaku of it - and counting jukujikun first would let a kanji swallow the
-    unreadable part of the reading in one long chunk so that the kanji after it can each pick
-    up a mora that happens to fit: 趙清々しい came out as 趙[ちょうすが]清[す]々[が] that way,
-    against the 趙[ちょう]清々[すがすが] that explains more of the reading. Ranked on chars first,
-    the search agreed with the split enumeration it replaced on every input it was compared on.
-    """
-    return (-chars, jukujikun)
-
-
 class Choice(NamedTuple):
     """
     The best way on from one state of the search.
 
-    :param cost: path_cost of the best path to the goal from here; lower is better
-    :param jukujikun: How many kanji on that path are jukujikun
+    :param jukujikun: How many kanji on the best path to the goal from here are jukujikun
     :param chars: How many chars of the reading that path matches to a listed reading
     :param chunks: The chunk of the kanji at this state, and of the repeater after it if it
         has one
     :param next_state: The state the chunks lead to, None at the goal
     """
 
-    cost: tuple[int, int]
     jukujikun: int
     chars: int
     chunks: tuple[str, ...]
     next_state: tuple[int, int, int] | None
+
+    @property
+    def cost(self) -> tuple[int, int]:
+        """path_cost of the best path to the goal from here; lower is better."""
+        return path_cost(self.jukujikun, self.chars)
 
 
 def pair_starts(word: str) -> set[int]:
@@ -533,7 +522,7 @@ class AlignmentSearch:
         word, _, _, kanji_count = self.ctx
         choice: Choice | None = None
         if i == kanji_count:
-            choice = Choice(path_cost(0, 0), 0, 0, (), None) if cut == self.last else None
+            choice = Choice(0, 0, (), None) if cut == self.last else None
         elif cut < self.last:
             choice = self.best_from(i, cut, prev_len)
         self.memo[key] = choice
@@ -556,15 +545,14 @@ class AlignmentSearch:
             if rest is None:
                 return
             step = align_step(self.ctx, i, chunks[0], chunks[1] if len(chunks) > 1 else None)
-            jukujikun = sum(1 for match in step.matches if match is None)
-            chars = sum(len(match["matched_mora"]) for match in step.matches if match is not None)
-            jukujikun += rest.jukujikun
-            chars += rest.chars
-            cost = path_cost(jukujikun, chars)
-            if best_choice is None or cost < best_choice.cost:
-                best_choice = Choice(
-                    cost, jukujikun, chars, chunks, self.key(i + len(chunks), end, chunk_len)
-                )
+            choice = Choice(
+                rest.jukujikun + step.matches.count(None),
+                rest.chars + matched_chars(step.matches),
+                chunks,
+                self.key(i + len(chunks), end, chunk_len),
+            )
+            if best_choice is None or choice.cost < best_choice.cost:
+                best_choice = choice
 
         if start.inside:
             # The chunk before this one ended inside a yōon mora, so this kanji gets the small
@@ -729,13 +717,7 @@ def find_first_complete_alignment(
 
     # Handle edge case: empty word
     if kanji_count == 0:
-        return MoraAlignment(
-            kanji_matches=[],
-            mora_split=[],
-            jukujikun_positions=[],
-            final_okurigana="",
-            final_rest_kana=maybe_okuri,
-        )
+        return empty_alignment(ctx, [])
 
     if possible_splits is not None:
         return align_given_splits(ctx, possible_splits)
