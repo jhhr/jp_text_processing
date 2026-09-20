@@ -1,5 +1,4 @@
 import re
-from collections.abc import Callable
 
 from ..all_types.main_types import OkuriResults
 from ..kana.kana_highlight import WithTagsDef, kana_highlight
@@ -15,6 +14,7 @@ from .use_tag_cleaning import (
     FURIGANA_PART_RE,
     TAG_AND_BARE_DOT_PART_RE,
     TAG_AND_DOT_PART_RE,
+    TAG_PART_RE,
     use_tag_cleaning_with_b_insertion,
 )
 
@@ -61,19 +61,6 @@ def replace_hiragana_in_pattern(text: str) -> str:
         return rf"(?:{char}|{katakana_char})"
 
     return re.sub(r"[ぁ-ん]", replace_hiragana, text)
-
-
-def sub_outside_furigana(pattern: str, repl: Callable[[re.Match], str], text: str) -> str:
-    """Substitute in what the text says, leaving the readings in its brackets alone.
-
-    A reading inside [...] is not the word occurring in the text, so a kana word must not
-    match one.
-    """
-    # re.split leaves the brackets it split on at the odd indexes
-    parts = re.split(rf"({FURIGANA_PART_RE})", text)
-    return "".join(
-        part if idx % 2 else re.sub(pattern, repl, part) for idx, part in enumerate(parts)
-    )
 
 
 def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
@@ -329,14 +316,36 @@ def word_highlight(text: str, word: str) -> str:
         pattern = make_word_pattern(word)
         logger.debug("Using pattern: %s", pattern)
 
+        # Remove tags from the text temporarily, so that a word a tag splits is found here too
+        # and not only on the mecab path below. Only the tags are stored: the pattern matches
+        # the space before a word, and the furigana brackets have to stay for the readings in
+        # them to be recognized as readings.
+        html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
+            text, part_regex=TAG_PART_RE
+        )
+        logger.debug("html_free_text for matching: '%s'", html_free_text)
+        furigana_spans = [m.span() for m in re.finditer(FURIGANA_PART_RE, html_free_text)]
+
+        # re.sub reports every match's position in its input, which has none of the b tags the
+        # earlier matches got, so their length is added on to get the current position.
+        b_tags_inserted = 0
+
         def replace_match(match: re.Match) -> str:
+            nonlocal b_tags_inserted
+            if any(start < match.start(0) < end for start, end in furigana_spans):
+                # A reading inside [...] is not the word occurring in the text, so a kana word
+                # must not match one
+                return match.group(0)
+            increment_tag_indexes(match.start(0) + b_tags_inserted, match.end(0) + b_tags_inserted)
+            b_tags_inserted += len("<b></b>")
             return f"<b>{match.group(0)}</b>"
 
-        result = sub_outside_furigana(pattern, replace_match, text)
+        result = re.sub(pattern, replace_match, html_free_text)
 
-        if result != text:
+        if result != html_free_text:
             # If that worked, return the result
-            return result
+            logger.debug("Intermediate result with <b> tags: '%s'", result)
+            return restore_tags(result)
 
         # Otherwise, use MeCab to find inflected forms
         return highlight_inflected_words_with_mecab(text, word)

@@ -945,6 +945,39 @@ CASES = [
         "<b><span>はし</span>って</b>",
         id="Html shape - a tag around part of the word goes inside the highlight",
     ),
+    # A kana word is searched for as it is written before the mecab path is tried, so that
+    # search has to see through the caller's tags the way the mecab one does.
+    pytest.param(
+        "この<i>い</i>えは",
+        "いえ",
+        "この<b><i>い</i>え</b>は",
+        id="Html shape - a tag splitting a kana word is still the word",
+    ),
+    pytest.param(
+        'この<span class="x">い</span>えは',
+        "いえ",
+        'この<b><span class="x">い</span>え</b>は',
+        marks=pytest.mark.xfail(
+            reason=(
+                "the attributes of a tag the highlight crosses are lost when the tag is"
+                " reopened, on this path and on the mecab one alike"
+            ),
+            strict=True,
+        ),
+        id="Html shape - a tag with attributes splitting a kana word is still the word",
+    ),
+    pytest.param(
+        "この<i>い</i>え<i>で</i>す",
+        "いえで",
+        "この<b><i>い</i>え<i>で</i></b>す",
+        id="Html shape - two tags splitting a kana word are still the word",
+    ),
+    pytest.param(
+        "この<i>いえ</i>は",
+        "いえ",
+        "この<i><b>いえ</b></i>は",
+        id="Html shape - a tag around a whole kana word keeps the highlight inside it",
+    ),
     pytest.param(
         "<span>はしって</span><br>",
         "はしる",
