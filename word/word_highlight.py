@@ -27,11 +27,20 @@ CONSECUTIVE_FURI_WORD_RE = (
 )
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
-# The text can carry furigana the word was written without (an Anki word field often has none
-# where the sentence field does). A kanji run the word gives no reading for matches one that
-# has a bracket too, so the bracket stays inside the highlight instead of being cut off from
-# the kanji it belongs to.
-MAYBE_FURIGANA_RE = r"(?:\[[^\]]*\])?"
+KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
+
+
+def kanji_run_with_maybe_furigana(escaped_kanji: str) -> str:
+    """Create a pattern for a kanji run of the word that gives no reading for it.
+
+    The text can carry furigana the word was written without (an Anki word field often has
+    none where the sentence field does). The kanji then match a text run that has a bracket
+    too, so the bracket stays inside the highlight instead of being cut off from the kanji it
+    belongs to. The word can also be only part of that run, whose one reading cannot be split
+    without the word's own reading, so the rest of the run is taken along with the bracket.
+    A run the text wrote no reading on is matched as far as the word goes, as before.
+    """
+    return rf"(?:{KANJI_RUN_CHAR_RE}*{escaped_kanji}{KANJI_RUN_CHAR_RE}*\[[^\]]*\]|{escaped_kanji})"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:
@@ -49,7 +58,7 @@ def make_word_pattern(word: str) -> str:
 
     A kanji run the word already gives a reading for is matched as written; one it does not
     also matches the reading the text has for it, together with the space furigana syntax
-    puts before the kanji.
+    puts before the kanji and the rest of the text's kanji run that reading covers.
     """
     # Remove first space
     word = re.sub(r"^ ", "", word)
@@ -61,12 +70,11 @@ def make_word_pattern(word: str) -> str:
             pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
             pattern_parts.append(r"\s?")
         kanji, kanji_furigana = match.group(1), match.group(2)
-        pattern_parts.append(re.escape(kanji))
-        pattern_parts.append(
-            replace_hiragana_in_pattern(re.escape(kanji_furigana))
-            if kanji_furigana
-            else MAYBE_FURIGANA_RE
-        )
+        if kanji_furigana:
+            pattern_parts.append(re.escape(kanji))
+            pattern_parts.append(replace_hiragana_in_pattern(re.escape(kanji_furigana)))
+        else:
+            pattern_parts.append(kanji_run_with_maybe_furigana(re.escape(kanji)))
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
@@ -186,7 +194,12 @@ def word_highlight(text: str, word: str) -> str:
     """
     Takes a japanese word or phrase in dictionary form and finds any inflected occurrences of
     it in the given text. The word and text is expected to be in furigana syntax; with brackets
-    containing the reading of the kanji words.
+    containing the reading of the kanji words. A word written without furigana still matches a
+    text that has it, but then the text's reading cannot be split, so a word that covers only
+    part of a kanji run highlights the whole run and its reading:
+
+    word_highlight("私は 日本語[にほんご]を", "語") --> "私は<b> 日本語[にほんご]</b>を"
+    word_highlight("私は 日本語[にほんご]を", "語[ご]") --> "私は 日本[にほん]<b> 語[ご]</b>を"
 
     Furigana syntax in text includes a space before the word begins, e.g "この 家[いえ]は" with the
     exception that the beginning of the string can omit the space, e.g "家[いえ]で 居[い]る".

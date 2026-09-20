@@ -797,6 +797,50 @@ CASES = [
         "その 人[ひと]が",
         id="Furigana mismatch - a reading the word disagrees with is still not the word",
     ),
+    # Without the word's own reading the text's reading cannot be split between the kanji it
+    # covers, so a word that is only part of a kanji run takes the whole run and its bracket.
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で",
+        "魚",
+        "この<b> 魚[さかな]</b>は<b> 魚市場[うおいちば]</b>で",
+        id="Furigana mismatch - word without furigana starting a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana ending a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "本語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana in the middle of a longer kanji run",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "日本",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word without furigana at the start of a longer kanji run",
+    ),
+    pytest.param(
+        "魚市場で",
+        "魚",
+        "<b>魚</b>市場で",
+        id="Furigana mismatch - a kanji run with no reading is highlighted as far as the word",
+    ),
+    pytest.param(
+        "この 魚[さかな]は 魚市場[うおいちば]で",
+        "魚[うお]",
+        "この 魚[さかな]は<b> 魚[うお]</b> 市場[いちば]で",
+        id="Furigana mismatch - a word with a reading still splits the run it is part of /1",
+    ),
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "語[ご]",
+        "私は 日本[にほん]<b> 語[ご]</b>を",
+        id="Furigana mismatch - a word with a reading still splits the run it is part of /2",
+    ),
     # The caller's own html around the word: the highlight goes inside the element when the
     # element holds the whole word, and around it when the word runs past the element's edge.
     pytest.param(
