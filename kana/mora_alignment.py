@@ -9,13 +9,10 @@ from collections.abc import Sequence
 from typing import NamedTuple
 
 from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
-from ..kanji.all_kanji_data import KanjiData, all_kanji_data
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger
 from .get_ordered_sublists import get_ordered_sublists
-from .reading_matcher import (
-    match_reading_to_mora,
-)
+from .reading_matcher import cached_reading_match
 
 
 def contains_repeated_kanji(word: str) -> bool:
@@ -69,14 +66,6 @@ def repeater_follows(word: str, i: int) -> bool:
     return next_kanji == "々" or next_kanji == word[i]
 
 
-def kanji_data_for(kanji: str) -> KanjiData:
-    kanji_data = all_kanji_data.get(kanji, None)
-    if kanji_data is None:
-        logger.error("Kanji data not found for '%s'", kanji)
-        kanji_data = KanjiData(onyomi="", kunyomi="")
-    return kanji_data
-
-
 def select_match(
     kunyomi_match: ReadingMatchInfo | None,
     onyomi_match: ReadingMatchInfo | None,
@@ -128,7 +117,6 @@ def align_step(ctx: AlignContext, i: int, chunk: str, next_chunk: str | None) ->
     is_last_kanji = i == kanji_count - 1
     next_kanji = word[i + 1] if i < kanji_count - 1 else ""
     next_kanji_is_repeater = repeater_follows(word, i)
-    kanji_data = kanji_data_for(kanji)
 
     repeater_is_last = next_kanji_is_repeater and (i + 1) == kanji_count - 1
     check_okurigana = is_last_kanji or repeater_is_last
@@ -149,12 +137,11 @@ def align_step(ctx: AlignContext, i: int, chunk: str, next_chunk: str | None) ->
     if next_kanji_is_repeater and next_chunk is not None:
         repeater_mora_sequence = f"{chunk}{next_chunk}"
 
-    kunyomi_match, onyomi_match = match_reading_to_mora(
+    kunyomi_match, onyomi_match = cached_reading_match(
         kanji=kanji,
         word=word,
         furigana=furigana,
         mora_sequence=chunk,
-        kanji_data=kanji_data,
         maybe_okuri=maybe_okuri if check_okurigana else "",
         is_last_kanji=is_last_kanji and not next_kanji_is_repeater,
         repeater_mora_sequence=repeater_mora_sequence,
@@ -201,12 +188,11 @@ def align_step(ctx: AlignContext, i: int, chunk: str, next_chunk: str | None) ->
     # reads つき+ゲツ - so the second occurrence gets matched on its own readings.
     second_match = None
     if next_kanji != "々":
-        second_kunyomi_match, second_onyomi_match = match_reading_to_mora(
+        second_kunyomi_match, second_onyomi_match = cached_reading_match(
             kanji=kanji,
             word=word,
             furigana=furigana,
             mora_sequence=second_mora,
-            kanji_data=kanji_data,
             maybe_okuri=maybe_okuri if check_okurigana else "",
             is_last_kanji=(i + 1) == kanji_count - 1,
         )
@@ -253,12 +239,11 @@ def youon_small_kana_match(ctx: AlignContext, i: int, chunk: str) -> str | None:
     kanji = word[i]
     small = chunk[1]
     is_last_kanji = i == kanji_count - 1 and not repeater_follows(word, i)
-    youon_kunyomi_match, youon_onyomi_match = match_reading_to_mora(
+    youon_kunyomi_match, youon_onyomi_match = cached_reading_match(
         kanji=kanji,
         word=word,
         furigana=furigana,
         mora_sequence=small,
-        kanji_data=kanji_data_for(kanji),
         maybe_okuri=maybe_okuri if is_last_kanji else "",
         is_last_kanji=is_last_kanji,
     )
@@ -286,7 +271,6 @@ def find_first_complete_alignment(
 
     :param word: The word to align (string of kanji, may include 々)
     :param furigana: The full reading of the word in kana
-    :param all_kanji_data: Dictionary mapping kanji to their reading data
     :param maybe_okuri: The kana following the word (for last kanji extraction)
     :param mora_list: List of mora units to distribute across kanji, optional if possible_splits
        provided

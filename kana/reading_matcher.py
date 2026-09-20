@@ -5,8 +5,10 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
+from functools import lru_cache
+
 from ..all_types.main_types import ReadingMatchInfo, ReadingType
-from ..kanji.all_kanji_data import KanjiData
+from ..kanji.all_kanji_data import KanjiData, all_kanji_data
 from ..mecab_controller.kana_conv import to_hiragana
 from ..okuri.check_okurigana_for_inflection import check_okurigana_for_inflection
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
@@ -499,3 +501,60 @@ def match_reading_to_mora(
             return (kunyomi_match, None)
 
     return (None, None)
+
+
+@lru_cache(maxsize=4096)
+def _cached_reading_match(
+    kanji: str,
+    word: str,
+    furigana: str,
+    mora_sequence: str,
+    maybe_okuri: str,
+    is_last_kanji: bool,
+    repeater_mora_sequence: str | None,
+) -> tuple[ReadingMatchInfo | None, ReadingMatchInfo | None]:
+    kanji_data = all_kanji_data.get(kanji, None)
+    if kanji_data is None:
+        logger.error("Kanji data not found for '%s'", kanji)
+        kanji_data = KanjiData(onyomi="", kunyomi="")
+    return match_reading_to_mora(
+        kanji=kanji,
+        word=word,
+        furigana=furigana,
+        mora_sequence=mora_sequence,
+        kanji_data=kanji_data,
+        maybe_okuri=maybe_okuri,
+        is_last_kanji=is_last_kanji,
+        repeater_mora_sequence=repeater_mora_sequence,
+    )
+
+
+def cached_reading_match(
+    kanji: str,
+    word: str,
+    furigana: str,
+    mora_sequence: str,
+    maybe_okuri: str,
+    is_last_kanji: bool,
+    repeater_mora_sequence: str | None = None,
+) -> tuple[ReadingMatchInfo | None, ReadingMatchInfo | None]:
+    """
+    match_reading_to_mora with its result remembered, for the alignment search.
+
+    A search over the ways to split a reading among a word's kanji asks about the same
+    (kanji, chunk) pair once for every split that contains it, and there are combinatorially
+    many of those, so the answers are kept: the key is every argument the matchers depend on,
+    with the kanji's reading data looked up in here rather than passed in. The cache is only
+    warm within one word (the key carries the word and its reading), which is all it is for.
+
+    The caller gets copies, since the alignment writes into the dicts it is handed and the cached
+    ones have to stay as the matchers made them. Every value in them is a string or a bool, so a
+    shallow copy is a full one.
+    """
+    kunyomi_match, onyomi_match = _cached_reading_match(
+        kanji, word, furigana, mora_sequence, maybe_okuri, is_last_kanji, repeater_mora_sequence
+    )
+    return (
+        kunyomi_match.copy() if kunyomi_match is not None else None,
+        onyomi_match.copy() if onyomi_match is not None else None,
+    )
