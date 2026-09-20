@@ -110,6 +110,21 @@ def construct_wrapped_furi_word(
                 tag = "mix"
             elif (
                 return_type != "kana_only"
+                and next_tag_res["kanji"] == ""
+                and next_tag_res["highlight"] == cur_tag_res["highlight"]
+            ):
+                # The same placeholder, after the number it expands has stopped counting as one:
+                # merging 24's ニ into the on tag of its 二 left a block that is no longer a number,
+                # so the branch above no longer took the よん of its 四 and furigana mode dropped it
+                # for having no kanji of its own. Whatever the block is tagged, the reading of a
+                # position with no surface belongs in it - and a block reading two ways is mixed.
+                logger.debug("Merging placeholder into the block before it: %s", next_tag_res)
+                do_merge = True
+                highlight = cur_tag_res["highlight"]
+                is_num = cur_tag_res["is_num"]
+                tag = cur_tag_res["tag"] if next_tag_res["tag"] == cur_tag_res["tag"] else "mix"
+            elif (
+                return_type != "kana_only"
                 and next_tag_res["is_num"]
                 and cur_tag_res["is_num"]
                 and next_tag_res["highlight"] == cur_tag_res["highlight"]

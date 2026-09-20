@@ -325,6 +325,13 @@ def reconstruct_from_alignment(
             tag = part["tag"]
             is_num = part["is_num"]
             is_noun_suru_verb = part.get("is_noun_suru_verb", False)
+            if surface_kanji.isdigit():
+                # The jukujikun processor is handed the converted word, where the digits read as
+                # kanji numerals, so the surface is what still knows this position is a number.
+                # A number's reading is a reading, not jukujikun, the same call the processor
+                # makes for a digit of its own.
+                tag = "kun"
+                is_num = True
         elif match_info := alignment["kanji_matches"][i]:
             # The alignment is what decides a doubled kanji is really the repeater, so where it
             # says 々, 々 is what gets written - even if the word came in spelled out.
@@ -688,7 +695,10 @@ def kana_highlight(
             return final_result
 
         # Steps 2-3: Handle mora split either as whole-word or partial-word and find alignment
-        # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七)
+        # Convert numeric digits to kanji to enable proper reading matching (e.g., ７ → 七).
+        # Everything from here to the reconstruction counts positions in this word, not in the
+        # digits: 24 is two characters but 二十四 is three readings to place. The reconstruction
+        # is the one that has to see the digits, and it maps the positions back to them itself.
         alignment_word = replace_numeric_substrings(full_word)
         alignment = None
         katakana_positions: list[int] = []
@@ -712,7 +722,7 @@ def kana_highlight(
                 possible_splits=possible_whole_word_splits,
             )
         else:
-            mora_result = split_to_mora_list(full_furigana, len(full_word))
+            mora_result = split_to_mora_list(full_furigana, len(alignment_word))
             katakana_positions = mora_result["katakana_positions"]
             long_vowel_positions = mora_result["long_vowel_positions"]
             logger.debug("furigana_replacer - partial_word_case mora_result: %s", mora_result)
@@ -735,7 +745,7 @@ def kana_highlight(
             # an otherwise complete alignment, to allow okurigana extraction for cases like
             # 清々しい.
             juku_parts, juku_okurigana, juku_rest_kana = process_jukujikun_positions(
-                word=full_word,
+                word=alignment_word,
                 furigana=full_furigana,
                 alignment=alignment,
                 remaining_kana=maybe_okuri,
@@ -748,7 +758,7 @@ def kana_highlight(
             # okurigana from alignment, prefer the longer match from the juku extraction.
             # process_jukujikun_positions updated the alignment in place, so this and the
             # reconstruction below see the positions and mora it settled on.
-            if len(full_word) - 1 in alignment["jukujikun_positions"]:
+            if len(alignment_word) - 1 in alignment["jukujikun_positions"]:
                 if len(juku_okurigana) >= len(final_okurigana):
                     final_okurigana = juku_okurigana
                     final_rest_kana = juku_rest_kana

@@ -4232,6 +4232,64 @@ CASES = [
         },
         id="Three digit numbers",
     ),
+    # A digit run is converted to kanji to be read, and 24 is three kanji for two digits, so the
+    # reading of that third kanji had no position in the two characters the rest of the pipeline
+    # was given: it was dropped from the output, and a reading with fewer mora than the converted
+    # word has kanji raised. The whole run is one chunk either way, tagged mix where it reads
+    # both ways, so only the kana-only modes show a reading per kanji.
+    pytest.param(
+        "",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": " 24[ニジュウよん]",
+            "furigana split": "<mix> 24[ニジュウよん]</mix>",
+            "furigana merged": "<mix> 24[ニジュウよん]</mix>",
+            "furikanji": " ニジュウよん[24]",
+            "furikanji split": "<mix> ニジュウよん[24]</mix>",
+            "furikanji merged": "<mix> ニジュウよん[24]</mix>",
+            "kana_only": "ニジュウよん",
+            "kana_only split": "<on>ニ</on><on>ジュウ</on><kun>よん</kun>",
+            "kana_only merged": "<on>ニジュウ</on><kun>よん</kun>",
+        },
+        id="two digits read as three kanji, the last one kun",
+    ),
+    pytest.param(
+        "",
+        "77[しちじゅうなな]",
+        True,
+        {
+            "furigana": " 77[シチジュウなな]",
+            "furigana split": "<mix> 77[シチジュウなな]</mix>",
+            "furigana merged": "<mix> 77[シチジュウなな]</mix>",
+            "furikanji": " シチジュウなな[77]",
+            "furikanji split": "<mix> シチジュウなな[77]</mix>",
+            "furikanji merged": "<mix> シチジュウなな[77]</mix>",
+            "kana_only": "シチジュウなな",
+            "kana_only split": "<on>シチ</on><on>ジュウ</on><kun>なな</kun>",
+            "kana_only merged": "<on>シチジュウ</on><kun>なな</kun>",
+        },
+        id="the same digit read two ways, the on reading first",
+    ),
+    # Too few mora for the kanji the digits convert into is nothing a reading can be made of,
+    # so this only asks that the digits and the whole reading survive it.
+    pytest.param(
+        "",
+        "77[ひと]",
+        True,
+        {
+            "furigana": " 77[ひと]",
+            "furigana split": "<mix> 77[ひと]</mix>",
+            "furigana merged": "<mix> 77[ひと]</mix>",
+            "furikanji": " ひと[77]",
+            "furikanji split": "<mix> ひと[77]</mix>",
+            "furikanji merged": "<mix> ひと[77]</mix>",
+            "kana_only": "ひと",
+            "kana_only split": "<kun>ひ</kun><juk>と</juk>",
+            "kana_only merged": "<kun>ひ</kun><juk>と</juk>",
+        },
+        id="fewer mora than the digits convert into kanji",
+    ),
     pytest.param(
         "円",
         "10000円[いちまんえん]",
