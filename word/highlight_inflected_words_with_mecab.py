@@ -1,4 +1,6 @@
 
+from collections.abc import Iterator
+
 from ..all_types.main_types import PartOfSpeech
 from ..mecab_controller.basic_types import MecabParsedToken
 from ..mecab_controller.kana_conv import (
@@ -20,6 +22,22 @@ from ..okuri.okurigana_dict import (
 )
 from ..utils.logger import package_logger as logger
 from .use_tag_cleaning import TAG_AND_SPACE_PART_RE, use_tag_cleaning_with_b_insertion
+
+
+def walk_okurigana_progression(
+    part_of_speech: PartOfSpeech, okurigana: str
+) -> Iterator[tuple[int, dict]]:
+    """Walk a part of speech's okurigana progression over the text, one character at a time.
+
+    Yields how much of the text the progression has read and the node that reading reached,
+    stopping where the progression cannot continue.
+    """
+    progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(part_of_speech)
+    for char_index, char in enumerate(okurigana):
+        progression = progression.get(char) if progression else None
+        if not progression:
+            return
+        yield char_index + 1, progression
 
 
 def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: int = 0) -> str:
@@ -92,13 +110,20 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         following_text = "".join(t.word for t in tokens[index + 1 :])
         okurigana_len = 0
         for pos in possible_parts_of_speech:
-            progression = POSSIBLE_OKURIGANA_PROGRESSION_DICT.get(pos)
-            for char_index, char in enumerate(following_text):
-                progression = progression.get(char) if progression else None
-                if not progression:
-                    break
-                if progression.get("is_last"):
-                    okurigana_len = max(okurigana_len, char_index + 1)
+            for okuri_len, node in walk_okurigana_progression(pos, following_text):
+                if node.get("is_last"):
+                    okurigana_len = max(okurigana_len, okuri_len)
+                if not node.get("る", {}).get("is_last"):
+                    continue
+                # The causative, the passive and the potential turn the word into an ichidan
+                # verb of its own (バズる -> バズらせる) and the dict lists only a few of that
+                # verb's own forms, らせた not among them. Where the okurigana so far plus る
+                # is one of them, the rest of the text goes on as the ichidan okurigana it is.
+                for extra_len, extra_node in walk_okurigana_progression(
+                    "v1", following_text[okuri_len:]
+                ):
+                    if extra_node.get("is_last"):
+                        okurigana_len = max(okurigana_len, okuri_len + extra_len)
         if not okurigana_len and index + 1 < len(tokens):
             # MeCab can also read the conjugation as a verb of its own (バズ/られ/た, where
             # られ is the verb られる), leaving the progression nothing to walk. An auxiliary

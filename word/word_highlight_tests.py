@@ -651,6 +651,24 @@ CASES = [
         id="Kana only - stem parsed as a noun, passive read as a verb of its own",
     ),
     pytest.param(
+        "それはバズらせたね",
+        "バズる",
+        "それは<b>バズらせた</b>ね",
+        id="Kana only - stem parsed as a noun, causative in the past",
+    ),
+    pytest.param(
+        "それはバズらせないね",
+        "バズる",
+        "それは<b>バズらせない</b>ね",
+        id="Kana only - stem parsed as a noun, causative negative",
+    ),
+    pytest.param(
+        "それはバズらせられたね",
+        "バズる",
+        "それは<b>バズらせられた</b>ね",
+        id="Kana only - stem parsed as a noun, causative passive in the past",
+    ),
+    pytest.param(
         "それはバズったね",
         "バズり",
         "それは<b>バズった</b>ね",
