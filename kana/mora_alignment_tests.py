@@ -64,3 +64,15 @@ def test_partial_alignment_explains_the_most_of_the_reading():
     )
     assert alignment["mora_split"] == ["ちょう", "すが", "すが"]
     assert alignment["jukujikun_positions"] == [1, 2]
+
+
+def test_a_repeater_after_a_repeater_pair_is_held_to_the_chunk_before_it():
+    """人々々々 is not a word, but a run of 々 has to come out the way it always did: every 々 takes
+    as many mora as the kanji before it, the third 々 included, although it starts a pair of its
+    own in the search rather than closing one. Without that the pair it starts would take the
+    shortest chunk first and leave the rest to the last."""
+    alignment = find_first_complete_alignment(
+        "人々々々", "ひとびとひとびと", "", mora_list=list("ひとびとひとびと")
+    )
+    assert alignment["mora_split"] == ["ひと", "びと", "ひと", "びと"]
+    assert alignment["jukujikun_positions"] == [2, 3]

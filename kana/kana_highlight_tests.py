@@ -5292,6 +5292,29 @@ CASES = [
         },
         id="small kana of a palatalized mora is not a lone one",
     ),
+    # --- degenerate input ------------------------------------------------------------------
+    # 人々々 is not a word: a 々 can only repeat the kanji before it, and the one before this
+    # one is itself a 々. The policy for input like it is that it comes out in some sensible way
+    # and never crashes; what that way is, this case only records. The first pair reads as
+    # 人々 and the third 々 is left with the rest, and asking mecab for its okurigana used to
+    # fail on it having no jukujikun reading of its own to combine with the pair's.
+    pytest.param(
+        None,
+        "人々々[ひとびとと]しい",
+        True,
+        {
+            "furigana": " 人々々[ひとびとと]しい",
+            "furikanji": " ひとびとと[人々々]しい",
+            "kana_only": "ひとびととしい",
+            "furigana split": "<kun> 人々[ひとびと]</kun><juk> 々[と]</juk>しい",
+            "furigana merged": "<kun> 人々[ひとびと]</kun><juk> 々[と]</juk>しい",
+            "furikanji split": "<kun> ひとびと[人々]</kun><juk> と[々]</juk>しい",
+            "furikanji merged": "<kun> ひとびと[人々]</kun><juk> と[々]</juk>しい",
+            "kana_only split": "<kun>ひとびと</kun><juk>と</juk>しい",
+            "kana_only merged": "<kun>ひとびと</kun><juk>と</juk>しい",
+        },
+        id="a 々 after a 々 pair does not crash",
+    ),
     # --- the alignment search's cost -----------------------------------------------------
     # These inputs pin the search's speed rather than anything about its output: every kanji
     # reads by onyomi and the alignment is the obvious one. What made them slow was the number

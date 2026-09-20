@@ -594,12 +594,17 @@ class AlignmentSearch:
                 consider((self.chunk(cut, end),), end, chunk_len)
             return best_choice
 
-        # A repeater pair: two chunks, the second held to the first's length for a 々
+        # A repeater pair: two chunks, the second held to the first's length for a 々. A 々 that
+        # starts a pair (the third of 人々々々, not a word) is itself held to the chunk before it,
+        # so that a run of 々 is treated the way the split filter treated it: nothing sensible
+        # can come of it, but it must not come out differently from how it always did.
         held = self.constrained and word[i + 1] == "々"
         remaining = kanji_count - i - 2
         for middle in range(cut + 1, self.last):
             first_len = self.cuts[middle].mora_index - start.mora_index
             if first_len < 1 or self.cuts[middle].inside:
+                continue
+            if i in self.single_constrained and first_len != prev_len:
                 continue
             if self.mora_count - self.cuts[middle].mora_index - 1 < remaining:
                 break
