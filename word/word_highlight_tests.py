@@ -174,11 +174,39 @@ CASES = [
         "<b>小[ちい]さ</b>な 家[いえ]",
         id="Furigana - adjective in the な form /2",
     ),
+    # 早読み is a word of its own: the adjective's okurigana would have to follow 早 directly
+    # and another kanji does, the same way 出来事 is not an occurrence of 出来る.
     pytest.param(
         "早読[はやよ]みするぜ",
         "早[はや]い",
-        "<b>早[はや]</b> 読[よ]みするぜ",
-        id="Furigana - adjective inflection with な /1",
+        "早読[はやよ]みするぜ",
+        id="Furigana - adjective kanji starting a longer run is not the word",
+    ),
+    # The same for a verb: 出来事 is a noun the run of which goes on past 出来, while a run
+    # that only begins before the word's kanji (花見 / 見る) stays the ambiguity it is.
+    pytest.param(
+        "今日の 出来事[できごと]",
+        "出来る",
+        "今日の 出来事[できごと]",
+        id="Okuri word - a run continuing past the word's kanji is not the word",
+    ),
+    pytest.param(
+        "今日の 出来事[できごと]",
+        "出来[でき]る",
+        "今日の 出来事[できごと]",
+        id="Okuri word - a run continuing past the word's kanji is not the word, with furigana",
+    ),
+    pytest.param(
+        "花見[はなみ]に 行[い]く",
+        "見る",
+        "<b>花見[はなみ]</b>に 行[い]く",
+        id="Okuri word - a run ending at the word's kanji still matches",
+    ),
+    pytest.param(
+        "花見[はなみ]に 行[い]く",
+        "見[み]る",
+        "花[はな]<b> 見[み]</b>に 行[い]く",
+        id="Okuri word - a run ending at the word's kanji still matches, with furigana",
     ),
     pytest.param(
         "垂[タ]レ 込[コ]ミがあった、オイ！",

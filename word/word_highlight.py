@@ -32,7 +32,7 @@ KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?
 KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
 
 
-def kanji_run_with_maybe_furigana(escaped_kanji: str) -> str:
+def kanji_run_with_maybe_furigana(escaped_kanji: str, run_may_continue: bool = True) -> str:
     """Create a pattern for a kanji run of the word that gives no reading for it.
 
     The text can carry furigana the word was written without (an Anki word field often has
@@ -41,8 +41,15 @@ def kanji_run_with_maybe_furigana(escaped_kanji: str) -> str:
     belongs to. The word can also be only part of that run, whose one reading cannot be split
     without the word's own reading, so the rest of the run is taken along with the bracket.
     A run the text wrote no reading on is matched as far as the word goes, as before.
+
+    An inflecting word's okurigana follows its last kanji directly, so a run that goes on past
+    that kanji is not the word (出来事 is not 出来る) and run_may_continue is False for it. The
+    run may still begin before the word: a compound ending in the word's kanji is a genuine
+    ambiguity (花見 / 見る).
     """
-    return rf"(?:{KANJI_RUN_CHAR_RE}*{escaped_kanji}{KANJI_RUN_CHAR_RE}*\[[^\]]*\]|{escaped_kanji})"
+    run_tail = rf"{KANJI_RUN_CHAR_RE}*" if run_may_continue else ""
+    bare_kanji = escaped_kanji if run_may_continue else rf"{escaped_kanji}(?!{KANJI_RUN_CHAR_RE})"
+    return rf"(?:{KANJI_RUN_CHAR_RE}*{escaped_kanji}{run_tail}\[[^\]]*\]|{bare_kanji})"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:
@@ -68,18 +75,20 @@ def sub_outside_furigana(pattern: str, repl: Callable[[re.Match], str], text: st
     )
 
 
-def make_word_pattern(word: str) -> str:
+def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     """Create a regex pattern matching the word, with or without the text's furigana.
 
     A kanji run the word already gives a reading for is matched as written; one it does not
     also matches the reading the text has for it, together with the space furigana syntax
-    puts before the kanji and the rest of the text's kanji run that reading covers.
+    puts before the kanji and the rest of the text's kanji run that reading covers. Where the
+    word has okurigana after its last kanji, the text's run has to end at that kanji.
     """
     # Remove first space
     word = re.sub(r"^ ", "", word)
     pattern_parts: list[str] = [r"\s?"]
     cursor = 0
-    for match in re.finditer(KANJI_RUN_AND_MAYBE_FURIGANA_RE, word):
+    kanji_matches = list(re.finditer(KANJI_RUN_AND_MAYBE_FURIGANA_RE, word))
+    for index, match in enumerate(kanji_matches):
         literal_prefix = word[cursor : match.start()]
         if literal_prefix:
             pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
@@ -89,7 +98,10 @@ def make_word_pattern(word: str) -> str:
             pattern_parts.append(re.escape(kanji))
             pattern_parts.append(replace_hiragana_in_pattern(re.escape(kanji_furigana)))
         else:
-            pattern_parts.append(kanji_run_with_maybe_furigana(re.escape(kanji)))
+            run_ends_word = followed_by_okurigana and index == len(kanji_matches) - 1
+            pattern_parts.append(
+                kanji_run_with_maybe_furigana(re.escape(kanji), run_may_continue=not run_ends_word)
+            )
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
@@ -150,6 +162,26 @@ def furigana_captures_match_readings(
         if reading_match_type == "none":
             return False
     return True
+
+
+def kanji_run_continuations(text: str) -> list[bool]:
+    """Tell for each kanji of the text whether the run it stands in goes on after it.
+
+    Splitting the text into one kanji per bracket gives every kanji a run of its own, so what
+    directly follows the word's last kanji is only visible in the text as it was written. The
+    kanji keep their order through the splitting, so the answer is looked up by counting them.
+    """
+    bare_text = re.sub(rf"{TAG_AND_BARE_DOT_PART_RE}|{FURIGANA_PART_RE}", "", text)
+    return [
+        bool(re.match(KANJI_RUN_CHAR_RE, bare_text[index + 1 : index + 2]))
+        for index, char in enumerate(bare_text)
+        if re.match(KANJI_RUN_CHAR_RE, char)
+    ]
+
+
+def kanji_count_before(text: str, position: int) -> int:
+    """Count the kanji the text has before the given position, the readings not counted."""
+    return len(re.findall(KANJI_RUN_CHAR_RE, re.sub(FURIGANA_PART_RE, "", text[:position])))
 
 
 def preserve_small_counter_kana(text: str) -> str:
@@ -442,7 +474,7 @@ def word_highlight(text: str, word: str) -> str:
 
     if not furigana:
         logger.debug("No furigana but have kanji with okuri, use get_conjugated_okuri_with_mecab")
-        pattern = make_word_pattern(word)
+        pattern = make_word_pattern(word, followed_by_okurigana=True)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         # Remove tags and splitter dots from text temporarily
@@ -558,7 +590,7 @@ def word_highlight(text: str, word: str) -> str:
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
         if last_kanji:
-            pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
+            pattern += rf"(?P<last_kanji>{last_kanji}{repeater})(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 
@@ -569,11 +601,22 @@ def word_highlight(text: str, word: str) -> str:
         logger.debug("html_free_text for matching: '%s', pattern: '%s'", html_free_text, pattern)
         matches = list(re.finditer(pattern, html_free_text))
         logger.debug("Found %s matches", len(matches))
+        # The word's okurigana follows its last kanji directly, so a run of the text that goes
+        # on past that kanji is not the word (出来事 is not 出来る). The run may still begin
+        # before the word: a compound ending in the word's kanji is a genuine ambiguity.
+        run_continues_after_kanji = kanji_run_continuations(text)
         result_indices = []
         for m in matches:
             if not furigana_captures_match_readings(m, prefix_expected_readings):
                 logger.debug("Skipping match; prefix furigana does not match expected readings")
                 continue
+            if last_kanji:
+                kanji_index = kanji_count_before(html_free_text, m.end("last_kanji") - 1)
+                if run_continues_after_kanji[kanji_index : kanji_index + 1] == [True]:
+                    logger.debug(
+                        "Skipping match; the text's kanji run goes on past the word's last kanji"
+                    )
+                    continue
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
