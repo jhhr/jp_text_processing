@@ -10,8 +10,11 @@ from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
-from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
-from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
+from .use_tag_cleaning import (
+    TAG_AND_BARE_DOT_PART_RE,
+    TAG_AND_DOT_PART_RE,
+    use_tag_cleaning_with_b_insertion,
+)
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
@@ -237,43 +240,24 @@ def word_highlight(text: str, word: str) -> str:
         # Most simple case, we can regex search for the word directly
         pattern = make_word_pattern(word)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text
+            text, part_regex=TAG_AND_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
 
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text)
-
         # re.sub reports every match's position in its input, which has none of the b tags the
-        # earlier matches got. The splitter bookkeeping works in those same positions, but the
-        # tag bookkeeping counts the inserted tags, so they are added on for it - once to get
-        # from the reported position to the current one, and once more because converting
-        # through the splitter indexes takes them back off.
+        # earlier matches got, so their length is added on to get the current position.
         b_tags_inserted = 0
-
-        def to_tag_index(split_free_index: int) -> int:
-            edited_index = split_free_index + b_tags_inserted
-            return split_free_to_original_index(edited_index) + b_tags_inserted
 
         def replace_match(match: re.Match) -> str:
             nonlocal b_tags_inserted
-            split_start = match.start(0)
-            split_end = match.end(0)
-            increment_tag_indexes(to_tag_index(split_start), to_tag_index(split_end))
-            increment_splitter_indexes(split_start, split_end)
+            increment_tag_indexes(match.start(0) + b_tags_inserted, match.end(0) + b_tags_inserted)
             b_tags_inserted += len("<b></b>")
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, splitter_free_text)
+        result = re.sub(pattern, replace_match, html_free_text)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         result = restore_tags(result)
         return result
     elif not ending_okurigana and furigana:
@@ -300,30 +284,14 @@ def word_highlight(text: str, word: str) -> str:
             logger.debug("Appended fixed katakana suffix pattern: '%s'", katakana_suffix_pattern)
         logger.debug("Using pattern: %s", pattern)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text_with_readings_split
+            text_with_readings_split, part_regex=TAG_AND_BARE_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
 
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(
-            html_free_text,
-            splitter_regex=r"・",
-        )
-        logger.debug("splitter_free_text for matching: '%s'", splitter_free_text)
-
         # As above: the positions re.sub reports know nothing of the b tags already inserted
         b_tags_inserted = 0
-
-        def to_tag_index(split_free_index: int) -> int:
-            edited_index = split_free_index + b_tags_inserted
-            return split_free_to_original_index(edited_index) + b_tags_inserted
 
         def replace_match(match: re.Match) -> str:
             nonlocal b_tags_inserted
@@ -352,15 +320,12 @@ def word_highlight(text: str, word: str) -> str:
             if not match_text:
                 return match.group(0)
 
-            increment_tag_indexes(to_tag_index(split_start), to_tag_index(split_end))
-            increment_splitter_indexes(split_start, split_end)
+            increment_tag_indexes(split_start + b_tags_inserted, split_end + b_tags_inserted)
             b_tags_inserted += len("<b></b>")
             return f"{leading_ws}<b>{match_text}</b>"
 
-        result = re.sub(pattern, replace_match, splitter_free_text)
+        result = re.sub(pattern, replace_match, html_free_text)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-
-        result = restore_splitters(result)
 
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
@@ -369,8 +334,10 @@ def word_highlight(text: str, word: str) -> str:
         # Re-merge any consecutive furigana parts that were split earlier
         result = merge_consecutive_furigana(result)
 
-        # Remove space from beginning as it's not required
-        result = re.sub(r"^(<b>)? ", r"\1", result)
+        # Remove the space the furigana splitting puts at the beginning, unless the text was
+        # written with one there
+        if not text[:1].isspace():
+            result = re.sub(r"^(<b>)? ", r"\1", result)
         return result
 
     # Getting more complicated, need to handle possible inflections
@@ -388,24 +355,12 @@ def word_highlight(text: str, word: str) -> str:
         pattern = make_word_pattern(word)
         # Add regex for possible okurigana after the word, we'll try to match inflections to those
         pattern += rf"((?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text
+            text, part_regex=TAG_AND_DOT_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
-
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(
-            html_free_text,
-            splitter_regex=r"・",
-        )
-        logger.debug("splitter_free_text for matching: '%s'", splitter_free_text)
-        matches = list(re.finditer(pattern, splitter_free_text))
+        matches = list(re.finditer(pattern, html_free_text))
         result_indices: list[tuple[int, int]] = []
         for m in matches:
             maybe_okuri = m.group(1)
@@ -446,16 +401,12 @@ def word_highlight(text: str, word: str) -> str:
                 result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
-        result = splitter_free_text
+        result = html_free_text
 
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
             # Increment for tags inside (but not on exact same position) or after the opening tag
-            increment_tag_indexes(
-                split_free_to_original_index(start),
-                split_free_to_original_index(end),
-            )
-            increment_splitter_indexes(start, end)
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             logger.debug("Result after %s <b> insertions: '%s'", idx + 1, result)
             # Adjust subsequent indices due to added tag lengths
@@ -463,7 +414,6 @@ def word_highlight(text: str, word: str) -> str:
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
         return result
@@ -515,22 +465,12 @@ def word_highlight(text: str, word: str) -> str:
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 
-        # Remove tags from text temporarily
+        # Remove tags and splitter dots from text temporarily
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text_with_readings_split
+            text_with_readings_split, part_regex=TAG_AND_BARE_DOT_PART_RE
         )
-
-        (
-            splitter_free_text,
-            increment_splitter_indexes,
-            restore_splitters,
-            _,
-            split_free_to_original_index,
-        ) = use_splitter_dot_cleaning_with_b_insertion(html_free_text)
-        logger.debug(
-            "splitter_free_text for matching: '%s', pattern: '%s'", splitter_free_text, pattern
-        )
-        matches = list(re.finditer(pattern, splitter_free_text))
+        logger.debug("html_free_text for matching: '%s', pattern: '%s'", html_free_text, pattern)
+        matches = list(re.finditer(pattern, html_free_text))
         logger.debug("Found %s matches", len(matches))
         result_indices = []
         for m in matches:
@@ -540,7 +480,7 @@ def word_highlight(text: str, word: str) -> str:
             # For each match, check if the last kanji's furigana can be inflected to match
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
-            matched_text = splitter_free_text[m.start(0) : m.end(0)]
+            matched_text = html_free_text[m.start(0) : m.end(0)]
             furigana = m.group("furigana")
             maybe_okuri = m.group("maybe_okuri")
             reading_match_type = "plain"
@@ -652,28 +592,25 @@ def word_highlight(text: str, word: str) -> str:
             result_indices = [
                 (start, end + suffix_len)
                 for start, end in result_indices
-                if re.match(katakana_suffix_re, splitter_free_text[end:])
+                if re.match(katakana_suffix_re, html_free_text[end:])
             ]
-        result = splitter_free_text
+        result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
-            increment_tag_indexes(
-                split_free_to_original_index(start),
-                split_free_to_original_index(end),
-            )
-            increment_splitter_indexes(start, end)
+            increment_tag_indexes(start, end)
             result = result[:start] + "<b>" + result[start:end] + "</b>" + result[end:]
             # Adjust subsequent indices due to added tag lengths
             for j in range(idx + 1, len(result_indices)):
                 s, e = result_indices[j]
                 result_indices[j] = (s + 7, e + 7)
         logger.debug("Intermediate result with <b> tags: '%s'", result)
-        result = restore_splitters(result)
         # Restore tags now, as the tag indexes are based on the split text
         result = restore_tags(result)
         logger.debug("Restored html tags result: '%s'", result)
         # Re-merge any consecutive furigana parts that were split earlier
         result = merge_consecutive_furigana(result)
-        # Remove space from beginning as it's not required
-        result = re.sub(r"^(<b>)? ", r"\1", result)
+        # Remove the space the furigana splitting puts at the beginning, unless the text was
+        # written with one there
+        if not text[:1].isspace():
+            result = re.sub(r"^(<b>)? ", r"\1", result)
         return result

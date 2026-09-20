@@ -131,11 +131,18 @@ def apply_tag_fixes(restored_text: str) -> str:
 
 
 TAG_PART_RE = r"<\/?[^>]+>"
-# Whitespace goes into the same storage as the tags for a caller that loses both, rather than
-# into a storage of its own: two storages each index a text the other one still has its parts
-# in, so neither can place a <b> that the other's parts sit around. The tag comes first in the
-# alternation, so the space inside <span class="x"> is part of that tag and stays in it.
-TAG_AND_SPACE_PART_RE = rf"{TAG_PART_RE}|\s+"
+# A splitter dot between the parts of a word (報・連・相) is stored like a tag as well, so the
+# word matches without it and it comes back where it was.
+SPLITTER_DOT_RE = r"・\s*"
+# Whitespace and dots go into the same storage as the tags for a caller that loses them, rather
+# than into a storage of their own: two storages each index a text the other one still has its
+# parts in, so neither can place a <b> that the other's parts sit around. The tag comes first in
+# the alternation, so the space inside <span class="x"> is part of that tag and stays in it.
+TAG_AND_DOT_PART_RE = rf"{TAG_PART_RE}|{SPLITTER_DOT_RE}"
+# The furigana paths match the space before a kanji as part of the word, so there the dot has to
+# leave the space where it is.
+TAG_AND_BARE_DOT_PART_RE = rf"{TAG_PART_RE}|・"
+TAG_AND_SPACE_PART_RE = rf"{TAG_PART_RE}|\s+|{SPLITTER_DOT_RE}"
 
 
 def use_tag_cleaning_with_b_insertion(
@@ -148,7 +155,8 @@ def use_tag_cleaning_with_b_insertion(
 
     Args:
         text: The original text containing parts to be stored.
-        part_regex: What to store; TAG_AND_SPACE_PART_RE to take the whitespace with the tags.
+        part_regex: What to store; one of the TAG_AND_* alternations to take the whitespace
+            or the splitter dots with the tags.
     Returns:
         A tuple containing:
             - The cleaned text with parts removed.

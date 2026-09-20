@@ -782,6 +782,51 @@ CASES = [
         "<span><b> 家[いえ]</b>と<b> 家[いえ]</b></span>",
         id="Html shape - several furigana occurrences inside one tag",
     ),
+    # A splitter dot is stored like a tag: it is out of the way while the word is matched and
+    # comes back where it was, inside the highlight when the word is written across it and
+    # outside when it only separates two occurrences.
+    pytest.param(
+        "家出・家出",
+        "家出",
+        "<b>家出</b>・<b>家出</b>",
+        id="Splitter dot - between two occurrences, not inside either",
+    ),
+    pytest.param(
+        " 家出[いえで]・ 家出[いえで]",
+        "家出[いえで]",
+        "<b> 家出[いえで]</b>・<b> 家出[いえで]</b>",
+        id="Splitter dot - between two furigana occurrences",
+    ),
+    pytest.param(
+        " 家[いえ]・ 家[いえ]",
+        "家[いえ]",
+        "<b> 家[いえ]</b>・<b> 家[いえ]</b>",
+        id="Splitter dot - between two single-kanji furigana occurrences",
+    ),
+    pytest.param(
+        "<span> 家[いえ]・ 家[いえ]</span>",
+        "家[いえ]",
+        "<span><b> 家[いえ]</b>・<b> 家[いえ]</b></span>",
+        id="Splitter dot - between two furigana occurrences inside a tag",
+    ),
+    pytest.param(
+        "家・出でした",
+        "家出",
+        "<b>家・出</b>でした",
+        id="Splitter dot - inside the word, spanned by the highlight",
+    ),
+    pytest.param(
+        "毎日 報・ 連・ 相しています",
+        "報連相する",
+        "毎日<b> 報・ 連・ 相しています</b>",
+        id="Splitter dot - inside a word with okurigana",
+    ),
+    pytest.param(
+        "毎日[まいにち] 報[ほう]・ 連[れん]・ 相[そう]しています",
+        "報連相[ほうれんそう]する",
+        "毎日[まいにち]<b> 報[ほう]・ 連[れん]・ 相[そう]しています</b>",
+        id="Splitter dot - inside a furigana word with okurigana",
+    ),
 ]
 
 
