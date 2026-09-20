@@ -596,9 +596,13 @@ def kana_highlight(
         if not full_furigana or not is_kana_str(full_furigana):
             logger.debug("furigana_replacer - empty or invalid furigana case: %s", full_furigana)
             if return_type == "kana_only":
-                # return furigana as is, since it's either empty or invalid
+                # return furigana as is, since it's invalid; an empty one would return nothing
+                # at all and the word would silently vanish, so the same placeholder the
+                # furikanji mode uses stands in for the missing reading
                 # Since the kanji are omitted, there's nothing to highlight
-                if not full_furigana or not with_tags_def.with_tags:
+                if not full_furigana:
+                    full_furigana = "□"
+                if not with_tags_def.with_tags:
                     return f"{full_furigana}{maybe_okuri}"
                 return f"<err>{full_furigana}</err>{maybe_okuri}"
             if kanji_to_highlight and kanji_to_highlight in full_word:

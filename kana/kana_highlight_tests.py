@@ -198,15 +198,15 @@ CASES = [
         "今日[]は天気[てんき]がいい。",
         True,
         {
-            # Kana becomes empty
-            "kana_only": "はテンキがいい。",
+            # An empty reading would leave nothing at all, so kana_only shows the placeholder too
+            "kana_only": "□はテンキがいい。",
             # Furigana can show the kanji with empty reading
             "furigana": "今日は 天気[テンキ]がいい。",
             # To hide the kanji with empty furigana, a placeholder is used
             "furikanji": " □[今日]は テンキ[天気]がいい。",
-            # kana_only can't show tags for empty furigana
-            "kana_only split": "は<on>テン</on><on>キ</on>がいい。",
-            "kana_only merged": "は<on>テンキ</on>がいい。",
+            # The placeholder gets the <err> tag as well
+            "kana_only split": "<err>□</err>は<on>テン</on><on>キ</on>がいい。",
+            "kana_only merged": "<err>□</err>は<on>テンキ</on>がいい。",
             # furigan/furikanji uses <err> tag for empty furigana
             "furigana split": "<err>今日</err>は<on> 天[テン]</on><on> 気[キ]</on>がいい。",
             "furigana merged": "<err>今日</err>は<on> 天気[テンキ]</on>がいい。",
@@ -220,10 +220,11 @@ CASES = [
         "今日[]は天気[てんき]がいい。",
         True,
         {
-            # Kana is the same as no highlight since kanji with empty furigana is skipped
-            "kana_only": "はテンキがいい。",
-            "kana_only split": "は<on>テン</on><on>キ</on>がいい。",
-            "kana_only merged": "は<on>テンキ</on>がいい。",
+            # Kana is the same as no highlight since the placeholder standing in for the missing
+            # reading has nothing to bold, the same way the furikanji placeholder isn't bolded
+            "kana_only": "□はテンキがいい。",
+            "kana_only split": "<err>□</err>は<on>テン</on><on>キ</on>がいい。",
+            "kana_only merged": "<err>□</err>は<on>テンキ</on>がいい。",
             # Furigana/furikanji highglights the kanji
             "furigana": "<b>今</b>日は 天気[テンキ]がいい。",
             "furikanji": " □[<b>今</b>日]は テンキ[天気]がいい。",
