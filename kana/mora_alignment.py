@@ -1,8 +1,16 @@
 """
-Mora-to-kanji alignment module with early exit optimization.
+Mora-to-kanji alignment: which run of a word's reading belongs to which kanji.
 
-This module implements the combinatorial mora alignment algorithm that tries
-all possible ways to split mora among kanji, returning the first complete match.
+Given a word of kanji and its reading split into mora, the search finds the way to deal the
+mora out to the kanji, in order, that has the most of the reading accounted for by the kanji's
+listed readings, then the fewest kanji left without one, and among those the earliest in split
+order (the first kanji given the shortest chunk, then the second, and so on). A complete
+alignment is one where every kanji is read by one of its own readings; a kanji that none of
+its readings account for is jukujikun.
+
+The search is a dynamic program over (next kanji, next mora) states; each state's step is
+matched once and remembered. A caller that already has one or two candidate splits (the
+whole-word case) hands them in as ``possible_splits`` and they are scored in the order given.
 """
 
 from collections.abc import Sequence
@@ -11,7 +19,6 @@ from typing import NamedTuple
 from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger
-from .get_ordered_sublists import get_ordered_sublists
 from .reading_matcher import cached_reading_match
 
 
@@ -254,6 +261,444 @@ def youon_small_kana_match(ctx: AlignContext, i: int, chunk: str) -> str | None:
     return None
 
 
+def empty_alignment(ctx: AlignContext, mora_split: list[str]) -> MoraAlignment:
+    """The alignment with every kanji jukujikun, for when no split of the reading exists."""
+    return MoraAlignment(
+        kanji_matches=[None] * ctx.kanji_count,
+        mora_split=mora_split,
+        jukujikun_positions=list(range(ctx.kanji_count)),
+        final_okurigana="",
+        final_rest_kana=ctx.maybe_okuri,
+    )
+
+
+def walk_split(
+    ctx: AlignContext, mora_split: list[str], youon_queue: list[list[str]] | None
+) -> MoraAlignment:
+    """
+    Align the word along one split, one joined mora string per kanji.
+
+    :param youon_queue: Where to queue the yōon variants of this split (see
+        youon_small_kana_match), or None to try none
+    """
+    word, _, maybe_okuri, kanji_count = ctx
+    logger.debug("walk_split - trying mora_split: %s", mora_split)
+    kanji_matches: list[ReadingMatchInfo | None] = []
+    jukujikun_positions: list[int] = []
+    final_okurigana = ""
+    final_rest_kana = maybe_okuri
+
+    i = 0
+    while i < kanji_count:
+        try:
+            mora_sequence = mora_split[i]
+        except IndexError:
+            mora_sequence = ""
+            logger.error(
+                "walk_split - mora_split contains fewer parts than kanji_count for word '%s': %s"
+                " vs %s",
+                word,
+                mora_split,
+                kanji_count,
+            )
+        next_mora_sequence = mora_split[i + 1] if (i + 1) < len(mora_split) else None
+
+        step = align_step(ctx, i, mora_sequence, next_mora_sequence)
+
+        # Test for possible youon match
+        prev_mora_sequence = mora_split[i - 1] if i > 0 else None
+        if (
+            youon_queue is not None
+            and step.consumed_kanji == 1
+            # yōon only possible if previous mora exists
+            and prev_mora_sequence is not None
+        ):
+            small = youon_small_kana_match(ctx, i, mora_sequence)
+            # If the current kanji matches the small kana as yōon, we'll make a new youon
+            # mora split to be tested fully after this loop
+            if small:
+                youon_mora_split = mora_split.copy()
+                # Adjust previous mora to include base kana
+                youon_mora_split[i - 1] = prev_mora_sequence + mora_sequence[0]
+                # Adjust current mora to just small kana
+                youon_mora_split[i] = small
+                youon_queue.append(youon_mora_split)
+                logger.debug("walk_split - queued youon_mora_split: %s", youon_mora_split)
+
+        for offset, match_info in enumerate(step.matches):
+            kanji_matches.append(match_info)
+            if match_info is None:
+                jukujikun_positions.append(i + offset)
+        if step.finals is not None:
+            final_okurigana, final_rest_kana = step.finals
+        i += step.consumed_kanji
+
+    alignment = MoraAlignment(
+        kanji_matches=kanji_matches,
+        mora_split=mora_split,
+        jukujikun_positions=jukujikun_positions,
+        final_okurigana=final_okurigana,
+        final_rest_kana=final_rest_kana,
+    )
+    logger.debug("walk_split - alignment result: %s", alignment)
+    return alignment
+
+
+def chars_matched(alignment: MoraAlignment) -> int:
+    return sum(
+        len(match["matched_mora"]) for match in alignment["kanji_matches"] if match is not None
+    )
+
+
+def align_given_splits(
+    ctx: AlignContext, possible_splits: Sequence[Sequence[Sequence[str]]]
+) -> MoraAlignment:
+    """
+    Score ready-made splits in the order given: the first complete one wins, then the yōon
+    variants they queued, else the best partial.
+
+    The best partial is chosen while iterating: a split replaces the best so far when it has
+    fewer jukujikun positions and at least as many matched characters, or at most as many
+    jukujikun positions and strictly more matched characters.
+    """
+    word, _, _, kanji_count = ctx
+
+    if contains_repeated_kanji(word):
+        filtered_splits = [s for s in possible_splits if is_valid_split_for_repeaters(word, s)]
+        logger.debug(
+            "align_given_splits - filtered splits for repeaters, remaining count: %s",
+            len(filtered_splits),
+        )
+        if filtered_splits:
+            possible_splits = filtered_splits
+        else:
+            logger.debug(
+                "align_given_splits - no valid splits remain after filtering for repeaters, using"
+                " original splits"
+            )
+
+    # From here on a split is one joined mora string per kanji, which is what MoraAlignment
+    # carries and what every reader of mora_split expects
+    joined_splits: list[list[str]] = [
+        ["".join(mora) for mora in split] for split in possible_splits
+    ]
+
+    best_alignment: MoraAlignment | None = None
+    best_jukujikun_count = kanji_count + 1  # Start with worst possible
+    best_chars_matched_count = 0
+    youon_mora_splits: list[list[str]] = []
+
+    def consider(alignment: MoraAlignment) -> None:
+        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
+        jukujikun_count = len(alignment["jukujikun_positions"])
+        chars_matched_count = chars_matched(alignment)
+        if (
+            jukujikun_count < best_jukujikun_count
+            and chars_matched_count >= best_chars_matched_count
+        ) or (
+            jukujikun_count <= best_jukujikun_count
+            and chars_matched_count > best_chars_matched_count
+        ):
+            logger.debug(
+                "align_given_splits - new best partial alignment found with %s jukujikun"
+                " positions and %s chars matched: %s",
+                jukujikun_count,
+                chars_matched_count,
+                alignment,
+            )
+            best_chars_matched_count = chars_matched_count
+            best_jukujikun_count = jukujikun_count
+            best_alignment = alignment
+
+    for mora_split in joined_splits:
+        alignment = walk_split(ctx, mora_split, youon_mora_splits)
+        if not alignment["jukujikun_positions"]:
+            return alignment
+        consider(alignment)
+    for youon_mora_split in youon_mora_splits:
+        alignment = walk_split(ctx, youon_mora_split, None)
+        if not alignment["jukujikun_positions"]:
+            return alignment
+        consider(alignment)
+
+    if best_alignment:
+        logger.debug("align_given_splits - returning best partial alignment")
+        return best_alignment
+
+    logger.error("align_given_splits - no splits given for word '%s'", word)
+    return empty_alignment(ctx, [])
+
+
+class Cut(NamedTuple):
+    """
+    A place in the joined reading where one kanji's chunk may end and the next one's begin.
+
+    :param offset: Character offset into the joined reading
+    :param mora_index: How many whole mora lie before it; a cut inside a yōon mora counts the
+        mora it sits in as not yet passed
+    :param inside: Whether the cut sits inside a yōon mora, between the base kana and the small
+        kana. A chunk ending there gives the small kana alone to the next kanji.
+    """
+
+    offset: int
+    mora_index: int
+    inside: bool
+
+
+def path_cost(jukujikun: int, chars: int) -> tuple[int, int]:
+    """
+    What a path through the search costs; lower is better.
+
+    The most chars of the reading accounted for by listed readings win, then the fewest
+    jukujikun. Chars come first because a short reading is easy to match by accident - a
+    one-mora stem, a rendaku of it - and counting jukujikun first would let a kanji swallow the
+    unreadable part of the reading in one long chunk so that the kanji after it can each pick
+    up a mora that happens to fit: 趙清々しい came out as 趙[ちょうすが]清[す]々[が] that way,
+    against the 趙[ちょう]清々[すがすが] that explains more of the reading. Ranked on chars first,
+    the search agreed with the split enumeration it replaced on every input it was compared on.
+    """
+    return (-chars, jukujikun)
+
+
+class Choice(NamedTuple):
+    """
+    The best way on from one state of the search.
+
+    :param cost: path_cost of the best path to the goal from here; lower is better
+    :param jukujikun: How many kanji on that path are jukujikun
+    :param chars: How many chars of the reading that path matches to a listed reading
+    :param chunks: The chunk of the kanji at this state, and of the repeater after it if it
+        has one
+    :param next_state: The state the chunks lead to, None at the goal
+    """
+
+    cost: tuple[int, int]
+    jukujikun: int
+    chars: int
+    chunks: tuple[str, ...]
+    next_state: tuple[int, int, int] | None
+
+
+def pair_starts(word: str) -> set[int]:
+    """The kanji indexes the search steps from, skipping the second of each repeater pair."""
+    starts = set()
+    i = 0
+    while i < len(word):
+        starts.add(i)
+        i += 2 if repeater_follows(word, i) else 1
+    return starts
+
+
+class AlignmentSearch:
+    """
+    The dynamic program over (next kanji, next cut) states.
+
+    From a state the kanji takes a chunk ending at any later cut, or the kanji and the repeater
+    after it take two, and the best way on from where that leaves the search is looked up or
+    computed once. Chunks are tried shortest first and a later chunk only replaces the best so
+    far when it is strictly better, so among equally good alignments the earliest in split order
+    wins: for complete alignments that is the same one an enumeration of every split, first kanji
+    shortest first, would have reached first.
+
+    :param constrained: Whether a 々 has to take as many mora as the kanji before it
+    """
+
+    def __init__(self, ctx: AlignContext, reading: str, cuts: list[Cut], constrained: bool):
+        self.ctx = ctx
+        self.reading = reading
+        self.cuts = cuts
+        self.mora_count = cuts[-1].mora_index
+        self.last = len(cuts) - 1
+        # A 々 that steps on its own (人々々) is held to the chunk before it, which the state has
+        # to carry; for every other kanji the previous chunk's length is dropped from the key.
+        self.single_constrained = (
+            {i for i in pair_starts(ctx.word) if i > 0 and ctx.word[i] == "々"}
+            if constrained
+            else set()
+        )
+        self.constrained = constrained
+        self.memo: dict[tuple[int, int, int], Choice | None] = {}
+
+    def key(self, i: int, cut: int, prev_len: int) -> tuple[int, int, int]:
+        return (i, cut, prev_len if i in self.single_constrained else 0)
+
+    def chunk(self, start: int, end: int) -> str:
+        return self.reading[self.cuts[start].offset : self.cuts[end].offset]
+
+    def best(self, i: int, cut: int, prev_len: int) -> Choice | None:
+        """The best way to the goal from the state, None when the goal cannot be reached."""
+        key = self.key(i, cut, prev_len)
+        if key in self.memo:
+            return self.memo[key]
+        word, _, _, kanji_count = self.ctx
+        choice: Choice | None = None
+        if i == kanji_count:
+            choice = Choice(path_cost(0, 0), 0, 0, (), None) if cut == self.last else None
+        elif cut < self.last:
+            choice = self.best_from(i, cut, prev_len)
+        self.memo[key] = choice
+        logger.debug(
+            "AlignmentSearch - kanji %s at offset %s: %s",
+            i,
+            self.cuts[cut].offset,
+            choice if choice is not None else "no way to the end",
+        )
+        return choice
+
+    def best_from(self, i: int, cut: int, prev_len: int) -> Choice | None:
+        word, _, _, kanji_count = self.ctx
+        start = self.cuts[cut]
+        best_choice: Choice | None = None
+
+        def consider(chunks: tuple[str, ...], end: int, chunk_len: int) -> None:
+            nonlocal best_choice
+            rest = self.best(i + len(chunks), end, chunk_len)
+            if rest is None:
+                return
+            step = align_step(self.ctx, i, chunks[0], chunks[1] if len(chunks) > 1 else None)
+            jukujikun = sum(1 for match in step.matches if match is None)
+            chars = sum(len(match["matched_mora"]) for match in step.matches if match is not None)
+            jukujikun += rest.jukujikun
+            chars += rest.chars
+            cost = path_cost(jukujikun, chars)
+            if best_choice is None or cost < best_choice.cost:
+                best_choice = Choice(
+                    cost, jukujikun, chars, chunks, self.key(i + len(chunks), end, chunk_len)
+                )
+
+        if start.inside:
+            # The chunk before this one ended inside a yōon mora, so this kanji gets the small
+            # kana on its own, and only if that reads it: the split is the variant an
+            # enumeration would have queued on finding the small kana matches.
+            if repeater_follows(word, i):
+                return None
+            end = cut + 1
+            if self.mora_count - self.cuts[end].mora_index < kanji_count - i - 1:
+                return None
+            small = self.chunk(cut, end)
+            if align_step(self.ctx, i, small, None).matches[0] is None:
+                return None
+            consider((small,), end, 1)
+            return best_choice
+
+        if not repeater_follows(word, i):
+            remaining = kanji_count - i - 1
+            for end in range(cut + 1, self.last + 1):
+                chunk_len = self.cuts[end].mora_index - start.mora_index
+                if chunk_len < 1:
+                    continue
+                if self.mora_count - self.cuts[end].mora_index < remaining:
+                    break
+                if i in self.single_constrained and chunk_len != prev_len:
+                    continue
+                consider((self.chunk(cut, end),), end, chunk_len)
+            return best_choice
+
+        # A repeater pair: two chunks, the second held to the first's length for a 々
+        held = self.constrained and word[i + 1] == "々"
+        remaining = kanji_count - i - 2
+        for middle in range(cut + 1, self.last):
+            first_len = self.cuts[middle].mora_index - start.mora_index
+            if first_len < 1 or self.cuts[middle].inside:
+                continue
+            if self.mora_count - self.cuts[middle].mora_index - 1 < remaining:
+                break
+            first = self.chunk(cut, middle)
+            for end in range(middle + 1, self.last + 1):
+                second_len = self.cuts[end].mora_index - self.cuts[middle].mora_index
+                if second_len < 1:
+                    continue
+                if self.mora_count - self.cuts[end].mora_index < remaining:
+                    break
+                if held and second_len != first_len:
+                    continue
+                consider((first, self.chunk(middle, end)), end, second_len)
+        return best_choice
+
+    def run(self) -> tuple[Choice, list[str]] | None:
+        """The root choice and the split it leads to, or None when no split reaches the goal."""
+        choice = self.best(0, 0, 0)
+        if choice is None:
+            return None
+        root = choice
+        mora_split: list[str] = []
+        while choice is not None and choice.next_state is not None:
+            mora_split.extend(choice.chunks)
+            choice = self.memo[choice.next_state]
+        return root, mora_split
+
+
+def align_by_search(ctx: AlignContext, mora_list: list[str]) -> MoraAlignment:
+    """
+    Find the alignment with the most matched chars, then the fewest jukujikun, then the earliest
+    in split order, by dynamic programming over the mora boundaries.
+
+    A 々 is first held to as many mora as the kanji before it; when that leaves no split at all
+    the constraint is dropped. When no alignment at mora boundaries is complete, a second pass
+    also lets a chunk end inside a yōon mora (きゃ → き | ゃ), giving the small kana alone to the
+    next kanji when it reads it that way, and its result stands when it is strictly better.
+    """
+    word, _, _, kanji_count = ctx
+    mora_count = len(mora_list)
+    if mora_count < kanji_count:
+        logger.debug(
+            "align_by_search - fewer mora than kanji for word '%s', all jukujikun: %s",
+            word,
+            mora_list,
+        )
+        # It doesn't matter that the mora_list is not split per kanji here: split_mora_for_jukujikun
+        # redistributes the mora among the jukujikun kanji later
+        return empty_alignment(ctx, mora_list)
+
+    reading = "".join(mora_list)
+    boundaries: list[Cut] = [Cut(0, 0, False)]
+    for mora in mora_list:
+        boundaries.append(Cut(boundaries[-1].offset + len(mora), len(boundaries), False))
+
+    constrained = contains_repeated_kanji(word)
+    found = None
+    if constrained:
+        found = AlignmentSearch(ctx, reading, boundaries, constrained=True).run()
+        if found is None:
+            logger.debug(
+                "align_by_search - no split gives each 々 the mora count of the kanji before it,"
+                " dropping the constraint"
+            )
+            constrained = False
+    if found is None:
+        found = AlignmentSearch(ctx, reading, boundaries, constrained=False).run()
+    if found is None:
+        # Cannot happen with at least one mora per kanji, but the search must return something
+        logger.error("align_by_search - no split found for word '%s': %s", word, mora_list)
+        return empty_alignment(ctx, mora_list)
+    choice, mora_split = found
+    logger.debug(
+        "align_by_search - best split at mora boundaries: %s, cost: %s", mora_split, choice.cost
+    )
+    if choice.jukujikun == 0:
+        return walk_split(ctx, mora_split, None)
+
+    # Yōon pass: every boundary, plus a cut inside each yōon mora that has a kanji before it
+    cuts: list[Cut] = []
+    for index, boundary in enumerate(boundaries):
+        cuts.append(boundary)
+        if 0 < index < mora_count:
+            mora = mora_list[index]
+            if len(mora) == 2 and mora[1] in ["ゃ", "ゅ", "ょ"]:
+                cuts.append(Cut(boundary.offset + 1, index, True))
+    if len(cuts) > len(boundaries):
+        youon_found = AlignmentSearch(ctx, reading, cuts, constrained).run()
+        if youon_found is not None and youon_found[0].cost < choice.cost:
+            choice, mora_split = youon_found
+            logger.debug(
+                "align_by_search - better split with a yōon cut: %s, cost: %s",
+                mora_split,
+                choice.cost,
+            )
+    logger.debug("align_by_search - returning best partial alignment")
+    return walk_split(ctx, mora_split, None)
+
+
 def find_first_complete_alignment(
     word: str,
     furigana: str,
@@ -262,21 +707,16 @@ def find_first_complete_alignment(
     possible_splits: Sequence[Sequence[Sequence[str]]] | None = None,
 ) -> MoraAlignment:
     """
-    Find the first complete alignment of mora to kanji with early exit.
-
-    Uses get_ordered_sublists to generate all possible mora divisions in order,
-    and returns immediately when a complete match (all kanji matched) is found.
-
-    If no complete match exists, returns the best partial alignment (fewest jukujikun positions).
+    Find the complete alignment of mora to kanji that is earliest in split order, or failing
+    that the best partial alignment (most matched chars, then fewest jukujikun positions).
 
     :param word: The word to align (string of kanji, may include 々)
     :param furigana: The full reading of the word in kana
     :param maybe_okuri: The kana following the word (for last kanji extraction)
-    :param mora_list: List of mora units to distribute across kanji, optional if possible_splits
-       provided
+    :param mora_list: List of mora units to distribute across kanji, searched over; optional if
+       possible_splits is provided
     :param possible_splits: Precomputed list of possible mora splits, each split a list of
-       mora lists, one per kanji; optional, replaces mora_list
-    :param is_whole_word: Whether the alignment is for the whole word (affects matching logic)
+       mora lists, one per kanji, scored in the order given; optional, replaces mora_list
     :return: MoraAlignment with the first complete match or best partial match
     """
     kanji_count = len(word)
@@ -292,195 +732,13 @@ def find_first_complete_alignment(
             final_rest_kana=maybe_okuri,
         )
 
-    # Get all possible mora splits in order, if a ready-made list is not provided
-    if possible_splits is None:
-        if mora_list is None:
-            raise ValueError("Either mora_list or possible_splits must be provided")
-        possible_splits = get_ordered_sublists(mora_list, kanji_count)
-        logger.debug(
-            "find_first_complete_alignment - generated %s possible splits for word '%s' with"
-            " mora_list: %s",
-            len(possible_splits),
-            word,
-            mora_list,
-        )
-
-    # Filter out invalid splits
-    if contains_repeated_kanji(word):
-        filtered_splits = [s for s in possible_splits if is_valid_split_for_repeaters(word, s)]
-        logger.debug(
-            "find_first_complete_alignment - filtered splits for repeaters, remaining count: %s",
-            len(filtered_splits),
-        )
-        if filtered_splits:
-            possible_splits = filtered_splits
-        else:
-            # We'll use original splits if none remain after filtering, this prevents crashes,
-            # this case ought to most likely be handled as an exception
-            logger.debug(
-                "find_first_complete_alignment - no valid splits remain after filtering for"
-                " repeaters, using original splits"
-            )
-
-    # From here on a split is one joined mora string per kanji, which is what MoraAlignment
-    # carries and what every reader of mora_split expects
-    joined_splits: list[list[str]] = [
-        ["".join(mora) for mora in split] for split in possible_splits
-    ]
-
-    best_alignment: MoraAlignment | None = None
-    best_jukujikun_count = kanji_count + 1  # Start with worst possible
-    best_chars_matched_count = 0
-
-    youon_mora_splits = []
-
-    def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
-        nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
-        logger.debug("find_first_complete_alignment - trying mora_split: %s", mora_split)
-        kanji_matches: list[ReadingMatchInfo | None] = []
-        jukujikun_positions: list[int] = []
-        final_okurigana = ""
-        final_rest_kana = maybe_okuri
-
-        # Try to match each kanji to its mora portion
-        i = 0
-        while i < kanji_count:
-            # Join the mora sublist for this kanji position
-            try:
-                mora_sequence = mora_split[i]
-            except IndexError:
-                mora_sequence = ""
-                logger.error(
-                    "find_first_complete_alignment - mora_split contains fewer parts than"
-                    " kanji_count for word '%s': %s vs %s",
-                    word,
-                    mora_split,
-                    kanji_count,
-                )
-            next_mora_sequence = mora_split[i + 1] if (i + 1) < len(mora_split) else None
-
-            step = align_step(ctx, i, mora_sequence, next_mora_sequence)
-
-            # Test for possible youon match
-            prev_mora_sequence = mora_split[i - 1] if i > 0 else None
-            if (
-                not skip_youon_check
-                and step.consumed_kanji == 1
-                # yōon only possible if previous mora exists
-                and prev_mora_sequence is not None
-            ):
-                small = youon_small_kana_match(ctx, i, mora_sequence)
-                # If the current kanji matches the small kana as yōon, we'll make a new youon
-                # mora split to be tested fully after this loop
-                if small:
-                    youon_mora_split = mora_split.copy()
-                    # Adjust previous mora to include base kana
-                    youon_mora_split[i - 1] = prev_mora_sequence + mora_sequence[0]
-                    # Adjust current mora to just small kana
-                    youon_mora_split[i] = small
-                    youon_mora_splits.append(youon_mora_split)
-                    logger.debug(
-                        "find_first_complete_alignment - queued youon_mora_split: %s",
-                        youon_mora_split,
-                    )
-
-            for offset, match_info in enumerate(step.matches):
-                kanji_matches.append(match_info)
-                if match_info is None:
-                    jukujikun_positions.append(i + offset)
-            if step.finals is not None:
-                final_okurigana, final_rest_kana = step.finals
-            i += step.consumed_kanji
-
-        # Create alignment result
-        alignment = MoraAlignment(
-            kanji_matches=kanji_matches,
-            mora_split=mora_split,
-            jukujikun_positions=jukujikun_positions,
-            final_okurigana=final_okurigana,
-            final_rest_kana=final_rest_kana,
-        )
-
-        logger.debug("find_first_complete_alignment - alignment result: %s", alignment)
-
-        # Early exit: if we found a complete match, return immediately
-        if not jukujikun_positions:
-            logger.debug("find_first_complete_alignment - complete alignment found")
-            return alignment
-
-        # Track best partial alignment (fewest jukujikun positions and most total kana chars matched)
-        chars_matched_count = sum(
-            len(match["matched_mora"]) for match in alignment["kanji_matches"] if match is not None
-        )
-        logger.debug(
-            "find_first_complete_alignment - partial alignment with jukujikun positions: %s, chars"
-            " matched: %s, best_jukujikun_count: %s, best_chars_matched_count: %s",
-            len(jukujikun_positions),
-            chars_matched_count,
-            best_jukujikun_count,
-            best_chars_matched_count,
-        )
-        # Update best alignment if better than previous best, either jukujikun count or chars matched
-        # should be improved while the other is at least as good
-        if (
-            len(jukujikun_positions) < best_jukujikun_count
-            and chars_matched_count >= best_chars_matched_count
-        ) or (
-            len(jukujikun_positions) <= best_jukujikun_count
-            and chars_matched_count > best_chars_matched_count
-        ):
-            logger.debug(
-                "find_first_complete_alignment - new best partial alignment found with %s"
-                " jukujikun positions and %s chars matched: %s",
-                len(jukujikun_positions),
-                chars_matched_count,
-                alignment,
-            )
-            best_chars_matched_count = chars_matched_count
-            best_jukujikun_count = len(jukujikun_positions)
-            best_alignment = alignment
-        return alignment
-
-    for mora_split in joined_splits:
-        result = process_mora_split(mora_split)
-        # Early exit on complete match
-        if not result["jukujikun_positions"]:
-            return result
-    # Also try yōon splits generated during processing
-    for youon_mora_split in youon_mora_splits:
-        result = process_mora_split(youon_mora_split, skip_youon_check=True)
-        if not result["jukujikun_positions"]:
-            return result
-
-    # No complete match found, return best partial alignment
-    if best_alignment:
-        logger.debug("find_first_complete_alignment - returning best partial alignment")
-        return best_alignment
-
-    # Fallback: all kanji are jukujikun
+    if possible_splits is not None:
+        return align_given_splits(ctx, possible_splits)
+    if mora_list is None:
+        raise ValueError("Either mora_list or possible_splits must be provided")
     logger.debug(
-        "find_first_complete_alignment - no valid alignment found, all jukujikun, possible_splits:"
-        " %s, mora_list: %s",
-        joined_splits,
+        "find_first_complete_alignment - searching splits for word '%s' with mora_list: %s",
+        word,
         mora_list,
     )
-    fallback_split: list[str] = []
-    if joined_splits:
-        # It doesn't matter which split we return here, as split_mora_for_jukujikun will handle
-        # redistributing mora among jukujikun kanji later
-        fallback_split = joined_splits[0]
-    elif mora_list is not None:
-        # Use original mora_list as split, it doesn't matter that it's not split properly here
-        fallback_split = mora_list
-    else:
-        logger.error(
-            "find_first_complete_alignment - cannot create fallback mora_split, no valid splits or"
-            " mora_list available"
-        )
-    return MoraAlignment(
-        kanji_matches=[None] * kanji_count,
-        mora_split=fallback_split,
-        jukujikun_positions=list(range(kanji_count)),
-        final_okurigana="",
-        final_rest_kana=maybe_okuri,
-    )
+    return align_by_search(ctx, mora_list)
