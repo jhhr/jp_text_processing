@@ -19,7 +19,7 @@ from ..utils.logger import package_logger as logger, silenced
 # why a prefix test on its own is not enough.
 LEADING_KANA_CLEANING_REC = re.compile(
     rf"""
-(?<![^ >])                      # the word's own start: the text's, a space's or a tag's
+(?<![^\s>])                     # the word's own start: the text's, a line's, a space's or a tag's
 (?P<pre>[ぁ-んァ-ヶー]+)          # the kana the word opens with   (a)お (b)いい (d)スペイン
 (?P<kanji>{KANJI_CHAR_RE}+)     # kanji, with no okurigana before the bracket
 \[
@@ -120,7 +120,7 @@ def leading_kana_cleaning_replacer(match):
 # itself a second time: すり 下[すりお]ろす.
 OKURIGANA_MIX_CLEANING_REC = re.compile(
     rf"""
-(?<![^ >])              # the word's own start: the text's, a space's or a tag's
+(?<![^\s>])             # the word's own start: the text's, a line's, a space's or a tag's
 (?P<pre>[ぁ-ん]*)        # kana before the first kanji            (4)すり (5)かも
 (?P<kanji1>{KANJI_CHAR_RE}+)   # kanji                           (1)消 (2)隣 (3)歯止 (5)知
 (?P<hira1>[ぁ-ん]+)      # hiragana after it                      (1)え (2)り (3)め (5)れない
@@ -130,26 +130,32 @@ OKURIGANA_MIX_CLEANING_REC = re.compile(
 )?
 \[
 (?P=pre)                # the reading opens with the same kana the word does
-(?P<furi1>.+)           # reading of kanji1  (1)き (2)とな (3)はど (4)お (5)し (6)もったいな
+(?P<furi1>[^\]]+)       # reading of kanji1  (1)き (2)とな (3)はど (4)お (5)し (6)もったいな
 (?P=hira1)              # hira1 occurring again
 (?(kanji2)              # only when there is a second kanji to read
-  (?P<furi2>.+)         # reading of kanji2  (1)さ (2)あ
+  (?P<furi2>[^\]]+)     # reading of kanji2  (1)さ (2)あ
   (?P=hira2)            # hira2 occurring again
 )
 ]
 """,
     re.VERBOSE,
 )
-# Two things make this work that are easy to get wrong:
+# Three things make this work that are easy to get wrong:
+#
+# Both reading groups are `[^\]]+` rather than `.+` so that a reading stops at its own closing
+# bracket. As `.+` the greedy furi1 ran on past the `]` and took the rest of the line with it,
+# so 食べ[たべ]たい 食べ[たべ]る gave the first 食 the reading たべ]たい 食べ[た and rewrote the
+# second word into 食べ[た]べる, which nothing downstream reads as furigana any more.
 #
 # `furi1` is greedy because hira1 is the okurigana that *follows* kanji1, so it is the last
 # place that run of kana can sit in the reading, not the first. Taking the first turned
 # 勿体無い[もったいない] into 勿体無[もった]い[ない] - the い matched inside もったい - and the
 # reading left over came out as a bracket with no word in front of it.
 #
-# `furi2` is `.+` rather than `.*?` so that a second kanji always gets a reading. With `.*?`
-# the greedy furi1 would swallow the lot and leave 行き来[いきき] as 行[いき]き来[] - the
-# engine backtracks furi1 instead when furi2 is made to insist on at least one character.
+# `furi2` insists on at least one character rather than being lazy, so that a second kanji
+# always gets a reading. Were it `[^\]]*?` the greedy furi1 would swallow the lot and leave
+# 行き来[いきき] as 行[いき]き来[] - the engine backtracks furi1 instead when furi2 is made to
+# insist on at least one character.
 # Together they mean kanji2 and furi2 always take part as a pair, so neither a word without a
 # reading nor a reading without a word can be produced here.
 

@@ -86,6 +86,25 @@ CASES = [
         '<img src="paste-123.jpg">かんじ',
         id="numbers in tag attributes are kept",
     ),
+    # Several words in one text. A mixed-okurigana reading used to run on past its own closing
+    # bracket to the last word in the text whose okurigana sat in front of one, which left the
+    # first word overfed and the second rewritten into a bracket the filter no longer reads.
+    pytest.param(
+        "彼は 見え[みえ]ない 所[ところ]で 消え[きえ]た",
+        "彼はみえないところできえた",
+        id="two words whose okurigana is the same kana",
+    ),
+    pytest.param(
+        "これは 上げ[あげ]て 下げ[さげ]る",
+        "これはあげてさげる",
+        id="two words whose okurigana and reading share a kana",
+    ),
+    pytest.param(
+        "食べ[たべ]たい 食べ[たべ]る", "たべたいたべる", id="the same word twice in one text"
+    ),
+    # A \n marks where a word begins just as a space does: fields written in the HTML editor
+    # break their lines with <br>, but fields pasted or imported as plain text carry \n.
+    pytest.param("行[い]く\n食べ[たべ]る", "いく\nたべる", id="a word opening a line is a word start"),
 ]
 
 

@@ -166,6 +166,35 @@ CASES = [
     pytest.param(
         "消[き]え去[さ]る", "消[き]え去[さ]る", id="an already cleaned word is not cleaned again"
     ),
+    # --- more than one word in the text -----------------------------------------------------
+    # A reading stops at its own bracket. As `.+` the greedy first reading ran on past the `]`
+    # and stopped at the last place in the whole text where the okurigana sat in front of one,
+    # so 見え[みえ] took everything up to 消え[きえ]'s bracket for its reading and left 消え
+    # rewritten into a form nothing reads as furigana any more.
+    pytest.param(
+        "彼は 見え[みえ]ない 所[ところ]で 消え[きえ]た",
+        "彼は 見[み]えない 所[ところ]で 消[き]えた",
+        id="two words whose okurigana is the same kana",
+    ),
+    pytest.param(
+        "これは 上げ[あげ]て 下げ[さげ]る",
+        "これは 上[あ]げて 下[さ]げる",
+        id="two words whose okurigana and reading share a kana",
+    ),
+    pytest.param(
+        "食べ[たべ]たい 食べ[たべ]る", "食[た]べたい 食[た]べる", id="the same word twice in one text"
+    ),
+    # A line start marks where a word begins just as a space does. Fields written in the HTML
+    # editor break their lines with <br>, but fields pasted or imported as plain text carry \n,
+    # and the first word of every line after the first used to be left uncleaned.
+    pytest.param(
+        "行[い]く\n食べ[たべ]る", "行[い]く\n食[た]べる", id="a word opening a line is a word start"
+    ),
+    pytest.param(
+        "行[い]く\nお前[おまえ]",
+        "行[い]く\nお前[まえ]",
+        id="opening kana of a word opening a line",
+    ),
 ]
 
 
