@@ -205,6 +205,24 @@ def merge_consecutive_furigana(split_furi_text: str) -> str:
     return split_furi_text
 
 
+def adnominal_na_okuri(word_okurigana: str, maybe_okuri: str) -> str:
+    """Give the okurigana an i-adjective's な form has in the text, if the text has that form.
+
+    大きい's adnominal form is 大きな and its stem 大き is the word as much as 大きく is, so the
+    stem is taken; the な is not, except when the word to match was written with it (大きいな).
+    Returns "" when the text does not have the word's な form.
+    """
+    word_ends_in_na = word_okurigana.endswith("な")
+    dictionary_okuri = word_okurigana[:-1] if word_ends_in_na else word_okurigana
+    stem = dictionary_okuri[:-1]
+    # Only an i-adjective with a stem of its own has a な form; 良[い]い's な is the particle
+    if not stem or not dictionary_okuri.endswith("い"):
+        return ""
+    if not maybe_okuri.startswith(f"{stem}な"):
+        return ""
+    return f"{stem}な" if word_ends_in_na else stem
+
+
 def word_highlight(text: str, word: str) -> str:
     """
     Takes a japanese word or phrase in dictionary form and finds any inflected occurrences of
@@ -229,7 +247,7 @@ def word_highlight(text: str, word: str) -> str:
     negation forms like ない, させない, せない, な but not すぎる, すぎない.
     For example:
     word_highlight("私は 食[た]べている", "食[た]べる") --> "私は<b> 食[た]べている</b>"
-    word_highlight() --> "<b>食[た]べさせる</b>な!"
+    word_highlight("食[た]べさせるな!", "食[た]べる") --> "<b>食[た]べさせる</b>な!"
 
     For adjectives, the inflected forms are found up to and including the い form, but not
     the な form except when な is included in the word to match.
@@ -447,6 +465,13 @@ def word_highlight(text: str, word: str) -> str:
                 logger.debug("Exact match found, no inflection check needed")
                 result_indices.append((m.start(0), m.end(0)))
                 continue
+            na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
+            if na_okuri:
+                # MeCab reads the whole な form as one adnominal word, so the stem is checked
+                # against the word's own okurigana instead
+                logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
+                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
+                continue
             # Check if the maybe_okuri contains a valid inflection for the ending_okurigana
             okuri_result, _ = get_conjugated_okuri_with_mecab(
                 word=word_without_furigana,
@@ -580,6 +605,13 @@ def word_highlight(text: str, word: str) -> str:
                     maybe_okuri,
                 )
                 result_indices.append((m.start(0), m.end(0)))
+                continue
+            na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
+            if na_okuri and reading_match_type != "none":
+                # MeCab reads the whole な form as one adnominal word, so the stem is checked
+                # against the word's own okurigana instead
+                logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
+                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
                 continue
             logger.debug(
                 "Matched text for kana_highlight inflection check: '%s', maybe_okuri: '%s', match:"

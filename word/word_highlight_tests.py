@@ -154,6 +154,26 @@ CASES = [
         "高[たか]いでも<b> 良[よ]かろう</b>",
         id="Furigana - adjective inflection /3",
     ),
+    # The な form: the adnominal 大きな has the stem of 大きい, so the stem is the word; the な
+    # is not, unless the word to match was written with it.
+    pytest.param(
+        "大[おお]きな 家[いえ]",
+        "大[おお]きい",
+        "<b>大[おお]き</b>な 家[いえ]",
+        id="Furigana - adjective in the な form",
+    ),
+    pytest.param(
+        "大[おお]きな 家[いえ]",
+        "大[おお]きいな",
+        "<b>大[おお]きな</b> 家[いえ]",
+        id="Furigana - adjective in the な form, the word written with the な",
+    ),
+    pytest.param(
+        "小[ちい]さな 家[いえ]",
+        "小[ちい]さい",
+        "<b>小[ちい]さ</b>な 家[いえ]",
+        id="Furigana - adjective in the な form /2",
+    ),
     pytest.param(
         "早読[はやよ]みするぜ",
         "早[はや]い",
