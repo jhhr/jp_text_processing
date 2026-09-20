@@ -1508,9 +1508,11 @@ for item in ALL_OKURI_BY_PART_OF_SPEECH:
         POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id] = {}
     # Recursively add each kana character of the okurigana to the dict
     add_chars_to_dict(okuri, POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])
-    # Also add entry for blank okuri, which indicates no conjugation applied on the stem,
-    # e.g. 恥ずかし気な
-    add_char_dict("", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id], is_last=True)
+    if not okuri and not euph:
+        # A wholly blank entry marks a part of speech whose stem can stand with no
+        # conjugation on it at all, e.g. 恥ずかし気な; only adj-i has one. add_chars_to_dict
+        # has no character to hang that marker on, so it goes in here.
+        add_char_dict("", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id], is_last=True)
     # If this okuri had a euphonic change entry, add the same progression for it too
     if euph:
         add_chars_to_dict(f"{euph}{okuri}", POSSIBLE_OKURIGANA_PROGRESSION_DICT[pos_id])

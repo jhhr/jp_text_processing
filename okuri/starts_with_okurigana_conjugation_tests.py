@@ -154,6 +154,25 @@ CASES = [
         ("", "げな", "empty_okuri", "adj-i"),
         id="恥[は]ずかしい + げな",
     ),
+    # no okuri tests
+    pytest.param(
+        # only an i-adjective stem can stand bare; 見方 is the noun 見 plus かた, not 見る
+        # with an empty conjugation
+        "かた",
+        "る",
+        "見",
+        "み",
+        ("", "かた", "no_okuri", None),
+        id="見[み]る + かた",
+    ),
+    pytest.param(
+        "こむ",
+        "む",
+        "読",
+        "よ",
+        ("", "こむ", "no_okuri", None),
+        id="読[よ]む + こむ",
+    ),
     # partial okuri tests
     pytest.param(
         "った",
