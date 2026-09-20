@@ -710,6 +710,26 @@ CASES = [
         "はしがある",
         id="Kana only - noun spelling the word's stem is not the word /3",
     ),
+    # A reading inside [...] is not the word occurring in the text, so neither the plain
+    # search nor the mecab one may highlight inside a bracket.
+    pytest.param(
+        "この 家[いえ]は",
+        "いえ",
+        "この 家[いえ]は",
+        id="Kana only - a kana word is not the reading in a bracket",
+    ),
+    pytest.param(
+        "この 家[いえ]は いえ",
+        "いえ",
+        "この 家[いえ]は<b> いえ</b>",
+        id="Kana only - a kana word in the text highlights, the same reading does not",
+    ),
+    pytest.param(
+        "この 家[いえ]は いえた",
+        "いえる",
+        "この 家[いえ]は <b>いえた</b>",
+        id="Kana only - an inflected kana word highlights, the same reading does not",
+    ),
     pytest.param(
         (
             "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"

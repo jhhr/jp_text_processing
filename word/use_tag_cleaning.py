@@ -146,6 +146,10 @@ TAG_AND_DOT_PART_RE = rf"{TAG_PART_RE}|{SPLITTER_DOT_RE}"
 # leave the space where it is.
 TAG_AND_BARE_DOT_PART_RE = rf"{TAG_PART_RE}|・"
 TAG_AND_SPACE_PART_RE = rf"{TAG_PART_RE}|\s+|{SPLITTER_DOT_RE}"
+# A reading in brackets is not text the word occurs in, so the mecab path stores it away with
+# the tags instead of letting MeCab read it as part of the sentence and highlight inside it.
+FURIGANA_PART_RE = r"\[[^\]]*\]"
+TAG_SPACE_AND_FURIGANA_PART_RE = rf"{TAG_PART_RE}|\s+|{SPLITTER_DOT_RE}|{FURIGANA_PART_RE}"
 
 
 def use_tag_cleaning_with_b_insertion(

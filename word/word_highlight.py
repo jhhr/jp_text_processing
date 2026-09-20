@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 
 from ..all_types.main_types import OkuriResults
 from ..kana.kana_highlight import WithTagsDef, kana_highlight
@@ -11,6 +12,7 @@ from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
 from .use_tag_cleaning import (
+    FURIGANA_PART_RE,
     TAG_AND_BARE_DOT_PART_RE,
     TAG_AND_DOT_PART_RE,
     use_tag_cleaning_with_b_insertion,
@@ -51,6 +53,19 @@ def replace_hiragana_in_pattern(text: str) -> str:
         return rf"(?:{char}|{katakana_char})"
 
     return re.sub(r"[ぁ-ん]", replace_hiragana, text)
+
+
+def sub_outside_furigana(pattern: str, repl: Callable[[re.Match], str], text: str) -> str:
+    """Substitute in what the text says, leaving the readings in its brackets alone.
+
+    A reading inside [...] is not the word occurring in the text, so a kana word must not
+    match one.
+    """
+    # re.split leaves the brackets it split on at the odd indexes
+    parts = re.split(rf"({FURIGANA_PART_RE})", text)
+    return "".join(
+        part if idx % 2 else re.sub(pattern, repl, part) for idx, part in enumerate(parts)
+    )
 
 
 def make_word_pattern(word: str) -> str:
@@ -247,7 +262,7 @@ def word_highlight(text: str, word: str) -> str:
         def replace_match(match: re.Match) -> str:
             return f"<b>{match.group(0)}</b>"
 
-        result = re.sub(pattern, replace_match, text)
+        result = sub_outside_furigana(pattern, replace_match, text)
 
         if result != text:
             # If that worked, return the result

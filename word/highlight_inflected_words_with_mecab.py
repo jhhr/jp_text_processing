@@ -21,7 +21,10 @@ from ..okuri.okurigana_dict import (
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
 from ..utils.logger import package_logger as logger
-from .use_tag_cleaning import TAG_AND_SPACE_PART_RE, use_tag_cleaning_with_b_insertion
+from .use_tag_cleaning import (
+    TAG_SPACE_AND_FURIGANA_PART_RE,
+    use_tag_cleaning_with_b_insertion,
+)
 
 
 def walk_okurigana_progression(
@@ -139,9 +142,10 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         return okurigana_len
 
     # Clean the html tags from the text temporarily, and the whitespace with them as mecab wipes
-    # that out as well
+    # that out as well. The furigana brackets go with them: a reading is not the word occurring
+    # in the text, so MeCab must not read one as a word of the sentence.
     html_and_space_free_text, increment_indexes_for_b, restore_tags_and_spaces, _ = (
-        use_tag_cleaning_with_b_insertion(text, part_regex=TAG_AND_SPACE_PART_RE)
+        use_tag_cleaning_with_b_insertion(text, part_regex=TAG_SPACE_AND_FURIGANA_PART_RE)
     )
 
     all_tokens: list[MecabParsedToken] = list(mecab.translate(html_and_space_free_text))
