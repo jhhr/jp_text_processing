@@ -267,14 +267,14 @@ def find_first_complete_alignment(
             if match_info:
                 # For repeater, check if second occurrence has rendaku
                 if next_kanji_is_repeater:
-                    first_mora = "".join(mora_split[i])
-                    # A split can come back with fewer parts than the word has kanji, so the
-                    # repeater's mora is guarded the same way repeater_mora_sequence is above
+                    # A split can come back with fewer parts than the word has kanji, so both
+                    # mora are guarded the same way repeater_mora_sequence is above
+                    first_mora = "".join(mora_split[i]) if i < len(mora_split) else ""
                     second_mora = "".join(mora_split[i + 1]) if (i + 1) < len(mora_split) else ""
 
                     # Check for rendaku in second occurrence: the same reading again, but voiced,
-                    # the way 国々 reads くに+ぐに.
-                    rendaku_matched = any(
+                    # the way 国々 reads くに+ぐに. An empty chunk leaves nothing to voice.
+                    rendaku_matched = bool(first_mora) and any(
                         second_mora.startswith(rendaku_kana + first_mora[1:])
                         for rendaku_kana in RENDAKU_CONVERSION_DICT_HIRAGANA.get(first_mora[0], [])
                     )
