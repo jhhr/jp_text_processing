@@ -15,12 +15,27 @@ Add `--log-cli-level=debug` to that to see everything the case logged; pytest ca
 package logger on its own, so nothing here has to turn logging on, and it prints the
 expected/got diff itself. A case known to fail is written
 `pytest.param(..., marks=pytest.mark.xfail(reason="why"))`; none carries one at the moment.
+
+A case that pins a performance fix carries `pytest.mark.timed(max_ms=...)` among its marks and
+fails when one of its modes runs over the budget; see conftest.py. The run lists their times at
+the end. The module brings mecab up once before its first case, so that its first-use cost is
+charged to setup rather than to a timed case.
 """
 
 import pytest
 
 from ..all_types.main_types import WithTagsDef
 from .kana_highlight import FuriReconstruct, kana_highlight
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mecab_warm() -> None:
+    """Bring mecab up before the first case runs, so that its first-use cost is not on a timed
+    case's clock; a fixture is not timed, the case's own call is. Reading the okurigana off a
+    word is what asks mecab, so one such word does it. (pytest.param cannot carry usefixtures,
+    which is why this is autouse for the module rather than requested by the timed cases.)"""
+    kana_highlight(None, "食[た]べる", "furigana")
+
 
 # (mode id, return type, with_tags, merge_consecutive). The mode id is the key a case's
 # expectations are stored under.
@@ -5288,6 +5303,158 @@ CASES = [
             "kana_only merged": "<on>キャッ</on>て",
         },
         id="small kana of a palatalized mora is not a lone one",
+    ),
+    # --- degenerate input ------------------------------------------------------------------
+    # 人々々 is not a word: a 々 can only repeat the kanji before it, and the one before this
+    # one is itself a 々. The policy for input like it is that it comes out in some sensible way
+    # and never crashes; what that way is, this case only records. The first pair reads as
+    # 人々 and the third 々 is left with the rest, and asking mecab for its okurigana used to
+    # fail on it having no jukujikun reading of its own to combine with the pair's.
+    pytest.param(
+        None,
+        "人々々[ひとびとと]しい",
+        True,
+        {
+            "furigana": " 人々々[ひとびとと]しい",
+            "furikanji": " ひとびとと[人々々]しい",
+            "kana_only": "ひとびととしい",
+            "furigana split": "<kun> 人々[ひとびと]</kun><juk> 々[と]</juk>しい",
+            "furigana merged": "<kun> 人々[ひとびと]</kun><juk> 々[と]</juk>しい",
+            "furikanji split": "<kun> ひとびと[人々]</kun><juk> と[々]</juk>しい",
+            "furikanji merged": "<kun> ひとびと[人々]</kun><juk> と[々]</juk>しい",
+            "kana_only split": "<kun>ひとびと</kun><juk>と</juk>しい",
+            "kana_only merged": "<kun>ひとびと</kun><juk>と</juk>しい",
+        },
+        id="a 々 after a 々 pair does not crash",
+    ),
+    # --- the alignment search's cost -----------------------------------------------------
+    # These inputs pin the search's speed rather than anything about its output: every kanji
+    # reads by onyomi and the alignment is the obvious one. What made them slow was the number
+    # of ways to split the reading, C(mora-1, kanji-1) of them - 2 588 for eleven kanji over
+    # sixteen mora - each walked in full before the next was tried, so a long word took a
+    # second, the okurigana after it made every split test both readings of the last kanji, and
+    # a reading that matched nothing walked the whole space and then retried it. A word that
+    # opens with kana is aligned once more for each spelling of its reading on top. The search
+    # is a dynamic program now and each is a few milliseconds; the budget is loose enough for a
+    # slow machine and a mecab lookup on first use, and an order of magnitude under the old cost.
+    pytest.param(
+        "許",
+        "東京特許許可局[とうきょうとっきょきょかきょく]",
+        True,
+        {
+            "furigana": " 東京特[トウキョウトッ]<b> 許許[キョキョ]</b> 可局[カキョク]",
+            "furikanji": " トウキョウトッ[東京特]<b> キョキョ[許許]</b> カキョク[可局]",
+            "kana_only": "トウキョウトッ<b>キョキョ</b>カキョク",
+            "furigana split": "<on> 東[トウ]</on><on> 京[キョウ]</on><on> 特[トッ]</on><b><on> 許[キョ]</on>"
+            "<on> 許[キョ]</on></b><on> 可[カ]</on><on> 局[キョク]</on>",
+            "furigana merged": "<on> 東京特[トウキョウトッ]</on><b><on> 許許[キョキョ]</on></b>"
+            "<on> 可局[カキョク]</on>",
+            "furikanji split": "<on> トウ[東]</on><on> キョウ[京]</on><on> トッ[特]</on><b><on> キョ[許]</on>"
+            "<on> キョ[許]</on></b><on> カ[可]</on><on> キョク[局]</on>",
+            "furikanji merged": "<on> トウキョウトッ[東京特]</on><b><on> キョキョ[許許]</on></b>"
+            "<on> カキョク[可局]</on>",
+            "kana_only split": "<on>トウ</on><on>キョウ</on><on>トッ</on><b><on>キョ</on><on>キョ</on></b>"
+            "<on>カ</on><on>キョク</on>",
+            "kana_only merged": "<on>トウキョウトッ</on><b><on>キョキョ</on></b><on>カキョク</on>",
+        },
+        marks=pytest.mark.timed(max_ms=200),
+        id="search cost: seven kanji, twelve mora",
+    ),
+    pytest.param(
+        None,
+        "ご協力者募集中[ごきょうりょくしゃぼしゅうちゅう]",
+        True,
+        {
+            "furigana": "ご 協力者募集中[キョウリョクシャボシュウチュウ]",
+            "furikanji": "ご キョウリョクシャボシュウチュウ[協力者募集中]",
+            "kana_only": "ごキョウリョクシャボシュウチュウ",
+            "furigana split": "ご<on> 協[キョウ]</on><on> 力[リョク]</on><on> 者[シャ]</on><on> 募[ボ]</on>"
+            "<on> 集[シュウ]</on><on> 中[チュウ]</on>",
+            "furigana merged": "ご<on> 協力者募集中[キョウリョクシャボシュウチュウ]</on>",
+            "furikanji split": "ご<on> キョウ[協]</on><on> リョク[力]</on><on> シャ[者]</on><on> ボ[募]</on>"
+            "<on> シュウ[集]</on><on> チュウ[中]</on>",
+            "furikanji merged": "ご<on> キョウリョクシャボシュウチュウ[協力者募集中]</on>",
+            "kana_only split": "ご<on>キョウ</on><on>リョク</on><on>シャ</on><on>ボ</on><on>シュウ</on>"
+            "<on>チュウ</on>",
+            "kana_only merged": "ご<on>キョウリョクシャボシュウチュウ</on>",
+        },
+        marks=pytest.mark.timed(max_ms=200),
+        id="search cost: six kanji behind a kana prefix",
+    ),
+    pytest.param(
+        "安",
+        "国際連合安全保障理事会[こくさいれんごうあんぜんほしょうりじかい]",
+        True,
+        {
+            "furigana": " 国際連合[コクサイレンゴウ]<b> 安[アン]</b> 全保障理事会[ゼンホショウリジカイ]",
+            "furikanji": " コクサイレンゴウ[国際連合]<b> アン[安]</b> ゼンホショウリジカイ[全保障理事会]",
+            "kana_only": "コクサイレンゴウ<b>アン</b>ゼンホショウリジカイ",
+            "furigana split": "<on> 国[コク]</on><on> 際[サイ]</on><on> 連[レン]</on><on> 合[ゴウ]</on>"
+            "<b><on> 安[アン]</on></b><on> 全[ゼン]</on><on> 保[ホ]</on><on> 障[ショウ]</on><on> 理[リ]</on>"
+            "<on> 事[ジ]</on><on> 会[カイ]</on>",
+            "furigana merged": "<on> 国際連合[コクサイレンゴウ]</on><b><on> 安[アン]</on></b>"
+            "<on> 全保障理事会[ゼンホショウリジカイ]</on>",
+            "furikanji split": "<on> コク[国]</on><on> サイ[際]</on><on> レン[連]</on><on> ゴウ[合]</on>"
+            "<b><on> アン[安]</on></b><on> ゼン[全]</on><on> ホ[保]</on><on> ショウ[障]</on><on> リ[理]</on>"
+            "<on> ジ[事]</on><on> カイ[会]</on>",
+            "furikanji merged": "<on> コクサイレンゴウ[国際連合]</on><b><on> アン[安]</on></b>"
+            "<on> ゼンホショウリジカイ[全保障理事会]</on>",
+            "kana_only split": "<on>コク</on><on>サイ</on><on>レン</on><on>ゴウ</on><b><on>アン</on></b>"
+            "<on>ゼン</on><on>ホ</on><on>ショウ</on><on>リ</on><on>ジ</on><on>カイ</on>",
+            "kana_only merged": "<on>コクサイレンゴウ</on><b><on>アン</on></b><on>ゼンホショウリジカイ</on>",
+        },
+        marks=pytest.mark.timed(max_ms=200),
+        id="search cost: eleven kanji, sixteen mora",
+    ),
+    pytest.param(
+        None,
+        "国際連合安全保障理事会[こくさいれんごうあんぜんほしょうりじかい]する",
+        True,
+        {
+            "furigana": " 国際連合安全保障理事会[コクサイレンゴウアンゼンホショウリジカイ]する",
+            "furikanji": " コクサイレンゴウアンゼンホショウリジカイ[国際連合安全保障理事会]する",
+            "kana_only": "コクサイレンゴウアンゼンホショウリジカイする",
+            "furigana split": "<on> 国[コク]</on><on> 際[サイ]</on><on> 連[レン]</on><on> 合[ゴウ]</on>"
+            "<on> 安[アン]</on><on> 全[ゼン]</on><on> 保[ホ]</on><on> 障[ショウ]</on><on> 理[リ]</on>"
+            "<on> 事[ジ]</on><on> 会[カイ]</on><oku>する</oku>",
+            "furigana merged": "<on> 国際連合安全保障理事会[コクサイレンゴウアンゼンホショウリジカイ]</on>"
+            "<oku>する</oku>",
+            "furikanji split": "<on> コク[国]</on><on> サイ[際]</on><on> レン[連]</on><on> ゴウ[合]</on>"
+            "<on> アン[安]</on><on> ゼン[全]</on><on> ホ[保]</on><on> ショウ[障]</on><on> リ[理]</on>"
+            "<on> ジ[事]</on><on> カイ[会]</on><oku>する</oku>",
+            "furikanji merged": "<on> コクサイレンゴウアンゼンホショウリジカイ[国際連合安全保障理事会]</on>"
+            "<oku>する</oku>",
+            "kana_only split": "<on>コク</on><on>サイ</on><on>レン</on><on>ゴウ</on><on>アン</on><on>ゼン</on>"
+            "<on>ホ</on><on>ショウ</on><on>リ</on><on>ジ</on><on>カイ</on><oku>する</oku>",
+            "kana_only merged": "<on>コクサイレンゴウアンゼンホショウリジカイ</on><oku>する</oku>",
+        },
+        marks=pytest.mark.timed(max_ms=200),
+        id="search cost: eleven kanji with okurigana after them",
+    ),
+    pytest.param(
+        None,
+        "国際連合安全保障理事会[ぱぴぷぺぽぱぴぷぺぽぱぴぷぺぽぱ]",
+        True,
+        {
+            "furigana": " 国際連合安全保障理事会[ぱぴぷぺぽぱぴぷぺポぱぴぷぺぽぱ]",
+            "furikanji": " ぱぴぷぺぽぱぴぷぺポぱぴぷぺぽぱ[国際連合安全保障理事会]",
+            "kana_only": "ぱぴぷぺぽぱぴぷぺポぱぴぷぺぽぱ",
+            "furigana split": "<juk> 国[ぱぴ]</juk><juk> 際[ぷぺ]</juk><juk> 連[ぽぱ]</juk><juk> 合[ぴ]</juk>"
+            "<juk> 安[ぷ]</juk><juk> 全[ぺ]</juk><on> 保[ポ]</on><juk> 障[ぱぴ]</juk><juk> 理[ぷぺ]</juk>"
+            "<juk> 事[ぽ]</juk><juk> 会[ぱ]</juk>",
+            "furigana merged": "<juk> 国際連合安全[ぱぴぷぺぽぱぴぷぺ]</juk><on> 保[ポ]</on>"
+            "<juk> 障理事会[ぱぴぷぺぽぱ]</juk>",
+            "furikanji split": "<juk> ぱぴ[国]</juk><juk> ぷぺ[際]</juk><juk> ぽぱ[連]</juk><juk> ぴ[合]</juk>"
+            "<juk> ぷ[安]</juk><juk> ぺ[全]</juk><on> ポ[保]</on><juk> ぱぴ[障]</juk><juk> ぷぺ[理]</juk>"
+            "<juk> ぽ[事]</juk><juk> ぱ[会]</juk>",
+            "furikanji merged": "<juk> ぱぴぷぺぽぱぴぷぺ[国際連合安全]</juk><on> ポ[保]</on>"
+            "<juk> ぱぴぷぺぽぱ[障理事会]</juk>",
+            "kana_only split": "<juk>ぱぴ</juk><juk>ぷぺ</juk><juk>ぽぱ</juk><juk>ぴ</juk><juk>ぷ</juk>"
+            "<juk>ぺ</juk><on>ポ</on><juk>ぱぴ</juk><juk>ぷぺ</juk><juk>ぽ</juk><juk>ぱ</juk>",
+            "kana_only merged": "<juk>ぱぴぷぺぽぱぴぷぺ</juk><on>ポ</on><juk>ぱぴぷぺぽぱ</juk>",
+        },
+        marks=pytest.mark.timed(max_ms=200),
+        id="search cost: eleven kanji and a reading none of them has",
     ),
 ]
 

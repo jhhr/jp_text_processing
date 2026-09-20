@@ -295,8 +295,15 @@ def process_jukujikun_positions(
         if last_kanji == "々" and last_kanji_index > 0:
             # Combine with previous kanji for okurigana extraction
             last_kanji = word[last_kanji_index - 1] + "々"
-            # Combine reading also
-            juku_reading = jukujikun_parts[last_kanji_index - 1]["furigana"] + juku_reading
+            # Combine reading also. The kanji before a jukujikun 々 is normally jukujikun with
+            # it, but in a run of 々 (人々々, not a word) it can be the matched second of the pair
+            # before, whose reading then comes from its match; a word must not crash on it.
+            previous_part = jukujikun_parts.get(last_kanji_index - 1)
+            previous_match = alignment["kanji_matches"][last_kanji_index - 1]
+            if previous_part is not None:
+                juku_reading = previous_part["furigana"] + juku_reading
+            elif previous_match is not None:
+                juku_reading = previous_match["matched_mora"] + juku_reading
 
         # Use mecab to extract okurigana
         logger.debug(
