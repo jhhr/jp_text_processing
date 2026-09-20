@@ -626,6 +626,54 @@ CASES = [
         id="Kana only - stem parsed as a noun, conjugation at the end of the text",
     ),
     pytest.param(
+        "それはバズられたね",
+        "バズる",
+        "それは<b>バズられた</b>ね",
+        id="Kana only - stem parsed as a noun, passive read as a verb of its own",
+    ),
+    pytest.param(
+        "それはバズったね",
+        "バズり",
+        "それは<b>バズった</b>ね",
+        id="Kana only - stem parsed as a noun, word given in noun form",
+    ),
+    pytest.param(
+        "それはバズがすごいね",
+        "バズる",
+        "それはバズがすごいね",
+        id="Kana only - a particle after the stem is not a conjugation",
+    ),
+    pytest.param(
+        "それはバズらしいね",
+        "バズる",
+        "それはバズらしいね",
+        id="Kana only - a non-verb auxiliary after the stem is not a conjugation",
+    ),
+    pytest.param(
+        "きのうサボった",
+        "サボる",
+        "きのう<b>サボった</b>",
+        id="Kana only - katakana-stem verb MeCab knows",
+    ),
+    pytest.param(
+        "かれはサボっているよ",
+        "サボる",
+        "かれは<b>サボっている</b>よ",
+        id="Kana only - katakana-stem verb MeCab knows, conjugation spanning several tokens",
+    ),
+    pytest.param(
+        "サボらないでよ",
+        "サボる",
+        "<b>サボらないで</b>よ",
+        id="Kana only - katakana-stem verb MeCab knows, negative form",
+    ),
+    pytest.param(
+        "はしがある",
+        "はしる",
+        "はしがある",
+        id="Kana only - noun spelling the word's stem is not the word /3",
+    ),
+    pytest.param(
         (
             "<div>「でも 魔王[まおう] 城[じょう]の 辺[あた]りって<k> 滅茶苦茶[めちゃくちゃ]</k>"
             " 寒[さむ]いんだよね。 行[い]きたくないなぁ…。"

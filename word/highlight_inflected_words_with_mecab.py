@@ -45,25 +45,25 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
     # Determine the word type from the base form word
     word_type: Optional[MecabWordType] = None
     base_form_word_ending = to_hiragana(base_form_word[-1])
+    word_stem = base_form_word[:-1]
+    if not word_stem:
+        # A one-character word has no stem to inflect and the verbatim search already failed
+        return text
     possible_parts_of_speech: list[PartOfSpeech] = []
     # Check if the last character is in the conjugatable okuri list
     if base_form_word_ending in CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH:
         possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH[base_form_word_ending]
     elif base_form_word_ending in GODAN_FORM_VERB_STARTINGS:
-        # Or, if it's a godan verb in noun form, convert to dictionary form
+        # Or, if it's a godan verb in noun form, convert to dictionary form, so that
+        # token.headword can match it. Only here is the word rebuilt: a dictionary form is
+        # already what MeCab spells as the headword, katakana stem and all (サボる).
         base_form_word_ending = GODAN_FORM_VERB_STARTINGS[base_form_word_ending]
         possible_parts_of_speech = CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH.get(
             base_form_word_ending, []
         )
-
-    word_stem = base_form_word[:-1]
-    if not word_stem:
-        # A one-character word has no stem to inflect and the verbatim search already failed
-        return text
-    # Set noun form verbs to basic verb from, so that token.headword can match them
-    if is_katakana_str(word_stem):
-        base_form_word_ending = to_katakana(base_form_word_ending)
-    base_form_word = word_stem + base_form_word_ending
+        if is_katakana_str(word_stem):
+            base_form_word_ending = to_katakana(base_form_word_ending)
+        base_form_word = word_stem + base_form_word_ending
     for pos in possible_parts_of_speech:
         if pos.startswith("v"):
             word_type = "verb"
@@ -102,6 +102,18 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
                     break
                 if progression.get("is_last"):
                     okurigana_len = max(okurigana_len, char_index + 1)
+        if not okurigana_len and index + 1 < len(tokens):
+            # MeCab can also read the conjugation as a verb of its own (バズ/られ/た, where
+            # られ is the verb られる), leaving the progression nothing to walk. An auxiliary
+            # verb that counts as this word's conjugated okurigana is the same evidence that
+            # the stem is the word's - and only a verb is: バズらしい is the noun plus らしい.
+            # The tokens after it are checked the usual way as the highlight goes on.
+            next_token = tokens[index + 1]
+            if (
+                get_word_type_from_mecab_token(next_token) == "verb"
+                and get_all_conjugation_conditions(next_token, tokens, word_type)[0]
+            ):
+                okurigana_len = len(next_token.word)
         return okurigana_len
 
     # Store indexes of all whitespace as mecab wipes them out
