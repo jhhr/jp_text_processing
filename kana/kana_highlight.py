@@ -502,13 +502,6 @@ def kana_highlight(
     return_type: FuriReconstruct = "kana_only",
     with_tags_def: Optional[WithTagsDef] = None,
 ) -> str:
-    if with_tags_def is None:
-        with_tags_def = WithTagsDef(
-            True,  # with_tags
-            True,  # merge_consecutive
-            True,  # onyomi_to_katakana
-            False,  # include_suru_okuri
-        )
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
     onyomi or kunyomi reading. The furigana is then highlighted with<b> tags.
@@ -524,6 +517,13 @@ def kana_highlight(
         kanji_to_highlight. Any<b> tags the text already carries are left as they are: the caller
         either supplies text without<b> around the word to highlight, or accepts the nesting
     """
+    if with_tags_def is None:
+        with_tags_def = WithTagsDef(
+            True,  # with_tags
+            True,  # merge_consecutive
+            True,  # onyomi_to_katakana
+            False,  # include_suru_okuri
+        )
 
     def furigana_replacer(match: re.Match):
         """
@@ -694,7 +694,7 @@ def kana_highlight(
 
         if is_whole_word_case:
             possible_whole_word_splits, katakana_positions, long_vowel_positions = (
-                whole_word_mora_split(full_word, full_furigana)
+                whole_word_mora_split(alignment_word, full_furigana)
             )
             logger.debug(
                 "furigana_replacer - whole_word_case possible_splits: %s, katakana_positions: %s,"

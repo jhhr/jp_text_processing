@@ -30,7 +30,6 @@ def check_okurigana_for_inflection(
     """
     # Kana text occurring after the kanji in the word, may not be okurigana and can
     # contain other kana after the okurigana
-    maybe_okuri
     logger.debug(
         "check okurigana 0 - reading_okurigana: %s, maybe_okuri: %s, reading: %s, part_of_speech:"
         " %s",

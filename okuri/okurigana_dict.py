@@ -1442,7 +1442,7 @@ ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] 
     (48, "せたり", "さ"),
     (48, "せます", "さ"),
     (48, "せました", "さ"),
-    (48, "せまましたら", "さ"),
+    (48, "せましたら", "さ"),
     (48, "せましたり", "さ"),
     (48, "します", "さ"),
     (48, "したい", "さ"),
@@ -1501,7 +1501,6 @@ for item in ALL_OKURI_BY_PART_OF_SPEECH:
     else:
         pos_num, okuri = item
         euph = ""
-    # Get part of speech string id
     # Get part of speech string id
     pos_id, pos_desc = PART_OF_SPEECH_NUM[pos_num]
     if pos_id not in POSSIBLE_OKURIGANA_PROGRESSION_DICT:

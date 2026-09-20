@@ -180,7 +180,6 @@ def process_jukujikun_positions(
         in place: a furigana exception may add positions to ``jukujikun_positions``, and
         ``recut_mora_around_exceptions`` rewrites ``mora_split``. The caller reads both again
         after this returns.
-    :param with_tags: Whether to wrap jukujikun portions in <juk> tags
     :param remaining_kana: The kana following the word (for okurigana extraction)
     :return: Tuple of (jukujikun_parts_dict, okurigana, rest_kana)
              jukujikun_parts_dict maps kanji_index → WrapMatchEntry describing the mora

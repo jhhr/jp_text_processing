@@ -679,5 +679,3 @@ def word_highlight(text: str, word: str) -> str:
         # Remove space from beginning as it's not required
         result = re.sub(r"^(<b>)? ", r"\1", result)
         return result
-
-    return text

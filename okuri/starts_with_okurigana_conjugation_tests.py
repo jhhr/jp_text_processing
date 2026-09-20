@@ -144,6 +144,14 @@ CASES = [
         ("たい", "", "full_okuri", "v1"),
         id="見[み]る + たい",
     ),
+    pytest.param(
+        "った",
+        "る",
+        "去",
+        "さ",
+        ("った", "", "full_okuri", "v5r"),
+        id="去[さ]る + った",
+    ),
     # empty okuri tests
     pytest.param(
         # 恥[は]ずかしげな is an i-adjective, not na-adjective!
@@ -172,15 +180,6 @@ CASES = [
         "よ",
         ("", "こむ", "no_okuri", None),
         id="読[よ]む + こむ",
-    ),
-    # partial okuri tests
-    pytest.param(
-        "った",
-        "る",
-        "去",
-        "さ",
-        ("った", "", "full_okuri", "v5r"),
-        id="去[さ]る + った",
     ),
 ]
 

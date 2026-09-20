@@ -4,7 +4,7 @@ import re
 # ideographs and their extension A there are 〆 and 〇, which are written as part of a word
 # (〆切, 四〇三), the compatibility ideographs, and the supplementary planes from extension B
 # on. Python's re takes those last ones in a character class as they are.
-KANJI_RANGES = "\u3006\u3007\u4e00-\u9faf\u3400-\u4dbf\uf900-\ufaff\U00020000-\U0002fa1f"
+KANJI_RANGES = "\u3006\u3007\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\U00020000-\U0002fa1f"
 
 # Regex matching any kanji characters or other characters to be treated as kanji, including
 # - the counter characters ヶ and ヵ which are just small katakana

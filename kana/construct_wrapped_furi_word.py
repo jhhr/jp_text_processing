@@ -223,10 +223,7 @@ def construct_wrapped_furi_word(
             base = f"{kana}"
 
         if with_tags:
-            if return_type == "kana_only":
-                with_furi = f"<{tag}>{base}</{tag}>"
-            else:
-                with_furi = f"<{tag}>{base}</{tag}>"
+            with_furi = f"<{tag}>{base}</{tag}>"
         else:
             with_furi = base
 
