@@ -726,6 +726,39 @@ CASES = [
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに<b> 総[そう]勃ち</b> だよ",
         id="Shouldn't crash with mixture of furigana and non-furigana in word",
     ),
+    # An Anki word field often has no furigana where the sentence field does, or the other way
+    # round. The highlight then covers the same occurrence as it would if both agreed, brackets
+    # and all, instead of closing between a kanji and its reading.
+    pytest.param(
+        "私は 日本語[にほんご]を",
+        "日本語",
+        "私は<b> 日本語[にほんご]</b>を",
+        id="Furigana mismatch - word written without the furigana the text has",
+    ),
+    pytest.param(
+        "食[た]べた",
+        "食べる",
+        "<b>食[た]べた</b>",
+        id="Furigana mismatch - word written without the furigana the text has, inflected",
+    ),
+    pytest.param(
+        "食べた",
+        "食[た]べる",
+        "<b>食べた</b>",
+        id="Furigana mismatch - text written without the furigana the word has, inflected",
+    ),
+    pytest.param(
+        "食[た]べた",
+        "食[た]べる",
+        "<b>食[た]べた</b>",
+        id="Furigana mismatch - neither side is missing furigana, inflected",
+    ),
+    pytest.param(
+        "その 人[ひと]が",
+        "人[じん]",
+        "その 人[ひと]が",
+        id="Furigana mismatch - a reading the word disagrees with is still not the word",
+    ),
     # The caller's own html around the word: the highlight goes inside the element when the
     # element holds the whole word, and around it when the word runs past the element's edge.
     pytest.param(

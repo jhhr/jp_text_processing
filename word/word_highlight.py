@@ -26,6 +26,12 @@ CONSECUTIVE_FURI_WORD_RE = (
     rf" ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])"
 )
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
+KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
+# The text can carry furigana the word was written without (an Anki word field often has none
+# where the sentence field does). A kanji run the word gives no reading for matches one that
+# has a bracket too, so the bracket stays inside the highlight instead of being cut off from
+# the kanji it belongs to.
+MAYBE_FURIGANA_RE = r"(?:\[[^\]]*\])?"
 
 
 def replace_hiragana_in_pattern(text: str) -> str:
@@ -39,12 +45,33 @@ def replace_hiragana_in_pattern(text: str) -> str:
 
 
 def make_word_pattern(word: str) -> str:
+    """Create a regex pattern matching the word, with or without the text's furigana.
+
+    A kanji run the word already gives a reading for is matched as written; one it does not
+    also matches the reading the text has for it, together with the space furigana syntax
+    puts before the kanji.
+    """
     # Remove first space
     word = re.sub(r"^ ", "", word)
-    # Escape the word for regex special characters
-    escaped_word = re.escape(word)
-    escaped_word = replace_hiragana_in_pattern(escaped_word)
-    return rf"\s?{escaped_word}"
+    pattern_parts: list[str] = [r"\s?"]
+    cursor = 0
+    for match in re.finditer(KANJI_RUN_AND_MAYBE_FURIGANA_RE, word):
+        literal_prefix = word[cursor : match.start()]
+        if literal_prefix:
+            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            pattern_parts.append(r"\s?")
+        kanji, kanji_furigana = match.group(1), match.group(2)
+        pattern_parts.append(re.escape(kanji))
+        pattern_parts.append(
+            replace_hiragana_in_pattern(re.escape(kanji_furigana))
+            if kanji_furigana
+            else MAYBE_FURIGANA_RE
+        )
+        cursor = match.end()
+    literal_suffix = word[cursor:]
+    if literal_suffix:
+        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+    return "".join(pattern_parts)
 
 
 def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
@@ -53,6 +80,9 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
     The generated pattern keeps kanji and separators strict, but allows the furigana
     inside brackets to vary. Captured furigana values can then be validated via
     check_reading_match (rendaku/small-tsu/vowel-change, etc.).
+
+    A text written without furigana has neither the brackets nor the space before a kanji, so
+    both are optional; a bracket that is there still has to agree with the word's reading.
     """
     word = re.sub(r"^ ", "", word)
     expected_readings: list[str] = []
@@ -61,10 +91,14 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
     for idx, match in enumerate(re.finditer(FURIGANA_TOKEN_RE, word)):
         literal_prefix = word[cursor : match.start()]
         if literal_prefix:
-            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            without_space = literal_prefix.rstrip(" ")
+            if without_space:
+                pattern_parts.append(replace_hiragana_in_pattern(re.escape(without_space)))
+            if without_space != literal_prefix:
+                pattern_parts.append(r"\s?")
         kanji = match.group(1)
         expected_readings.append(to_hiragana(match.group(2)))
-        pattern_parts.append(rf"{re.escape(kanji)}\[(?P<furi_{idx}>[^\]]+)\]")
+        pattern_parts.append(rf"{re.escape(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
@@ -76,9 +110,15 @@ def furigana_captures_match_readings(
     match: re.Match,
     expected_readings: list[str],
 ) -> bool:
-    """Validate captured furigana readings against expected readings with variants."""
+    """Validate captured furigana readings against expected readings with variants.
+
+    A kanji the text gave no reading for has nothing to disagree with the word about.
+    """
     for idx, expected in enumerate(expected_readings):
-        observed = to_hiragana(match.group(f"furi_{idx}"))
+        captured = match.group(f"furi_{idx}")
+        if captured is None:
+            continue
+        observed = to_hiragana(captured)
         _, reading_match_type = check_reading_match(
             reading=expected,
             mora_string=observed,
@@ -297,7 +337,11 @@ def word_highlight(text: str, word: str) -> str:
             nonlocal b_tags_inserted
             has_variant = False
             for idx, expected in enumerate(expected_readings):
-                observed = to_hiragana(match.group(f"furi_{idx}"))
+                captured = match.group(f"furi_{idx}")
+                if captured is None:
+                    # No furigana in the text for this kanji, so nothing to disagree about
+                    continue
+                observed = to_hiragana(captured)
                 _, reading_match_type = check_reading_match(
                     reading=expected,
                     mora_string=observed,
@@ -461,7 +505,7 @@ def word_highlight(text: str, word: str) -> str:
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
         if last_kanji:
-            pattern += rf"{last_kanji}{repeater}\[(?P<furigana>[^\]]+)\]"
+            pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 
@@ -481,7 +525,9 @@ def word_highlight(text: str, word: str) -> str:
             # the ending_okurigana
             # Find the position of the last kanji in the matched text
             matched_text = html_free_text[m.start(0) : m.end(0)]
-            furigana = m.group("furigana")
+            # Where the text writes the last kanji without furigana, the word's own
+            # reading for it is the one to inflect with
+            furigana = m.group("furigana") or last_kanji_furigana
             maybe_okuri = m.group("maybe_okuri")
             reading_match_type = "plain"
             if last_kanji and furigana:
