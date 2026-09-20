@@ -43,7 +43,9 @@ EMPTY_PAIR = r"<([a-zA-Z][^\s/>]*)[^>]*></\1>"
 UNPAIRED_TAGS = {"br", "hr", "img", "wbr", "b"}
 
 
-def crossed_tags(text: str, b_open: int, b_close: int) -> tuple[list[str], list[str]]:
+def crossed_tags(
+    text: str, b_open: int, b_close: int
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """
     Find the tags that a <b>...</b> span crosses instead of enclosing.
 
@@ -55,20 +57,45 @@ def crossed_tags(text: str, b_open: int, b_close: int) -> tuple[list[str], list[
         A tuple of:
             - the tags opened inside the span and closed after it, outermost first
             - the tags opened before the span and closed inside it, innermost first
+        each as (name, opening tag as written), so a reopened tag keeps its attributes. A tag
+        closed inside the span whose opening isn't found before it gets a bare opening tag.
     """
-    opened: list[str] = []
+    opened: list[tuple[str, str]] = []
     closed_from_before: list[str] = []
     for m in TAG_RE.finditer(text, b_open + len("<b>"), b_close):
         tag = m.group(2)
         if tag in UNPAIRED_TAGS:
             continue
         if not m.group(1):
-            opened.append(tag)
-        elif opened and opened[-1] == tag:
+            opened.append((tag, m.group(0)))
+        elif opened and opened[-1][0] == tag:
             opened.pop()
         else:
             closed_from_before.append(tag)
-    return opened, closed_from_before
+    if not closed_from_before:
+        return opened, []
+    # The tags still open where the span starts, innermost last
+    open_before: list[tuple[str, str]] = []
+    for m in TAG_RE.finditer(text, 0, b_open):
+        tag = m.group(2)
+        if tag in UNPAIRED_TAGS:
+            continue
+        if not m.group(1):
+            open_before.append((tag, m.group(0)))
+        else:
+            remove_innermost(open_before, tag)
+    closed_from_before_as_written: list[tuple[str, str]] = []
+    for tag in closed_from_before:
+        closed_from_before_as_written.append(remove_innermost(open_before, tag) or (tag, f"<{tag}>"))
+    return opened, closed_from_before_as_written
+
+
+def remove_innermost(open_tags: list[tuple[str, str]], tag: str) -> tuple[str, str] | None:
+    """Remove and return the last entry for the tag name, the one a closing tag closes."""
+    for idx in range(len(open_tags) - 1, -1, -1):
+        if open_tags[idx][0] == tag:
+            return open_tags.pop(idx)
+    return None
 
 
 def balance_b_tags(text: str) -> str:
@@ -76,6 +103,7 @@ def balance_b_tags(text: str) -> str:
     Close and reopen the tags that a <b>...</b> crosses, which the reorderings in
     apply_tag_fixes can only do when the tag sits right next to a b tag:
     '<b><k>A</k>を<k>B</b>C</k>' becomes '<b><k>A</k>を<k>B</k></b><k>C</k>'.
+    A reopened tag keeps its attributes.
 
     Args:
         text: The text after restoring tags.
@@ -89,18 +117,22 @@ def balance_b_tags(text: str) -> str:
         b_close = rest.find("</b>", b_open + 3) if b_open != -1 else -1
         if b_close == -1:
             return result + rest
-        opened, closed_from_before = crossed_tags(rest, b_open, b_close)
+        # A tag the span crosses may have been opened before an earlier span, so the whole
+        # text handled so far is in view for finding its opening
+        opened, closed_from_before = crossed_tags(
+            result + rest, len(result) + b_open, len(result) + b_close
+        )
         result += (
             rest[:b_open]
             # Tags the span started inside of are closed before it and reopened within it
-            + "".join(f"</{tag}>" for tag in closed_from_before)
+            + "".join(f"</{tag}>" for tag, _ in closed_from_before)
             + "<b>"
-            + "".join(f"<{tag}>" for tag in reversed(closed_from_before))
+            + "".join(opening for _, opening in reversed(closed_from_before))
             + rest[b_open + 3 : b_close]
             # Tags the span opened are closed within it and reopened after it
-            + "".join(f"</{tag}>" for tag in reversed(opened))
+            + "".join(f"</{tag}>" for tag, _ in reversed(opened))
             + "</b>"
-            + "".join(f"<{tag}>" for tag in opened)
+            + "".join(opening for _, opening in opened)
         )
         rest = rest[b_close + 4 :]
 

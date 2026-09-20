@@ -957,13 +957,6 @@ CASES = [
         'この<span class="x">い</span>えは',
         "いえ",
         'この<b><span class="x">い</span>え</b>は',
-        marks=pytest.mark.xfail(
-            reason=(
-                "the attributes of a tag the highlight crosses are lost when the tag is"
-                " reopened, on this path and on the mecab one alike"
-            ),
-            strict=True,
-        ),
         id="Html shape - a tag with attributes splitting a kana word is still the word",
     ),
     pytest.param(
