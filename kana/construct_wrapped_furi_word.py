@@ -81,9 +81,14 @@ def construct_wrapped_furi_word(
             ):
                 # Do not merge when switching between number blocks and regular kanji if the
                 # highlight differs (keep boundaries for targeted bolding). Otherwise allow
-                # merging so unhighlighted numeric+counter pairs combine.
-                if cur_tag_res["is_num"] != next_tag_res["is_num"] and (
-                    cur_tag_res["highlight"] or next_tag_res["highlight"]
+                # merging so unhighlighted numeric+counter pairs combine. A placeholder that
+                # expands a number is no kanji of the number's own to keep a boundary against:
+                # refusing it there left its reading in a block with no surface to render, and
+                # the highlighted 十 of 24 came out reading ニ.
+                if (
+                    cur_tag_res["is_num"] != next_tag_res["is_num"]
+                    and next_tag_res["kanji"] != ""
+                    and (cur_tag_res["highlight"] or next_tag_res["highlight"])
                 ):
                     do_merge = False
                 else:

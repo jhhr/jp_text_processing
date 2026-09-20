@@ -4290,6 +4290,60 @@ CASES = [
         },
         id="fewer mora than the digits convert into kanji",
     ),
+    # The kanji to highlight is one the digits convert into, not one the sentence writes: the run
+    # is a single chunk, so the modes that show a surface bold all of it and only the kana-only
+    # ones bold that kanji's own reading.
+    pytest.param(
+        "十",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>",
+            "kana_only": "ニ<b>ジュウ</b>よん",
+            "kana_only split": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>",
+            "kana_only merged": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>",
+        },
+        id="a highlighted kanji in the middle of a digit run",
+    ),
+    pytest.param(
+        "四",
+        "24[にじゅうよん]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>",
+            "kana_only": "ニジュウ<b>よん</b>",
+            "kana_only split": "<on>ニ</on><on>ジュウ</on><b><kun>よん</kun></b>",
+            "kana_only merged": "<on>ニジュウ</on><b><kun>よん</kun></b>",
+        },
+        id="a highlighted kanji at the end of a digit run",
+    ),
+    pytest.param(
+        "十",
+        "24[にじゅうよん]と 十[じゅう]",
+        True,
+        {
+            "furigana": "<b> 24[ニジュウよん]</b>と<b> 十[ジュウ]</b>",
+            "furigana split": "<b><mix> 24[ニジュウよん]</mix></b>と<b><on> 十[ジュウ]</on></b>",
+            "furigana merged": "<b><mix> 24[ニジュウよん]</mix></b>と<b><on> 十[ジュウ]</on></b>",
+            "furikanji": "<b> ニジュウよん[24]</b>と<b> ジュウ[十]</b>",
+            "furikanji split": "<b><mix> ニジュウよん[24]</mix></b>と<b><on> ジュウ[十]</on></b>",
+            "furikanji merged": "<b><mix> ニジュウよん[24]</mix></b>と<b><on> ジュウ[十]</on></b>",
+            "kana_only": "ニ<b>ジュウ</b>よんと <b>ジュウ</b>",
+            "kana_only split": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>と <b><on>ジュウ</on></b>",
+            "kana_only merged": "<on>ニ</on><b><on>ジュウ</on></b><kun>よん</kun>と <b><on>ジュウ</on></b>",
+        },
+        id="the same kanji inside a digit run and written out",
+    ),
     pytest.param(
         "円",
         "10000円[いちまんえん]",
@@ -4306,6 +4360,25 @@ CASES = [
             "kana_only merged": "<on>イチマン</on><b><on>エン</on></b>",
         },
         id="Myriad numbers keep the 一 - with highlight",
+    ),
+    # The 万 of 10000 has no digit of its own either, so the whole run bolds - and the run reads
+    # on all through, so it keeps its <on> where the merged modes do not force a mix.
+    pytest.param(
+        "万",
+        "10000円[いちまんえん]",
+        True,
+        {
+            "furigana": "<b> 10000[イチマン]</b> 円[エン]",
+            "furigana split": "<b><mix> 10000[イチマン]</mix></b><on> 円[エン]</on>",
+            "furigana merged": "<b><on> 10000[イチマン]</on></b><on> 円[エン]</on>",
+            "furikanji": "<b> イチマン[10000]</b> エン[円]",
+            "furikanji split": "<b><mix> イチマン[10000]</mix></b><on> エン[円]</on>",
+            "furikanji merged": "<b><on> イチマン[10000]</on></b><on> エン[円]</on>",
+            "kana_only": "イチ<b>マン</b>エン",
+            "kana_only split": "<on>イチ</on><b><on>マン</on></b><on>エン</on>",
+            "kana_only merged": "<on>イチ</on><b><on>マン</on></b><on>エン</on>",
+        },
+        id="Myriad numbers keep the 一 - the 万 highlighted inside the digits",
     ),
     pytest.param(
         "",

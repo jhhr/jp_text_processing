@@ -389,6 +389,25 @@ def reconstruct_from_alignment(
                 highlight_positions.append(end)
             start = highlight_lookup_word.find(kanji_to_highlight, end)
 
+    if reconstruct_type != "kana_only" and highlight_positions:
+        # A digit run converts into several kanji but renders as one chunk - only its first
+        # position carries the digits, the rest have no surface of their own - so a highlight on
+        # one of those kanji takes the whole run with it. Split at the kanji instead and the
+        # segment holding it has nothing to write, so its reading - and every reading after it -
+        # is dropped. The kana-only modes have no surface to keep together, so they keep the
+        # finer split.
+        digit_runs: list[list[int]] = []
+        for i, surface in enumerate(surface_slices):
+            if surface.isdigit():
+                digit_runs.append([i])
+            elif surface == "" and digit_runs and digit_runs[-1][-1] == i - 1:
+                digit_runs[-1].append(i)
+        marked = set(highlight_positions)
+        for run in digit_runs:
+            if marked.intersection(run):
+                marked.update(run)
+        highlight_positions = sorted(marked)
+
     for idx in highlight_positions:
         if idx < len(entries):
             entries[idx]["highlight"] = True
@@ -515,6 +534,13 @@ def kana_highlight(
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's
     onyomi or kunyomi reading. The furigana is then highlighted with<b> tags.
     Text received could be a sentence or a single word with furigana.
+
+    A run of digits is read as the kanji it converts into - 24 is 二十四, three readings for two
+    characters - and renders as one chunk, since its surface cannot be split per kanji. A
+    kanji_to_highlight that a run only converts into therefore bolds the whole run in the furigana
+    and furikanji modes: 十 in 24[にじゅうよん] gives<b><mix> 24[ニジュウよん]</mix></b>. The
+    kana-only modes have no surface to keep together and bold that one kanji's reading.
+
     :param kanji_to_highlight: the kanji to highlight, usually a single character but any run of
         kanji works; every occurrence of it in a word is highlighted
     :param text: The text to process
