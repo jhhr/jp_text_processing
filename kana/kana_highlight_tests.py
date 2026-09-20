@@ -16,14 +16,26 @@ package logger on its own, so nothing here has to turn logging on, and it prints
 expected/got diff itself. A case known to fail is written
 `pytest.param(..., marks=pytest.mark.xfail(reason="why"))`; none carries one at the moment.
 
-A case that pins a performance fix carries `marks=pytest.mark.timed(max_ms=...)` and fails when
-one of its modes runs over the budget; see conftest.py. The run lists their times at the end.
+A case that pins a performance fix carries `pytest.mark.timed(max_ms=...)` among its marks and
+fails when one of its modes runs over the budget; see conftest.py. The run lists their times at
+the end. The module brings mecab up once before its first case, so that its first-use cost is
+charged to setup rather than to a timed case.
 """
 
 import pytest
 
 from ..all_types.main_types import WithTagsDef
 from .kana_highlight import FuriReconstruct, kana_highlight
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mecab_warm() -> None:
+    """Bring mecab up before the first case runs, so that its first-use cost is not on a timed
+    case's clock; a fixture is not timed, the case's own call is. Reading the okurigana off a
+    word is what asks mecab, so one such word does it. (pytest.param cannot carry usefixtures,
+    which is why this is autouse for the module rather than requested by the timed cases.)"""
+    kana_highlight(None, "食[た]べる", "furigana")
+
 
 # (mode id, return type, with_tags, merge_consecutive). The mode id is the key a case's
 # expectations are stored under.
