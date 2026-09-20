@@ -195,6 +195,39 @@ CASES = [
         "行[い]く\nお前[まえ]",
         id="opening kana of a word opening a line",
     ),
+    # --- whole sentences ---------------------------------------------------------------------
+    # What the passes get from a card: several words in one text, kept apart by a space, a <br>
+    # or a newline, one of them opening the text and one following a tag.
+    pytest.param(
+        "勿体無い[もったいない] 行き来[いきき]",
+        "勿体無[もったいな]い 行[い]き来[き]",
+        id="the greedy reading and the second reading in one text",
+    ),
+    pytest.param(
+        "見え[みえ]た<br>消え[きえ]た",
+        "見[み]えた<br>消[き]えた",
+        id="words sharing okurigana across a line break",
+    ),
+    pytest.param(
+        "<b>上げ[あげ]</b>て 下げ[さげ]る",
+        "<b>上[あ]げ</b>て 下[さ]げる",
+        id="a word right after a tag, with another after it",
+    ),
+    pytest.param(
+        "すり下ろす[すりおろす]\nかも知れない[かもしれない]",
+        "すり下[お]ろす\nかも知[し]れない",
+        id="two words opening with kana, the second opening a line",
+    ),
+    pytest.param(
+        "隣り合わせ[となりあわせ]の 歯止め[はどめ]",
+        "隣[とな]り合[あ]わせの 歯止[はど]め",
+        id="two kanji runs in the first word, one in the second",
+    ),
+    pytest.param(
+        "朝[あさ] 起き[おき]て<br>夜[よる] 寝る[ねる]",
+        "朝[あさ] 起[お]きて<br>夜[よる] 寝[ね]る",
+        id="a sentence of words with and without okurigana",
+    ),
 ]
 
 

@@ -105,6 +105,33 @@ CASES = [
     # A \n marks where a word begins just as a space does: fields written in the HTML editor
     # break their lines with <br>, but fields pasted or imported as plain text carry \n.
     pytest.param("行[い]く\n食べ[たべ]る", "いく\nたべる", id="a word opening a line is a word start"),
+    # Whole sentences: what the filter gets from a card, with the words kept apart by a space,
+    # a <br> or a newline, one of them opening the text and one following a tag.
+    pytest.param(
+        "勿体無い[もったいない] 行き来[いきき]",
+        "もったいないいきき",
+        id="the greedy reading and the second reading in one text",
+    ),
+    pytest.param(
+        "見え[みえ]た<br>消え[きえ]た",
+        "みえた<br>きえた",
+        id="words sharing okurigana across a line break",
+    ),
+    pytest.param(
+        "<b>上げ[あげ]</b>て 下げ[さげ]る",
+        "<b>あげ</b>てさげる",
+        id="a word right after a tag, with another after it",
+    ),
+    pytest.param(
+        "すり下ろす[すりおろす]\nかも知れない[かもしれない]",
+        "すりおろす\nかもしれない",
+        id="two words opening with kana, the second opening a line",
+    ),
+    pytest.param(
+        "朝[あさ] 起き[おき]て<br>夜[よる] 寝る[ねる]",
+        "あさおきて<br>よるねる",
+        id="a sentence of words with and without okurigana",
+    ),
 ]
 
 
