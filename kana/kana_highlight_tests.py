@@ -17,14 +17,11 @@ expected/got diff itself. A case known to fail is written
 `pytest.param(..., marks=pytest.mark.xfail(reason="why"))`; none carries one at the moment.
 """
 
-from typing import Optional
 
 import pytest
 
-from .kana_highlight import kana_highlight, FuriReconstruct
-
 from ..all_types.main_types import WithTagsDef
-
+from .kana_highlight import FuriReconstruct, kana_highlight
 
 # (mode id, return type, with_tags, merge_consecutive). The mode id is the key a case's
 # expectations are stored under.
@@ -4880,7 +4877,7 @@ for _case in CASES:
 @pytest.mark.parametrize("mode, return_type, with_tags, merge_consecutive", MODES)
 @pytest.mark.parametrize("kanji, sentence, onyomi_to_katakana, expected", CASES)
 def test_kana_highlight(
-    kanji: Optional[str],
+    kanji: str | None,
     sentence: str,
     onyomi_to_katakana: bool,
     expected: dict[str, str],

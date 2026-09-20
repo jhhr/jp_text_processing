@@ -1,19 +1,18 @@
 import logging
 
+from ..all_types.main_types import (
+    OkuriResults,
+    OkuriType,
+)
+from ..mecab_controller.basic_types import (
+    MecabParsedToken,
+)
+from ..utils.logger import package_logger as logger
 from .mecab_common import (
     OkuriPrefix,
     get_all_conjugation_conditions,
     get_word_type_from_mecab_token,
     mecab,
-)
-from ..all_types.main_types import (
-    OkuriResults,
-    OkuriType,
-)
-from ..utils.logger import package_logger as logger
-
-from ..mecab_controller.basic_types import (
-    MecabParsedToken,
 )
 
 

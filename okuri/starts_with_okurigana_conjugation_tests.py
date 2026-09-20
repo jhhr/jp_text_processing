@@ -18,7 +18,6 @@ import pytest
 
 from .starts_with_okurigana_conjugation import starts_with_okurigana_conjugation
 
-
 CASES = [
     # full okuri tests
     pytest.param(

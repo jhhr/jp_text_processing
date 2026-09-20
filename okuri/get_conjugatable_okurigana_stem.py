@@ -1,4 +1,3 @@
-from typing import Union
 
 from ..all_types.main_types import PartOfSpeech
 
@@ -21,7 +20,7 @@ CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH: dict[str, list[PartOfSpeech]] = {
 
 def get_conjugatable_okurigana_stem(
     plain_okuri: str,
-) -> tuple[Union[str, None], list[PartOfSpeech]]:
+) -> tuple[str | None, list[PartOfSpeech]]:
     """
     Returns the stem of a word's okurigana.
     :param plain_okuri: A dictionary form word's okurigana

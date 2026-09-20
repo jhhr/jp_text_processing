@@ -13,7 +13,6 @@ import pytest
 
 from .number_to_kanji import number_to_kanji
 
-
 CASES = [
     # non-parseable cases return as is
     pytest.param("", "", id="(empty)"),

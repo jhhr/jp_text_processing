@@ -1,19 +1,15 @@
 import re
-from typing import Optional
 
-from .construct_wrapped_furi_word import (
-    construct_wrapped_furi_word,
-    FuriReconstruct,
+from ..all_types.main_types import (
+    FinalResult,
+    MatchType,
+    MoraAlignment,
+    WithTagsDef,
+    WrapMatchEntry,
+    WrapTag,
 )
-
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-from .katakana_positions import get_katakana_positions
-from .orphaned_repeater_cleaning import (
-    ORPHANED_REPEATER_CLEANING_REC,
-    orphaned_repeater_cleaning_replacer,
-)
-from ..utils.logger import package_logger as logger
 from ..kanji.number_to_kanji import number_to_kanji
+from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
 from ..okuri.okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
     OKURIGANA_MIX_CLEANING_REC,
@@ -21,25 +17,26 @@ from ..okuri.okurigana_mix_cleaning_replacer import (
     okurigana_mix_cleaning_replacer,
 )
 from ..regex.kanji_furi import (
-    KANJI_RE,
     DOUBLE_KANJI_REC,
     KANJI_AND_FURIGANA_AND_OKURIGANA_REC,
+    KANJI_RE,
     NON_KANA_REC,
 )
-from ..all_types.main_types import (
-    MatchType,
-    WithTagsDef,
-    FinalResult,
-    MoraAlignment,
-    WrapMatchEntry,
-    WrapTag,
+from ..utils.logger import package_logger as logger
+from .construct_wrapped_furi_word import (
+    FuriReconstruct,
+    construct_wrapped_furi_word,
 )
 from .furigana_exceptions import check_exception
-from .mora_splitter import split_to_mora_list, normalize_long_vowel_marks
 from .furigana_normalizer import normalize_furigana_for_matching
-from .mora_alignment import find_first_complete_alignment
 from .jukujikun_processor import process_jukujikun_positions
-
+from .katakana_positions import get_katakana_positions
+from .mora_alignment import find_first_complete_alignment
+from .mora_splitter import normalize_long_vowel_marks, split_to_mora_list
+from .orphaned_repeater_cleaning import (
+    ORPHANED_REPEATER_CLEANING_REC,
+    orphaned_repeater_cleaning_replacer,
+)
 
 # Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
 # before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
@@ -191,7 +188,7 @@ def reconstruct_furigana(
         rest_kana,
     )
     if rendered_segments and okurigana:
-        last_segment_part: Optional[WrapMatchEntry] = segments[-1][-1] if segments[-1] else None
+        last_segment_part: WrapMatchEntry | None = segments[-1][-1] if segments[-1] else None
         okuri_out_of_highlight = (
             not with_tags_def.include_suru_okuri
             and last_segment_part is not None
@@ -316,7 +313,7 @@ def reconstruct_from_alignment(
         reading = ""
         tag: WrapTag = "mix"
         is_num = False
-        is_noun_suru_verb: Optional[bool] = False
+        is_noun_suru_verb: bool | None = False
         if i in juku_parts:
             part = juku_parts[i]
             reading = part["furigana"]
@@ -497,10 +494,10 @@ def whole_word_mora_split(
 
 
 def kana_highlight(
-    kanji_to_highlight: Optional[str],
+    kanji_to_highlight: str | None,
     text: str,
     return_type: FuriReconstruct = "kana_only",
-    with_tags_def: Optional[WithTagsDef] = None,
+    with_tags_def: WithTagsDef | None = None,
 ) -> str:
     """
     Function that replaces the furigana of a kanji with the furigana that corresponds to the kanji's

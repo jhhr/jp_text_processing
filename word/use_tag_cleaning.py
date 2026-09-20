@@ -1,13 +1,13 @@
 import re
 
+from ..utils.logger import package_logger as logger
 from .use_text_part_storage import (
-    use_text_part_storage,
     BTagIndexIncrementer,
     IndexIncrementer,
     TextPartIndexes,
     TextPartRestorer,
+    use_text_part_storage,
 )
-from ..utils.logger import package_logger as logger
 
 
 def increment_for_b_tag_insertion(

@@ -13,7 +13,6 @@ import pytest
 
 from .word_highlight import word_highlight
 
-
 CASES = [
     pytest.param(
         "",

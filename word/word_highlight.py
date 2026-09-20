@@ -1,18 +1,17 @@
 import re
 
-from ..kana.reading_matcher import check_reading_match
 from ..all_types.main_types import OkuriResults
-
+from ..kana.kana_highlight import WithTagsDef, kana_highlight
+from ..kana.reading_matcher import check_reading_match
+from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
+from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
+from ..regex.kanji_furi import KANJI_RANGES
+from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
-from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
 from .use_splitter_dot_cleaning import use_splitter_dot_cleaning_with_b_insertion
-from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..kana.kana_highlight import kana_highlight, WithTagsDef
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana, is_kana_str
-from ..regex.kanji_furi import KANJI_RANGES
-from ..utils.logger import package_logger as logger
+from .use_tag_cleaning import use_tag_cleaning_with_b_insertion
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
@@ -589,14 +588,13 @@ def word_highlight(text: str, word: str) -> str:
                 okurigana="",
                 rest_kana="",
             )
-            if last_kanji and furigana:
-                if reading_match_type != "none":
-                    kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
-                        word=last_kanji,
-                        reading=last_kanji_furigana,
-                        maybe_okuri=to_hiragana(maybe_okuri),
-                        okuri_prefix="word",
-                    )
+            if last_kanji and furigana and reading_match_type != "none":
+                kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
+                    word=last_kanji,
+                    reading=last_kanji_furigana,
+                    maybe_okuri=to_hiragana(maybe_okuri),
+                    okuri_prefix="word",
+                )
             if kanji_okuri_result.result != "no_okuri":
                 okuri_result = kanji_okuri_result
                 logger.debug(

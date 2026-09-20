@@ -1,5 +1,5 @@
 import re
-from typing import Callable
+from collections.abc import Callable
 
 from ..utils.logger import package_logger as logger
 
@@ -87,7 +87,7 @@ def use_splitter_dot_cleaning_with_b_insertion(
         offset_indexes.append((b_close_index + 3, 4))
 
     def restore_splitters(edited_text: str) -> str:
-        for start, end, splitter_str in splitter_indexes:
+        for start, _end, splitter_str in splitter_indexes:
             edited_text = edited_text[:start] + splitter_str + edited_text[start:]
         return edited_text
 

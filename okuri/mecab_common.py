@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from ..mecab_controller.basic_types import (
     Inflection,
@@ -92,14 +92,14 @@ def verb_conjugation_conditions(
                 or (token.word == "で" and next_token and next_token.headword == "いる")
             )
         )
-        or ((
+        or (
             token.part_of_speech == PartOfSpeech.verb
             and token.headword == "いる"
             and prev_token
             and prev_token.word in ["て", "で"]
             # don't add iru if preceded by ない
             and (not prev_prev_token or prev_prev_token.headword != "ない")
-        ))
+        )
         or (
             # -られ, -させ
             token.part_of_speech == PartOfSpeech.verb
@@ -130,7 +130,7 @@ def verb_conjugation_conditions(
 def get_all_conjugation_conditions(
     token: MecabParsedToken,
     all_tokens: list[MecabParsedToken],
-    word_type: Optional[MecabWordType],
+    word_type: MecabWordType | None,
 ) -> tuple[bool, bool]:
     """Check if the token meets any conjugation conditions."""
     add_to_conjugated_okuri = False

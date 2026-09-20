@@ -13,7 +13,6 @@ import pytest
 
 from .use_tag_cleaning import apply_tag_fixes
 
-
 CASES = [
     # An opening tag right before <b>, closed within the b span
     pytest.param(

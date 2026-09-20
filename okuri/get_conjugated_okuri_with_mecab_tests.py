@@ -18,7 +18,6 @@ import pytest
 
 from .get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 
-
 CASES = [
     pytest.param("逆上", "のぼ", "せたので", ("せた", "ので", False), id="逆上[のぼ]せたので"),
     pytest.param("悔", "くや", "しいくらい", ("しい", "くらい", False), id="悔[くや]しいくらい"),

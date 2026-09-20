@@ -1,9 +1,7 @@
-from typing import Optional, Union, Tuple
 
 from ..all_types.main_types import PartOfSpeech
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger
-
 
 # Edited from https://github.com/yamagoya/jconj/blob/master/data/kwpos.csv
 # Retained only the rows that the conjugation table had entries for.
@@ -134,7 +132,7 @@ def get_part_of_speech(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
-) -> Optional[PartOfSpeech]:
+) -> PartOfSpeech | None:
     """
     Get the part of speech key for POSSIBLE_OKURIGANA_PROGRESSION_DICT for a word.
     :param okurigana: Always required.
@@ -197,8 +195,8 @@ def get_okuri_dict_for_okurigana(
     okurigana: str,
     kanji: str,
     kanji_reading: str,
-    part_of_speech: Optional[PartOfSpeech] = None,
-) -> tuple[Union[dict, None], Optional[PartOfSpeech]]:
+    part_of_speech: PartOfSpeech | None = None,
+) -> tuple[dict | None, PartOfSpeech | None]:
     """
     Get the okurigana progression dict for a dictionary form word.
     :param okurigana: The okurigana of the kanji.
@@ -232,7 +230,7 @@ def get_okuri_dict_for_okurigana(
 # in でしょう, ならば or です among others.
 # euphonic changes were also removed except for the last vs-s (47) vs vs-i (48)
 # suru verb classes
-ALL_OKURI_BY_PART_OF_SPEECH: list[Union[Tuple[int, str], Tuple[int, str, str]]] = [
+ALL_OKURI_BY_PART_OF_SPEECH: list[tuple[int, str] | tuple[int, str, str]] = [
     (1, "い"),
     (1, "くない"),
     # (1, "くないです"), # shouldn't include です in okurigana

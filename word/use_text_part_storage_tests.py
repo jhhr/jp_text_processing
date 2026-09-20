@@ -13,7 +13,6 @@ import pytest
 
 from .use_text_part_storage import use_text_part_storage
 
-
 CASES = [
     pytest.param(
         "<div>「<k> 糞[クソ]</k><k> 程[ほど]</k><k> 詰[つま]らん</k>。<k> 何[なん]</k>でも<k>"

@@ -10,8 +10,9 @@ logs takes it as `from ..utils.logger import package_logger as logger` and calls
 
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Literal, Optional, TextIO, Union
+from typing import Literal, TextIO
 
 LOGGER_NAME = "jp_text_processing"
 
@@ -54,7 +55,7 @@ class _ConsoleHandler(logging.StreamHandler):
 
 
 def console_logging(
-    level: Union[LogLevel, int] = "error", stream: Optional[TextIO] = None
+    level: LogLevel | int = "error", stream: TextIO | None = None
 ) -> None:
     """
     Send the package's logging to `stream` (stdout as of the call) at `level`, replacing any
@@ -72,7 +73,7 @@ def console_logging(
     set_level(level)
 
 
-def set_level(level: Union[LogLevel, int]) -> None:
+def set_level(level: LogLevel | int) -> None:
     package_logger.setLevel(LOG_LEVELS[level] if isinstance(level, str) else level)
 
 

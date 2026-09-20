@@ -7,7 +7,6 @@ import pytest
 
 from .kana_highlight import kana_filter
 
-
 CASES = [
     # Basic furigana, the cases Anki's own {{kana:Field}} filter gives the same result for
     pytest.param("漢字[かんじ]", "かんじ", id="single word"),

@@ -14,7 +14,6 @@ import pytest
 
 from .check_word_reading_type import WordReadingType, check_word_reading_type
 
-
 # Each tag type, on/kun/juk, with 1) a single and 2) multiple tags, and a) no ending kana,
 # b) okurigana, c) non-okuri ending kana and d) both — six cases per tag type.
 CASES = [

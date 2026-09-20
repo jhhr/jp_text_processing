@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from ..utils.logger import package_logger as logger
 
@@ -51,7 +52,7 @@ def make_diff_string_for_indexes(
         total_offset += offset
     logger.debug("Simulated edited text: \033[90m'%s'\033[0m", simulated_edited_text)
     # Then reconstruct the parts into the simulated edited text exactly as restore_parts
-    for start, end, part_str in indexes:
+    for start, _end, part_str in indexes:
         simulated_edited_text = (
             simulated_edited_text[:start] + part_str + simulated_edited_text[start:]
         )
@@ -160,7 +161,7 @@ def use_text_part_storage(
 
     def restore_parts(edited_text: str) -> str:
         """Restores the parts back into the text."""
-        for start, end, part_str in part_indexes:
+        for start, _end, part_str in part_indexes:
             edited_text = edited_text[:start] + part_str + edited_text[start:]
             logger.debug("Restored part: '%s' at index %s", part_str, start)
 

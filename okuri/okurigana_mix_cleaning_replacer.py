@@ -1,10 +1,11 @@
 import re
 
-from ..regex.kanji_furi import KANJI_CHAR_RE
-from ..mecab_controller.kana_conv import to_hiragana
 from ..kana.mora_alignment import find_first_complete_alignment
 from ..kana.mora_splitter import split_to_mora_list
-from ..utils.logger import package_logger as logger, silenced
+from ..mecab_controller.kana_conv import to_hiragana
+from ..regex.kanji_furi import KANJI_CHAR_RE
+from ..utils.logger import package_logger as logger
+from ..utils.logger import silenced
 
 # Regex for a word that opens with kana and then has nothing but kanji before its furigana, so
 # that the kana it opens with can be taken out of the reading. For example

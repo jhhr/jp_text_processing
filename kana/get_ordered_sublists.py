@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from itertools import combinations
-from typing import Sequence, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 

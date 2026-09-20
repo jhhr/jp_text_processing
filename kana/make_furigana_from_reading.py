@@ -1,8 +1,8 @@
 import re
-from .kana_highlight import kana_highlight, WithTagsDef
 
 from ..regex.kanji_furi import KANJI_RANGES
 from ..utils.logger import package_logger as logger
+from .kana_highlight import WithTagsDef, kana_highlight
 
 KANJI_RE = rf"[\d々{KANJI_RANGES}]"
 

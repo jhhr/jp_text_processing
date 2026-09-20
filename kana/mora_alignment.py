@@ -5,26 +5,23 @@ This module implements the combinatorial mora alignment algorithm that tries
 all possible ways to split mora among kanji, returning the first complete match.
 """
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
-from ..all_types.main_types import ReadingMatchInfo, MoraAlignment
+from ..all_types.main_types import MoraAlignment, ReadingMatchInfo
+from ..kanji.all_kanji_data import KanjiData, all_kanji_data
+from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
+from ..utils.logger import package_logger as logger
 from .get_ordered_sublists import get_ordered_sublists
 from .reading_matcher import (
     match_reading_to_mora,
 )
-from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
-from ..kanji.all_kanji_data import KanjiData, all_kanji_data
-from ..utils.logger import package_logger as logger
 
 
 def contains_repeated_kanji(word: str) -> bool:
     """
     Check if the word contains a repeater (々).
     """
-    for i in range(1, len(word)):
-        if word[i] == "々":
-            return True
-    return False
+    return "々" in word[1:]
 
 
 def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> bool:
@@ -34,10 +31,9 @@ def is_valid_split_for_repeaters(word: str, split: Sequence[Sequence[str]]) -> b
     length as the mora split at position i-1 (the kanji being repeated)
     """
     for i, kanji in enumerate(word):
-        if kanji == "々" and i > 0:
-            # This is a repeater - check if mora count matches previous kanji
-            if len(split[i]) != len(split[i - 1]):
-                return False
+        # A repeater's mora count has to match the kanji being repeated
+        if kanji == "々" and i > 0 and len(split[i]) != len(split[i - 1]):
+            return False
     return True
 
 
@@ -45,8 +41,8 @@ def find_first_complete_alignment(
     word: str,
     furigana: str,
     maybe_okuri: str,
-    mora_list: Optional[list[str]] = None,
-    possible_splits: Optional[Sequence[Sequence[Sequence[str]]]] = None,
+    mora_list: list[str] | None = None,
+    possible_splits: Sequence[Sequence[Sequence[str]]] | None = None,
 ) -> MoraAlignment:
     """
     Find the first complete alignment of mora to kanji with early exit.
@@ -115,7 +111,7 @@ def find_first_complete_alignment(
         ["".join(mora) for mora in split] for split in possible_splits
     ]
 
-    best_alignment: Optional[MoraAlignment] = None
+    best_alignment: MoraAlignment | None = None
     best_jukujikun_count = kanji_count + 1  # Start with worst possible
     best_chars_matched_count = 0
 
@@ -124,7 +120,7 @@ def find_first_complete_alignment(
     def process_mora_split(mora_split: list[str], skip_youon_check: bool = False) -> MoraAlignment:
         nonlocal best_alignment, best_jukujikun_count, best_chars_matched_count
         logger.debug("find_first_complete_alignment - trying mora_split: %s", mora_split)
-        kanji_matches: list[Optional[ReadingMatchInfo]] = []
+        kanji_matches: list[ReadingMatchInfo | None] = []
         jukujikun_positions: list[int] = []
         final_okurigana = ""
         final_rest_kana = maybe_okuri

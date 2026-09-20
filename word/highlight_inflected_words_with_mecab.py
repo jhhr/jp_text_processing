@@ -1,26 +1,25 @@
-from typing import Optional
 
 from ..all_types.main_types import PartOfSpeech
 from ..mecab_controller.basic_types import MecabParsedToken
+from ..mecab_controller.kana_conv import (
+    is_hiragana_str,
+    is_katakana_str,
+    to_hiragana,
+    to_katakana,
+)
+from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.mecab_common import (
+    MecabWordType,
     get_all_conjugation_conditions,
     get_word_type_from_mecab_token,
     mecab,
-    MecabWordType,
 )
-from ..mecab_controller.kana_conv import (
-    to_hiragana,
-    to_katakana,
-    is_hiragana_str,
-    is_katakana_str,
-)
-from .use_tag_cleaning import TAG_AND_SPACE_PART_RE, use_tag_cleaning_with_b_insertion
-from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.okurigana_dict import (
     GODAN_FORM_VERB_STARTINGS,
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
 from ..utils.logger import package_logger as logger
+from .use_tag_cleaning import TAG_AND_SPACE_PART_RE, use_tag_cleaning_with_b_insertion
 
 
 def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: int = 0) -> str:
@@ -41,7 +40,7 @@ def highlight_inflected_words_with_mecab(text: str, base_form_word: str, depth: 
         return text
 
     # Determine the word type from the base form word
-    word_type: Optional[MecabWordType] = None
+    word_type: MecabWordType | None = None
     base_form_word_ending = to_hiragana(base_form_word[-1])
     word_stem = base_form_word[:-1]
     if not word_stem:

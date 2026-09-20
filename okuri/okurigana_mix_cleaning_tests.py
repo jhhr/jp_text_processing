@@ -16,6 +16,9 @@ import re
 
 import pytest
 
+from ..kana.make_furigana_from_reading import make_furigana_from_reading
+from ..mecab_controller.kana_conv import to_hiragana
+from ..utils.logger import LOGGER_NAME
 from .okurigana_mix_cleaning_replacer import (
     LEADING_KANA_CLEANING_REC,
     OKURIGANA_MIX_CLEANING_REC,
@@ -23,11 +26,6 @@ from .okurigana_mix_cleaning_replacer import (
     okurigana_mix_cleaning_replacer,
     unread_kanji_count,
 )
-
-from ..kana.make_furigana_from_reading import make_furigana_from_reading
-from ..mecab_controller.kana_conv import to_hiragana
-from ..utils.logger import LOGGER_NAME
-
 
 TAG_RE = re.compile(r"<[^>]+>")
 GROUP_RE = re.compile(r" ?([^ \[\]<>]+?)\[([^\]]*)\]")

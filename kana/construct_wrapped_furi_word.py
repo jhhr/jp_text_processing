@@ -1,13 +1,10 @@
 import re
 from typing import Literal
 
-from ..mecab_controller.kana_conv import to_katakana, to_hiragana
-
 from ..all_types.main_types import WrapMatchEntry
-
-from ..utils.logger import package_logger as logger
-
 from ..kanji.number_to_kanji import number_to_kanji
+from ..mecab_controller.kana_conv import to_hiragana, to_katakana
+from ..utils.logger import package_logger as logger
 
 IS_NUMBER_RE = re.compile(r"^[0-9０-９]+$")
 
@@ -222,10 +219,7 @@ def construct_wrapped_furi_word(
             # kana_only: output kana even for empty kanji entries
             base = f"{kana}"
 
-        if with_tags:
-            with_furi = f"<{tag}>{base}</{tag}>"
-        else:
-            with_furi = base
+        with_furi = f"<{tag}>{base}</{tag}>" if with_tags else base
 
         if apply_highlight and highlight:
             with_furi = f"<b>{with_furi}</b>"

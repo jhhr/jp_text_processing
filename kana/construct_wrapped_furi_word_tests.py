@@ -13,9 +13,8 @@ the mode's id.
 
 import pytest
 
-from .construct_wrapped_furi_word import FuriReconstruct, construct_wrapped_furi_word
-
 from ..all_types.main_types import WrapMatchEntry, WrapTag
+from .construct_wrapped_furi_word import FuriReconstruct, construct_wrapped_furi_word
 
 
 def entry(
