@@ -50,6 +50,13 @@ CASES = [
         "となりあわせ",
         id="mixed okurigana furigana, okurigana in the middle and the end",
     ),
+    # A reading covering the kana the word opens with spells that kana once, not twice
+    pytest.param("お前[おまえ]", "おまえ", id="a word opening with an honorific お"),
+    pytest.param("ご飯[ごはん]", "ごはん", id="a word opening with an honorific ご"),
+    pytest.param("いい加減[いいかげん]", "いいかげん", id="a word opening with a run of kana"),
+    pytest.param("か家族[かぞく]", "かかぞく", id="a particle in front of a word is not its kana"),
+    # A 々 separated from its word is put back before the readings are taken out
+    pytest.param("人 々[ひとびと]", "ひとびと", id="a 々 separated from its word by a space"),
     # [sound:...] tags are left alone
     pytest.param("[sound:x.mp3]", "[sound:x.mp3]", id="sound tag alone"),
     pytest.param(

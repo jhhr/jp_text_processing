@@ -62,12 +62,17 @@ def kana_filter(text):
         # Return the furigana inside the brackets, dropping the kanji and the leading space
         return match.group(2)
 
-    # First turn mixed okurigana furigana like 消え去[きえさ]る into 消[き]え去[さ]る, so that
-    # every kanji is directly followed by its own furigana, then replace each kanji[furigana]
-    # with the furigana
-    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(
-        okurigana_mix_cleaning_replacer, text.replace("&nbsp;", " ")
+    # Run the same cleaning passes kana_highlight does, in the same order: put a separated 々
+    # back into its word's furigana group, so that 人 々[ひとびと] is not left with an unread 人,
+    # then give back the kana a word opens with, so that お前[おまえ] does not spell its お twice,
+    # then turn mixed okurigana furigana like 消え去[きえさ]る into 消[き]え去[さ]る, so that every
+    # kanji is directly followed by its own furigana. Then replace each kanji[furigana] with the
+    # furigana.
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(
+        orphaned_repeater_cleaning_replacer, text.replace("&nbsp;", " ")
     )
+    clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
+    clean_text = OKURIGANA_MIX_CLEANING_REC.sub(okurigana_mix_cleaning_replacer, clean_text)
     return KANA_FILTER_REC.sub(bracket_replace, clean_text)
 
 
