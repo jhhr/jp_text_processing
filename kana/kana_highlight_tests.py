@@ -1174,6 +1174,81 @@ CASES = [
         id="Keeps a kanji doubled across a word boundary spelled out",
     ),
     pytest.param(
+        # 毎月 + 月末, so the second 月 reads げつ where the first reads つき: the second
+        # occurrence is matched on its own readings instead of copying the first one's
+        "",
+        "毎月月末[まいつきげつまつ]",
+        True,
+        {
+            "kana_only": "マイつきゲツマツ",
+            "furigana": " 毎月月末[マイつきゲツマツ]",
+            "furikanji": " マイつきゲツマツ[毎月月末]",
+            "kana_only split": "<on>マイ</on><kun>つき</kun><on>ゲツ</on><on>マツ</on>",
+            "furigana split": "<on> 毎[マイ]</on><kun> 月[つき]</kun><on> 月[ゲツ]</on><on> 末[マツ]</on>",
+            "furikanji split": "<on> マイ[毎]</on><kun> つき[月]</kun><on> ゲツ[月]</on><on> マツ[末]</on>",
+            "kana_only merged": "<on>マイ</on><kun>つき</kun><on>ゲツマツ</on>",
+            "furigana merged": "<on> 毎[マイ]</on><kun> 月[つき]</kun><on> 月末[ゲツマツ]</on>",
+            "furikanji merged": "<on> マイ[毎]</on><kun> つき[月]</kun><on> ゲツマツ[月末]</on>",
+        },
+        id="Reads a kanji doubled across a word boundary as kun then on - 毎月月末",
+    ),
+    pytest.param(
+        # The same with 毎年 + 年末: とし then ねん
+        "",
+        "毎年年末[まいとしねんまつ]",
+        True,
+        {
+            "kana_only": "マイとしネンマツ",
+            "furigana": " 毎年年末[マイとしネンマツ]",
+            "furikanji": " マイとしネンマツ[毎年年末]",
+            "kana_only split": "<on>マイ</on><kun>とし</kun><on>ネン</on><on>マツ</on>",
+            "furigana split": "<on> 毎[マイ]</on><kun> 年[とし]</kun><on> 年[ネン]</on><on> 末[マツ]</on>",
+            "furikanji split": "<on> マイ[毎]</on><kun> とし[年]</kun><on> ネン[年]</on><on> マツ[末]</on>",
+            "kana_only merged": "<on>マイ</on><kun>とし</kun><on>ネンマツ</on>",
+            "furigana merged": "<on> 毎[マイ]</on><kun> 年[とし]</kun><on> 年末[ネンマツ]</on>",
+            "furikanji merged": "<on> マイ[毎]</on><kun> とし[年]</kun><on> ネンマツ[年末]</on>",
+        },
+        id="Reads a kanji doubled across a word boundary as kun then on - 毎年年末",
+    ),
+    pytest.param(
+        # A genuine doubled word written out: びと is ひと rendakued, which is evidence of a
+        # repeater, so it is written back as 人々
+        "",
+        "人人[ひとびと]",
+        True,
+        {
+            "kana_only": "ひとびと",
+            "furigana": " 人々[ひとびと]",
+            "furikanji": " ひとびと[人々]",
+            "kana_only split": "<kun>ひとびと</kun>",
+            "furigana split": "<kun> 人々[ひとびと]</kun>",
+            "furikanji split": "<kun> ひとびと[人々]</kun>",
+            "kana_only merged": "<kun>ひとびと</kun>",
+            "furigana merged": "<kun> 人々[ひとびと]</kun>",
+            "furikanji merged": "<kun> ひとびと[人々]</kun>",
+        },
+        id="Keeps a doubled word whose second reading rendakus - 人人",
+    ),
+    pytest.param(
+        # 各 only lists the doubled reading おのおの, so the second おの matches nothing on its
+        # own and falls back to a copy of the first match
+        "",
+        "各各[おのおの]",
+        True,
+        {
+            "kana_only": "おのおの",
+            "furigana": " 各各[おのおの]",
+            "furikanji": " おのおの[各各]",
+            "kana_only split": "<kun>おの</kun><kun>おの</kun>",
+            "furigana split": "<kun> 各[おの]</kun><kun> 各[おの]</kun>",
+            "furikanji split": "<kun> おの[各]</kun><kun> おの[各]</kun>",
+            "kana_only merged": "<kun>おのおの</kun>",
+            "furigana merged": "<kun> 各各[おのおの]</kun>",
+            "furikanji merged": "<kun> おのおの[各各]</kun>",
+        },
+        id="Keeps a doubled word that only lists the doubled reading - 各各",
+    ),
+    pytest.param(
         # Both 物 are the kanji being studied, so both get highlighted, even though they belong
         # to different words. Being adjacent, they highlight as one run under a single <b>.
         "物",

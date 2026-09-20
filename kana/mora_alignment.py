@@ -281,14 +281,37 @@ def find_first_complete_alignment(
                         for rendaku_kana in RENDAKU_CONVERSION_DICT_HIRAGANA.get(first_mora[0], [])
                     )
 
+                    # 々 has no readings of its own, so it can only copy the first match, but a
+                    # kanji written out twice is as often two words meeting - the 月月 of 毎月月末
+                    # reads つき+ゲツ - so the second occurrence gets matched on its own readings.
+                    second_match = None
+                    if next_kanji != "々":
+                        second_kunyomi_match, second_onyomi_match = match_reading_to_mora(
+                            kanji=kanji,
+                            word=word,
+                            furigana=furigana,
+                            mora_sequence=second_mora,
+                            kanji_data=kanji_data,
+                            maybe_okuri=maybe_okuri if check_okurigana else "",
+                            is_last_kanji=(i + 1) == kanji_count - 1,
+                        )
+                        second_match = (
+                            second_onyomi_match if second_onyomi_match else second_kunyomi_match
+                        )
+
                     # Add duplicate match for 々 (copy reading but mark as second occurrence).
+                    # The copy is also the fallback for a doubled kanji whose second mora matches
+                    # nothing on its own, the way 各々 only lists the doubled reading.
                     # Mark it as the repeater only when the word gives us evidence of one: either
                     # it was written with 々, or the second reading is a rendaku of the first, which
                     # only happens inside a single word. Two identical readings prove nothing - the
                     # 物物 of 生物物理学 reads exactly like the 我我 of 我々 - so a kanji doubled
                     # with a plain repeat keeps its own spelling.
-                    repeater_match = match_info.copy()
-                    repeater_match["matched_mora"] = second_mora
+                    if second_match is not None:
+                        repeater_match = second_match
+                    else:
+                        repeater_match = match_info.copy()
+                        repeater_match["matched_mora"] = second_mora
                     repeater_match["kanji"] = "々" if next_kanji == "々" or rendaku_matched else kanji
 
                     # Add match for first kanji
