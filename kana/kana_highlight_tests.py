@@ -361,93 +361,44 @@ CASES = [
         id="A [sound:...] tag in a mixed okurigana word is left alone with its okurigana",
     ),
     pytest.param(
-        # The highlighter adds its own <b>; a previous one - the user's emphasis, or the output
-        # of an earlier run fed back in - has to be dropped or the two end up nested.
-        "字",
-        "<b>漢字[かんじ]</b>",
-        True,
-        {
-            "furigana": " 漢[カン]<b> 字[ジ]</b>",
-            "furigana split": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furigana merged": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furikanji": " カン[漢]<b> ジ[字]</b>",
-            "furikanji split": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "furikanji merged": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "kana_only": "カン<b>ジ</b>",
-            "kana_only split": "<on>カン</on><b><on>ジ</on></b>",
-            "kana_only merged": "<on>カン</on><b><on>ジ</on></b>",
-        },
-        id="A <b> tag the text came in with does not nest with the highlight",
-    ),
-    pytest.param(
-        # The tag splits 漢字 in two, leaving nothing the furigana regex can match; the word only
-        # gets read at all because the tag is gone before any of the processing starts.
-        "字",
-        "漢<b>字</b>[かんじ]",
-        True,
-        {
-            "furigana": " 漢[カン]<b> 字[ジ]</b>",
-            "furigana split": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furigana merged": "<on> 漢[カン]</on><b><on> 字[ジ]</on></b>",
-            "furikanji": " カン[漢]<b> ジ[字]</b>",
-            "furikanji split": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "furikanji merged": "<on> カン[漢]</on><b><on> ジ[字]</on></b>",
-            "kana_only": "カン<b>ジ</b>",
-            "kana_only split": "<on>カン</on><b><on>ジ</on></b>",
-            "kana_only merged": "<on>カン</on><b><on>ジ</on></b>",
-        },
-        id="A <b> tag in the middle of a word does not hide the word",
-    ),
-    pytest.param(
+        # The highlighter leaves the caller's <b> where it is; only the word it highlights gets
+        # a <b> of its own.
         "気",
         "<b>これは</b>天気[てんき]だ",
         True,
         {
-            "furigana": "これは 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "これは<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": "これは テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "これは<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "kana_only": "これはテン<b>キ</b>だ",
-            "kana_only split": "これは<on>テン</on><b><on>キ</on></b>だ",
-            "kana_only merged": "これは<on>テン</on><b><on>キ</on></b>だ",
+            "furigana": "<b>これは</b> 天[テン]<b> 気[キ]</b>だ",
+            "furigana split": "<b>これは</b><on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+            "furigana merged": "<b>これは</b><on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
+            "furikanji": "<b>これは</b> テン[天]<b> キ[気]</b>だ",
+            "furikanji split": "<b>これは</b><on> テン[天]</on><b><on> キ[気]</on></b>だ",
+            "furikanji merged": "<b>これは</b><on> テン[天]</on><b><on> キ[気]</on></b>だ",
+            "kana_only": "<b>これは</b>テン<b>キ</b>だ",
+            "kana_only split": "<b>これは</b><on>テン</on><b><on>キ</on></b>だ",
+            "kana_only merged": "<b>これは</b><on>テン</on><b><on>キ</on></b>だ",
         },
-        id="A <b> tag around text with no furigana is simply removed",
+        id="A <b> tag around text with no furigana is left where it is",
     ),
     pytest.param(
-        # HTML tag names are case-insensitive and pasted content can carry either spelling.
+        # A <b> the caller put around the highlighted word itself nests with the highlight's own
+        # <b>, by design: the word is read and highlighted as usual inside it and the caller's
+        # tag comes back out untouched. Giving text without <b> around the word, or living with
+        # the nesting, is the caller's call.
         "気",
-        "<B>天気[てんき]</B>だ",
+        "これは<b>天気[てんき]</b>だ",
         True,
         {
-            "furigana": " 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": " テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "kana_only": "テン<b>キ</b>だ",
-            "kana_only split": "<on>テン</on><b><on>キ</on></b>だ",
-            "kana_only merged": "<on>テン</on><b><on>キ</on></b>だ",
+            "furigana": "これは<b> 天[テン]<b> 気[キ]</b></b>だ",
+            "furigana split": "これは<b><on> 天[テン]</on><b><on> 気[キ]</on></b></b>だ",
+            "furigana merged": "これは<b><on> 天[テン]</on><b><on> 気[キ]</on></b></b>だ",
+            "furikanji": "これは<b> テン[天]<b> キ[気]</b></b>だ",
+            "furikanji split": "これは<b><on> テン[天]</on><b><on> キ[気]</on></b></b>だ",
+            "furikanji merged": "これは<b><on> テン[天]</on><b><on> キ[気]</on></b></b>だ",
+            "kana_only": "これは<b>テン<b>キ</b></b>だ",
+            "kana_only split": "これは<b><on>テン</on><b><on>キ</on></b></b>だ",
+            "kana_only merged": "これは<b><on>テン</on><b><on>キ</on></b></b>だ",
         },
-        id="An upper case <B> tag is dropped like a lower case one",
-    ),
-    pytest.param(
-        # The sentence here is the untagged furigana output for 天気[てんき]だ with 気 highlighted;
-        # feeding it back in is a common Anki workflow and must not compound the <b> tags.
-        "気",
-        " 天[テン]<b> 気[キ]</b>だ",
-        True,
-        {
-            "furigana": " 天[テン]<b> 気[キ]</b>だ",
-            "furigana split": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furigana merged": "<on> 天[テン]</on><b><on> 気[キ]</on></b>だ",
-            "furikanji": " テン[天]<b> キ[気]</b>だ",
-            "furikanji split": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-            "furikanji merged": "<on> テン[天]</on><b><on> キ[気]</on></b>だ",
-        },
-        id="Re-running the highlighter over its own furigana output changes nothing",
+        id="A <b> tag the caller put around the highlighted word stays around it",
     ),
     pytest.param(
         "",

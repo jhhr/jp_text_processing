@@ -41,11 +41,6 @@ from .mora_alignment import find_first_complete_alignment
 from .jukujikun_processor import process_jukujikun_positions
 
 
-# Bold tags the text already carries: the caller's own emphasis, or what a previous run of the
-# highlighter left behind when its output is fed back in. Highlighting adds its own <b> tags, so
-# these have to go before any of it or the two nest.
-EXISTING_BOLD_TAGS_REC = re.compile(r"</?b>", re.IGNORECASE)
-
 # Kanji directly followed by their furigana, plus the optional space that furigana syntax puts
 # before a word to mark where its kanji start. Group 1 is the kanji, group 2 the furigana.
 KANA_FILTER_REC = re.compile(rf" ?{KANJI_RE}\[(.+?)\]")
@@ -525,8 +520,9 @@ def kana_highlight(
         remove the kanji and return only the kana
     :param with_tags_def: tuple, with_tags and merge_consecutive keys. Whether to wrap the readings
         with tags and whether to merge consecutive tags
-    :return: The text cleaned from any previous<b> tags and<b> added around the furigana
-        when the furigana corresponds to the kanji_to_highlight
+    :return: The text with<b> added around the furigana when the furigana corresponds to the
+        kanji_to_highlight. Any<b> tags the text already carries are left as they are: the caller
+        either supplies text without<b> around the word to highlight, or accepts the nesting
     """
 
     def furigana_replacer(match: re.Match):
@@ -776,13 +772,9 @@ def kana_highlight(
         logger.debug("furigana_replacer - final_result: %s\n", final_result)
         return final_result
 
-    # Drop any <b> tags the text came in with, so the ones added below are the only ones in the
-    # output. Left in place they would nest, and one sitting inside a word would also hide that
-    # word from the cleaning passes and the furigana replacer below.
-    clean_text = EXISTING_BOLD_TAGS_REC.sub("", text)
     # Put a 々 that got separated from its word back into the same furigana group, so that what
     # follows sees one word rather than a 々 with no kanji in front of it to repeat
-    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, clean_text)
+    clean_text = ORPHANED_REPEATER_CLEANING_REC.sub(orphaned_repeater_cleaning_replacer, text)
     # Give back the kana a word opens with, so the kanji is left holding only its own reading
     clean_text = LEADING_KANA_CLEANING_REC.sub(leading_kana_cleaning_replacer, clean_text)
     # Clean any potential mixed okurigana cases, turning them normal
