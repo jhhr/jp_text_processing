@@ -576,6 +576,8 @@ CASES = [
             "kana_only": "みのがしたエイガをみる",
             "furigana": " 見逃[みのが]した 映画[エイガ]をみる",
             "furikanji": " みのが[見逃]した エイガ[映画]をみる",
+            "kana_only split": "<kun>み</kun><kun>のが</kun><oku>した</oku><on>エイ</on><on>ガ</on>をみる",
+            "kana_only merged": "<kun>みのが</kun><oku>した</oku><on>エイガ</on>をみる",
         },
         id="Generates furigana for a whole phrase from its full reading in brackets",
     ),
@@ -1416,6 +1418,10 @@ CASES = [
             "kana_only": "シン ナイ<b>カク</b>の ソ<b>カク</b>が ハッピョウされた。",
             "furigana": " 新[シン] 内[ナイ]<b> 閣[カク]</b>の 組[ソ]<b> 閣[カク]</b>が 発表[ハッピョウ]された。",
             "furikanji": " シン[新] ナイ[内]<b> カク[閣]</b>の ソ[組]<b> カク[閣]</b>が ハッピョウ[発表]された。",
+            "kana_only split": "<on>シン</on> <on>ナイ</on><b><on>カク</on></b>の <on>ソ</on><b>"
+            "<on>カク</on></b>が <on>ハッ</on><on>ピョウ</on><oku>された</oku>。",
+            "kana_only merged": "<on>シン</on> <on>ナイ</on><b><on>カク</on></b>の <on>ソ</on><b>"
+            "<on>カク</on></b>が <on>ハッピョウ</on><oku>された</oku>。",
         },
         id="Is able to match the same kanji occurring twice",
     ),
@@ -1843,8 +1849,11 @@ CASES = [
         True,
         {
             "kana_only": "カンゼンに うら<b>めった</b>な",
+            "kana_only split": "<on>カン</on><on>ゼン</on>に <kun>うら</kun><b><kun>め</kun>"
+            "<oku>った</oku></b>な",
             "furigana split": "<on> 完[カン]</on><on> 全[ゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
             "<oku>った</oku></b>な",
+            "kana_only merged": "<on>カンゼン</on>に <kun>うら</kun><b><kun>め</kun><oku>った</oku></b>な",
             "furigana merged": "<on> 完全[カンゼン]</on>に<kun> 裏[うら]</kun><b><kun> 目[め]</kun>"
             "<oku>った</oku></b>な",
         },
@@ -2563,6 +2572,7 @@ CASES = [
             "kana_only split": "<b><juk>か</juk></b><juk>ぜ</juk>",
             "furigana split": "<b><juk> 風[か]</juk></b><juk> 邪[ぜ]</juk>",
             "furikanji split": "<b><juk> か[風]</juk></b><juk> ぜ[邪]</juk>",
+            "kana_only merged": "<b><juk>か</juk></b><juk>ぜ</juk>",
         },
         id="jukujikun test 風邪 matched",
     ),
@@ -2859,6 +2869,7 @@ CASES = [
         "美味[おい]しい",
         True,
         {
+            "kana_only": "おいしい",
             "kana_only split": "<juk>お</juk><juk>い</juk><oku>しい</oku>",
             "furigana split": "<juk> 美[お]</juk><juk> 味[い]</juk><oku>しい</oku>",
             "furikanji split": "<juk> お[美]</juk><juk> い[味]</juk><oku>しい</oku>",
@@ -2873,6 +2884,7 @@ CASES = [
         "美味[おい]しさがいい",
         True,
         {
+            "kana_only": "おいしさがいい",
             "kana_only split": "<juk>お</juk><juk>い</juk><oku>しさ</oku>がいい",
             "furigana split": "<juk> 美[お]</juk><juk> 味[い]</juk><oku>しさ</oku>がいい",
             "furikanji split": "<juk> お[美]</juk><juk> い[味]</juk><oku>しさ</oku>がいい",
@@ -3119,6 +3131,7 @@ CASES = [
             "kana_only split": "<juk>ちゃー</juk><on>メン</on>",
             "furigana split": "<juk> 炒[ちゃー]</juk><on> 麺[メン]</on>",
             "furikanji split": "<juk> ちゃー[炒]</juk><on> メン[麺]</on>",
+            "kana_only merged": "<juk>ちゃー</juk><on>メン</on>",
         },
         id="jukujikun test with ー long vowel mark",
     ),
@@ -3567,6 +3580,7 @@ CASES = [
             "kana_only split": "<b><kun>こころ</kun><oku>みる</oku></b>",
             "furigana split": "<b><kun> 試[こころ]</kun><oku>みる</oku></b>",
             "furikanji split": "<b><kun> こころ[試]</kun><oku>みる</oku></b>",
+            "kana_only merged": "<b><kun>こころ</kun><oku>みる</oku></b>",
         },
         id="Verb okurigana test /13",
     ),
@@ -3880,6 +3894,7 @@ CASES = [
             "kana_only split": "<b><kun>えぐ</kun><oku>かった</oku></b>よな",
             "furigana split": "<b><kun> 刳[えぐ]</kun><oku>かった</oku></b>よな",
             "furikanji split": "<b><kun> えぐ[刳]</kun><oku>かった</oku></b>よな",
+            "kana_only merged": "<b><kun>えぐ</kun><oku>かった</oku></b>よな",
         },
         id="adjective okurigana test 6/",
     ),
@@ -4212,6 +4227,8 @@ CASES = [
             "furikanji split": "<mix> ヒャクニジュウサン[123]</mix><mix> よんヒャクニ[402]</mix><mix>"
             " サンビャクニジュウ[３２０]</mix><mix> ハッピャクハチジュウハチ[888]</mix>"
             "<mix> よんセンロッピャクロクジュウ[４６６０]</mix>",
+            "kana_only merged": "<on>ヒャクニジュウサン</on> <kun>よん</kun><on>ヒャクニ</on> <on>サンビャクニジュウ</on>"
+            " <on>ハッピャクハチジュウハチ</on> <kun>よん</kun><on>センロッピャクロクジュウ</on>",
         },
         id="Three digit numbers",
     ),
@@ -4276,9 +4293,13 @@ CASES = [
         "為[し]て 為[し]た 為[し]ました 為[さ]れる 為[し]ろ 為[し]ません それを為[し]",
         True,
         {
+            "kana_only": "して した しました される しろ しません それをし",
             "kana_only split": "<kun>し</kun><oku>て</oku> <kun>し</kun><oku>た</oku> <kun>し</kun><oku>ました</oku>"
             " <kun>さ</kun><oku>れる</oku> <kun>し</kun><oku>ろ</oku> <kun>し</kun><oku>ません</oku>"
             " それを<kun>し</kun>",
+            "kana_only merged": "<kun>し</kun><oku>て</oku> <kun>し</kun><oku>た</oku> <kun>し</kun>"
+            "<oku>ました</oku> <kun>さ</kun><oku>れる</oku> <kun>し</kun><oku>ろ</oku> <kun>し</kun>"
+            "<oku>ません</oku> それを<kun>し</kun>",
         },
         id="為る conjugations /1",
     ),
@@ -4287,10 +4308,14 @@ CASES = [
         "為[し]まった 為[し]ない 為[し]なかった 為[さ]せない 為[さ]せた 為[さ]せました",
         True,
         {
+            "kana_only": "しまった しない しなかった させない させた させました",
             "kana_only split": "<kun>し</kun><oku>まった</oku> <kun>し</kun><oku>ない</oku>"
             " <kun>し</kun><oku>なかった</oku>"
             " <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せた</oku>"
             " <kun>さ</kun><oku>せました</oku>",
+            "kana_only merged": "<kun>し</kun><oku>まった</oku> <kun>し</kun><oku>ない</oku> <kun>し</kun>"
+            "<oku>なかった</oku> <kun>さ</kun><oku>せない</oku> <kun>さ</kun><oku>せた</oku> <kun>さ</kun>"
+            "<oku>せました</oku>",
         },
         id="為る conjugations /2",
     ),
@@ -4299,9 +4324,13 @@ CASES = [
         "為[さ]せて 為[さ]せられ 為[さ]せろ 為[さ]せません 為[さ]せて 為[さ]せられた",
         True,
         {
+            "kana_only": "させて させられ させろ させません させて させられた",
             "kana_only split": "<kun>さ</kun><oku>せて</oku> <kun>さ</kun><oku>せられ</oku> <kun>さ</kun><oku>せろ</oku>"
             " <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せて</oku>"
             " <kun>さ</kun><oku>せられた</oku>",
+            "kana_only merged": "<kun>さ</kun><oku>せて</oku> <kun>さ</kun><oku>せられ</oku> <kun>さ</kun>"
+            "<oku>せろ</oku> <kun>さ</kun><oku>せません</oku> <kun>さ</kun><oku>せて</oku> <kun>さ</kun>"
+            "<oku>せられた</oku>",
         },
         id="為る conjugations /3",
     ),
@@ -4310,9 +4339,12 @@ CASES = [
         "為[し]よう 為[さ]せよう 為[し]ましょう 為[せ]ずに 為[さ]せずに",
         True,
         {
+            "kana_only": "しよう させよう しましょう せずに させずに",
             "kana_only split": "<kun>し</kun><oku>よう</oku> <kun>さ</kun><oku>せよう</oku>"
             " <kun>し</kun><oku>ましょう</oku> <kun>せ</kun><oku>ず</oku>に"
             " <kun>さ</kun><oku>せず</oku>に",
+            "kana_only merged": "<kun>し</kun><oku>よう</oku> <kun>さ</kun><oku>せよう</oku> <kun>し</kun>"
+            "<oku>ましょう</oku> <kun>せ</kun><oku>ず</oku>に <kun>さ</kun><oku>せず</oku>に",
         },
         id="為る conjugations /4",
     ),
@@ -4339,9 +4371,11 @@ CASES = [
         "嗅[か]がせろって",
         True,
         {
+            "kana_only": "かがせろって",
             "kana_only split": "<kun>か</kun><oku>がせろ</oku>って",
             "furigana split": "<kun> 嗅[か]</kun><oku>がせろ</oku>って",
             "furikanji split": "<kun> か[嗅]</kun><oku>がせろ</oku>って",
+            "kana_only merged": "<kun>か</kun><oku>がせろ</oku>って",
         },
         id="matches okuri for causative imperative godan gu verb",
     ),
@@ -4350,9 +4384,11 @@ CASES = [
         "飲[の]ませろ!",
         True,
         {
+            "kana_only": "のませろ!",
             "kana_only split": "<kun>の</kun><oku>ませろ</oku>!",
             "furigana split": "<kun> 飲[の]</kun><oku>ませろ</oku>!",
             "furikanji split": "<kun> の[飲]</kun><oku>ませろ</oku>!",
+            "kana_only merged": "<kun>の</kun><oku>ませろ</oku>!",
         },
         id="matches okuri for causative imperative godan mu verb",
     ),
@@ -4361,9 +4397,11 @@ CASES = [
         "話[はな]させろ!",
         True,
         {
+            "kana_only": "はなさせろ!",
             "kana_only split": "<kun>はな</kun><oku>させろ</oku>!",
             "furigana split": "<kun> 話[はな]</kun><oku>させろ</oku>!",
             "furikanji split": "<kun> はな[話]</kun><oku>させろ</oku>!",
+            "kana_only merged": "<kun>はな</kun><oku>させろ</oku>!",
         },
         id="matches okuri for causative imperative godan su verb",
     ),
@@ -4372,9 +4410,11 @@ CASES = [
         "食[た]べさせろ!",
         True,
         {
+            "kana_only": "たべさせろ!",
             "kana_only split": "<kun>た</kun><oku>べさせろ</oku>!",
             "furigana split": "<kun> 食[た]</kun><oku>べさせろ</oku>!",
             "furikanji split": "<kun> た[食]</kun><oku>べさせろ</oku>!",
+            "kana_only merged": "<kun>た</kun><oku>べさせろ</oku>!",
         },
         id="matches okuri for causative imperative ichidan verb",
     ),
@@ -4383,9 +4423,11 @@ CASES = [
         "有[あ]らせろ!",
         True,
         {
+            "kana_only": "あらせろ!",
             "kana_only split": "<kun>あ</kun><oku>らせろ</oku>!",
             "furigana split": "<kun> 有[あ]</kun><oku>らせろ</oku>!",
             "furikanji split": "<kun> あ[有]</kun><oku>らせろ</oku>!",
+            "kana_only merged": "<kun>あ</kun><oku>らせろ</oku>!",
         },
         id="matches okuri for causative imperative godan aru verb",
     ),
@@ -4394,9 +4436,11 @@ CASES = [
         "博[はく]している",
         False,
         {
+            "kana_only": "はくしている",
             "kana_only split": "<on>はく</on><oku>している</oku>",
             "furigana split": "<on> 博[はく]</on><oku>している</oku>",
             "furikanji split": "<on> はく[博]</on><oku>している</oku>",
+            "kana_only merged": "<on>はく</on><oku>している</oku>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /1",
     ),
@@ -4405,9 +4449,11 @@ CASES = [
         "愛[あい]せるか？",
         False,
         {
+            "kana_only": "<b>あいせる</b>か？",
             "kana_only split": "<b><on>あい</on><oku>せる</oku></b>か？",
             "furigana split": "<b><on> 愛[あい]</on><oku>せる</oku></b>か？",
             "furikanji split": "<b><on> あい[愛]</on><oku>せる</oku></b>か？",
+            "kana_only merged": "<b><on>あい</on><oku>せる</oku></b>か？",
         },
         id="matches single-kanji onyomi す/する verbs okuri /2",
     ),
@@ -4416,9 +4462,11 @@ CASES = [
         "化[か]させない",
         False,
         {
+            "kana_only": "かさせない",
             "kana_only split": "<on>か</on><oku>させない</oku>",
             "furigana split": "<on> 化[か]</on><oku>させない</oku>",
             "furikanji split": "<on> か[化]</on><oku>させない</oku>",
+            "kana_only merged": "<on>か</on><oku>させない</oku>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /3",
     ),
@@ -4433,6 +4481,7 @@ CASES = [
             "kana_only split": "<b><on>てい</on><oku>さなかった</oku></b>",
             "furigana split": "<b><on> 呈[てい]</on><oku>さなかった</oku></b>",
             "furikanji split": "<b><on> てい[呈]</on><oku>さなかった</oku></b>",
+            "kana_only merged": "<b><on>てい</on><oku>さなかった</oku></b>",
         },
         id="matches single-kanji onyomi す/する verbs okuri /4",
     ),
@@ -4447,6 +4496,7 @@ CASES = [
             "kana_only split": "<b><on>さっ</on><oku>していなかった</oku></b>",
             "furigana split": "<b><on> 察[さっ]</on><oku>していなかった</oku></b>",
             "furikanji split": "<b><on> さっ[察]</on><oku>していなかった</oku></b>",
+            "kana_only merged": "<b><on>さっ</on><oku>していなかった</oku></b>",
         },
         id="matches single-kanji onyomi small tsu す verbs okuri /1",
     ),
@@ -4461,6 +4511,7 @@ CASES = [
             "kana_only split": "<b><on>さっ</on><oku>される</oku></b>かも",
             "furigana split": "<b><on> 察[さっ]</on><oku>される</oku></b>かも",
             "furikanji split": "<b><on> さっ[察]</on><oku>される</oku></b>かも",
+            "kana_only merged": "<b><on>さっ</on><oku>される</oku></b>かも",
         },
         id="matches single-kanji onyomi small tsu す verbs okuri /2",
     ),
@@ -4480,6 +4531,8 @@ CASES = [
             "furikanji split": "<b><kun> ほっ[欲]</kun><oku>すれば</oku></b>、<b><kun>"
             " ほ[欲]</kun><oku>しがれば</oku></b>"
             "、<kun> く[呉]</kun><oku>れましょう</oku>",
+            "kana_only merged": "<b><kun>ほっ</kun><oku>すれば</oku></b>、<b><kun>ほ</kun>"
+            "<oku>しがれば</oku></b>、<kun>く</kun><oku>れましょう</oku>",
         },
         id="matches single-kanji small tsu す verbs okuri /3",
     ),
@@ -4494,6 +4547,7 @@ CASES = [
             "kana_only split": "<on>べん</on><b><on>きょう</on></b><oku>しません</oku>！",
             "furigana split": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>しません</oku>！",
             "furikanji split": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>しません</oku>！",
+            "kana_only merged": "<on>べん</on><b><on>きょう</on></b><oku>しません</oku>！",
         },
         id="should not include suru okuri in multi-kanji suru verb highlight /1",
     ),
@@ -4508,6 +4562,7 @@ CASES = [
             "kana_only split": "<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
             "furigana split": "<on> 勉[べん]</on><b><on> 強[きょう]</on></b><oku>していません</oku>！",
             "furikanji split": "<on> べん[勉]</on><b><on> きょう[強]</on></b><oku>していません</oku>！",
+            "kana_only merged": "<on>べん</on><b><on>きょう</on></b><oku>していません</oku>！",
         },
         id="should not include suru okuri in multi-kanji suru verb highlight /2",
     ),
