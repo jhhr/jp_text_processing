@@ -7,6 +7,22 @@ from ..regex.kanji_furi import KANJI_CHAR_RE
 from ..utils.logger import package_logger as logger
 from ..utils.logger import silenced
 
+# The characters that can sit in front of a word without being part of it, so that a word
+# following one of them still counts as starting there. Besides whitespace and a tag's `>` those
+# are another word's closing `]` and punctuation: ASCII punctuation, the CJK symbols and
+# punctuation block 。、「」『』【】〜, the fullwidth forms of the ASCII punctuation ！？（）：；, and ….
+# Left out of it are the characters a word is written with: 々, 〆 and 〇 sit in the CJK block and
+# the fullwidth digits and letters sit among the fullwidth forms. Used in a negated lookbehind,
+# which also lets the match start where the text or a line does.
+WORD_START_PRECEDERS = (
+    r"\s>"  # whitespace, a line break and a tag's end
+    r"\]"  # another word's furigana bracket, the ASCII punctuation below covering it too
+    r"!-/:-@\[-`{-~"  # ASCII punctuation
+    "\u2026"  # …
+    "\u3000-\u3004\u3008-\u303f"  # CJK symbols and punctuation, without 々 〆 〇
+    "\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff60"  # the same punctuation, fullwidth
+)
+
 # Regex for a word that opens with kana and then has nothing but kanji before its furigana, so
 # that the kana it opens with can be taken out of the reading. For example
 # (a) お前[おまえ]
@@ -20,7 +36,8 @@ from ..utils.logger import silenced
 # why a prefix test on its own is not enough.
 LEADING_KANA_CLEANING_REC = re.compile(
     rf"""
-(?<![^\s>])                     # the word's own start: the text's, a line's, a space's or a tag's
+(?<![^{WORD_START_PRECEDERS}])  # the word's own start: the text's, a line's, or one after
+                                # a space, a tag, a bracket or punctuation
 (?P<pre>[ぁ-んァ-ヶー]+)          # the kana the word opens with   (a)お (b)いい (d)スペイン
 (?P<kanji>{KANJI_CHAR_RE}+)     # kanji, with no okurigana before the bracket
 \[
@@ -121,7 +138,8 @@ def leading_kana_cleaning_replacer(match):
 # itself a second time: すり 下[すりお]ろす.
 OKURIGANA_MIX_CLEANING_REC = re.compile(
     rf"""
-(?<![^\s>])             # the word's own start: the text's, a line's, a space's or a tag's
+(?<![^{WORD_START_PRECEDERS}])  # the word's own start: the text's, a line's, or one after
+                        # a space, a tag, a bracket or punctuation
 (?P<pre>[ぁ-ん]*)        # kana before the first kanji            (4)すり (5)かも
 (?P<kanji1>{KANJI_CHAR_RE}+)   # kanji                           (1)消 (2)隣 (3)歯止 (5)知
 (?P<hira1>[ぁ-ん]+)      # hiragana after it                      (1)え (2)り (3)め (5)れない

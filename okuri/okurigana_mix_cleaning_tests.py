@@ -193,6 +193,36 @@ CASES = [
         "行[い]く\nお前[まえ]",
         id="opening kana of a word opening a line",
     ),
+    # A word can follow another word's bracket or a punctuation mark with nothing in between,
+    # and both are as much a word start as a space is: 歩き[あるき]出す[だす] left its second
+    # word uncleaned, and a sentence's words were cleaned only up to its first 。
+    pytest.param(
+        "歩き[あるき]出す[だす]",
+        "歩[ある]き出[だ]す",
+        id="a word right after another word's bracket",
+    ),
+    pytest.param("。食べ[たべ]る", "。食[た]べる", id="a word after a full stop"),
+    pytest.param("「食べ[たべ]る」", "「食[た]べる」", id="a word inside quote marks"),
+    pytest.param(
+        "行[い]く。食べ[たべ]る",
+        "行[い]く。食[た]べる",
+        id="a word after a full stop, with another before it",
+    ),
+    pytest.param(
+        "行[い]く。お前[おまえ]",
+        "行[い]く。お前[まえ]",
+        id="opening kana of a word after a full stop",
+    ),
+    pytest.param(
+        "[sound:a.mp3]食べ[たべ]る",
+        "[sound:a.mp3]食[た]べる",
+        id="a word after a sound tag's bracket",
+    ),
+    # Kana and kanji are still no word start: は is a particle, not the start of 食べる.
+    pytest.param("私は食べ[たべ]る", "私は食べ[たべ]る", id="a word after a particle is skipped"),
+    pytest.param(
+        "私はお前[おまえ]", "私はお前[おまえ]", id="opening kana after a particle is left alone"
+    ),
     # --- whole sentences ---------------------------------------------------------------------
     # What the passes get from a card: several words in one text, kept apart by a space, a <br>
     # or a newline, one of them opening the text and one following a tag.

@@ -116,6 +116,17 @@ CASES = [
     # A \n marks where a word begins just as a space does: fields written in the HTML editor
     # break their lines with <br>, but fields pasted or imported as plain text carry \n.
     pytest.param("行[い]く\n食べ[たべ]る", "いく\nたべる", id="a word opening a line is a word start"),
+    # Another word's bracket and a punctuation mark are word starts too, so the words after
+    # them are cleaned rather than left with their kanji and brackets in the text
+    pytest.param(
+        "歩き[あるき]出す[だす]", "あるきだす", id="a word right after another word's bracket"
+    ),
+    pytest.param("。食べ[たべ]る", "。たべる", id="a word after a full stop"),
+    pytest.param("「食べ[たべ]る」", "「たべる」", id="a word inside quote marks"),
+    pytest.param("行[い]く。食べ[たべ]る", "いく。たべる", id="two words kept apart by a full stop"),
+    pytest.param(
+        "[sound:a.mp3]食べ[たべ]る", "[sound:a.mp3]たべる", id="a word after a sound tag's bracket"
+    ),
     # Whole sentences: what the filter gets from a card, with the words kept apart by a space,
     # a <br> or a newline, one of them opening the text and one following a tag.
     pytest.param(
