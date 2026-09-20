@@ -16,6 +16,35 @@ MecabWordType = Literal[
 ]
 OkuriPrefix = Literal["word", "reading"]
 
+# Mecab tags na-adjective stems as plain 名詞 (静か, 賑やか) and does not expose the
+# 形容動詞語幹 sub-class, so a noun ending in か is the only handle there is. The indefinite
+# pronouns built from an interrogative plus か are nouns ending in か too and take no な, so
+# they are excluded by their stem. Most of them (誰か, 何か, どこか) mecab already splits off
+# the か from, leaving the noun alone; 幾つか and いつか it does not.
+INTERROGATIVE_STEMS = (
+    "誰",
+    "だれ",
+    "何",
+    "なに",
+    "なん",
+    "何処",
+    "どこ",
+    "何時",
+    "いつ",
+    "幾つ",
+    "いくつ",
+    "幾ら",
+    "いくら",
+    "何方",
+    "どちら",
+    "どっち",
+    "何れ",
+    "どれ",
+    "どなた",
+    "如何",
+    "どう",
+)
+
 # Create a single MecabController instance that will be used by all functions in this module
 mecab = MecabController()
 
@@ -29,7 +58,11 @@ def get_word_type_from_mecab_token(token: MecabParsedToken) -> MecabWordType | N
         and token.word.endswith("く")
     ):
         return "i_adjective"
-    if token.part_of_speech == PartOfSpeech.noun and (token.word.endswith("か")):
+    if (
+        token.part_of_speech == PartOfSpeech.noun
+        and token.word.endswith("か")
+        and token.word[:-1] not in INTERROGATIVE_STEMS
+    ):
         return "na_adjective"
     if token.part_of_speech == PartOfSpeech.verb:
         return "verb"

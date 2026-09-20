@@ -107,6 +107,13 @@ CASES = [
     pytest.param(
         "静", "しず", "かなあおさ", ("かな", "あおさ", False), id="静[しず]かなあおさ"
     ),
+    pytest.param("賑", "にぎ", "やかな", ("やかな", "", False), id="賑[にぎ]やかな"),
+    # 静か and 賑やか are na-adjective stems mecab tags as plain nouns, so their な is
+    # okurigana. 幾つか, 誰か and 何か end in か as well but are an interrogative plus か and
+    # take no な, so the な after them stays out of the okurigana.
+    pytest.param("幾", "いく", "つかな", ("つか", "な", False), id="幾[いく]つかな"),
+    pytest.param("誰", "だれ", "かな", ("", "かな", False), id="誰[だれ]かな"),
+    pytest.param("何", "なに", "かな", ("", "かな", False), id="何[なに]かな"),
     pytest.param(
         "高",
         "たか",
