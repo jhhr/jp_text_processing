@@ -20,6 +20,11 @@ import time
 
 import pytest
 
+# pytest only exports TerminalReporter under its own name from 8.4; on 8.0 to 8.3, which
+# minversion allows, the attribute lookup fails while this file is being loaded and takes
+# every suite down with it. The class has always lived in this module.
+from _pytest.terminal import TerminalReporter
+
 TIMED_MARKER = "timed"
 ELAPSED_PROPERTY = "elapsed_ms"
 
@@ -55,7 +60,7 @@ def pytest_runtest_call(item: pytest.Item):
     return result
 
 
-def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+def pytest_terminal_summary(terminalreporter: TerminalReporter) -> None:
     timed = [
         (report, elapsed_ms)
         for outcome in ("passed", "failed")
