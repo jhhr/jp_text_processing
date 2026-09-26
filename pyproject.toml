@@ -37,9 +37,11 @@ ignore_errors = true
 # terminal's encoding; `PYTHONIOENCODING=utf-8` is already required here for anything that
 # prints Japanese.
 [tool.pytest.ini_options]
-# conftest.py's timing hook is a new-style wrapper, which older pytest rejects while loading
-# the file and with it every suite; this turns that into a message saying what to upgrade.
-minversion = "8.0"
+# conftest.py's timing hook is a new-style wrapper, which pytest before 8.0 rejects while loading
+# the file and with it every suite, and its summary hook is annotated with
+# `pytest.TerminalReporter`, which pytest only exports from 8.4. Either way the whole run fails
+# on conftest.py; this turns that into a message saying what to upgrade.
+minversion = "8.4"
 python_files = ["*_tests.py"]
 addopts = "-p no:anki"
 disable_test_id_escaping_and_forfeit_all_rights_to_community_support = true

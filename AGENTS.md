@@ -71,7 +71,7 @@ ruff format --check jp_text_processing
 All four have to come back clean before a change is committed: every test passing (the one
 `xfail` is a known colloquial case in `word_highlight_tests.py`), mypy with no issues, ruff with no
 findings, and the formatter with nothing to change. There is no CI; the checks are run locally.
-The whole test run takes a few seconds; pytest needs to be version 8 or newer (`minversion` in
+The whole test run takes a few seconds; pytest needs to be version 8.4 or newer (`minversion` in
 `pyproject.toml`). Nothing needs Anki, and `addopts = "-p no:anki"` keeps the pytest-anki plugin
 out of the way where it is installed.
 
