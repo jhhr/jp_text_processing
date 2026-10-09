@@ -3875,6 +3875,87 @@ CASES = [
         },
         id="Should not match okurigana in 餡こ",
     ),
+    # Mecab does not know the old-form 來賓, so its okurigana is looked for after the reading
+    # instead, and らいひん is not a word to mecab either: it comes back as the noun らい and the
+    # Kansai negative ひん. The second piece was taken for okurigana following the first, and
+    # the kana after the word were overwritten with it: 來賓[らいひん]ひん. Both pieces are the
+    # word, and the word comes out as 来賓 does.
+    pytest.param(
+        "",
+        "來賓[らいひん]には",
+        False,
+        {
+            "kana_only": "らいひんには",
+            "furigana": " 來賓[らいひん]には",
+            "furikanji": " らいひん[來賓]には",
+            "kana_only split": "<on>らい</on><on>ひん</on>には",
+            "furigana split": "<on> 來[らい]</on><on> 賓[ひん]</on>には",
+            "furikanji split": "<on> らい[來]</on><on> ひん[賓]</on>には",
+            "kana_only merged": "<on>らいひん</on>には",
+            "furigana merged": "<on> 來賓[らいひん]</on>には",
+            "furikanji merged": "<on> らいひん[來賓]</on>には",
+        },
+        id="A word mecab cuts the reading of keeps the kana after it",
+    ),
+    # The same for a word that does have okurigana: らいほう is cut into らい and ほう, and the
+    # する belongs to the piece the reading ends in, as it does after 来訪.
+    pytest.param(
+        "",
+        "來訪[らいほう]する",
+        False,
+        {
+            "kana_only": "らいほうする",
+            "furigana": " 來訪[らいほう]する",
+            "furikanji": " らいほう[來訪]する",
+            "kana_only split": "<on>らい</on><on>ほう</on><oku>する</oku>",
+            "furigana split": "<on> 來[らい]</on><on> 訪[ほう]</on><oku>する</oku>",
+            "furikanji split": "<on> らい[來]</on><on> ほう[訪]</on><oku>する</oku>",
+            "kana_only merged": "<on>らいほう</on><oku>する</oku>",
+            "furigana merged": "<on> 來訪[らいほう]</on><oku>する</oku>",
+            "furikanji merged": "<on> らいほう[來訪]</on><oku>する</oku>",
+        },
+        id="A word mecab cuts the reading of still gets its okurigana",
+    ),
+    # つまづ is the old spelling of つまず, so 躓 is read as jukujikun and its okurigana is
+    # looked for after the reading, which mecab cuts つま|づい|て. The verb begins inside the
+    # reading, and what it holds after the kanji is its inflection all the same.
+    pytest.param(
+        "",
+        "躓[つまづ]いて",
+        False,
+        {
+            "kana_only": "つまづいて",
+            "furigana": " 躓[つまづ]いて",
+            "furikanji": " つまづ[躓]いて",
+            "kana_only split": "<juk>つまづ</juk><oku>いて</oku>",
+            "furigana split": "<juk> 躓[つまづ]</juk><oku>いて</oku>",
+            "furikanji split": "<juk> つまづ[躓]</juk><oku>いて</oku>",
+            "kana_only merged": "<juk>つまづ</juk><oku>いて</oku>",
+            "furigana merged": "<juk> 躓[つまづ]</juk><oku>いて</oku>",
+            "furikanji merged": "<juk> つまづ[躓]</juk><oku>いて</oku>",
+        },
+        id="A verb mecab begins inside the reading still gives the okurigana",
+    ),
+    # 五分の is cut 五|分の, the 分の of 三分の一. That is a noun begun on the word's last kanji
+    # and not a tail of 五分: taken for a lexical suffix, the way こ is one in 餡こ, it would
+    # make ぶ a kunyomi.
+    pytest.param(
+        "",
+        "五分[ごぶ]の 出来[でき]",
+        False,
+        {
+            "kana_only": "ごぶの でき",
+            "furigana": " 五分[ごぶ]の 出来[でき]",
+            "furikanji": " ごぶ[五分]の でき[出来]",
+            "kana_only split": "<on>ご</on><on>ぶ</on>の <kun>で</kun><kun>き</kun>",
+            "furigana split": "<on> 五[ご]</on><on> 分[ぶ]</on>の<kun> 出[で]</kun><kun> 来[き]</kun>",
+            "furikanji split": "<on> ご[五]</on><on> ぶ[分]</on>の<kun> で[出]</kun><kun> き[来]</kun>",
+            "kana_only merged": "<on>ごぶ</on>の <kun>でき</kun>",
+            "furigana merged": "<on> 五分[ごぶ]</on>の<kun> 出来[でき]</kun>",
+            "furikanji merged": "<on> ごぶ[五分]</on>の<kun> でき[出来]</kun>",
+        },
+        id="A noun mecab begins on a word's last kanji is not that word's suffix",
+    ),
     pytest.param(
         "悲",
         "彼[かれ]は 悲[かな]しくすぎるので、 悲[かな]しみの 悲[かな]しさを 悲[かな]しんでいる。",

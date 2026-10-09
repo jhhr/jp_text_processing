@@ -172,6 +172,35 @@ CASES = [
     pytest.param("聴牌", "テンパ", "ってた", ("ってた", "", False), id="聴牌[テンパ]ってた"),
     pytest.param("", "はにか", "んだ", ("んだ", "", False), id="[はにか]んだ"),
     pytest.param("御座", "ござ", "います", ("います", "", False), id="御座[ござ]います"),
+    # Mecab does not know 來賓, and reads らいひん as the noun らい and the Kansai negative ひん.
+    # Both pieces are the word. Taking ひん for the okurigana of らい gave back ("ひん", ""):
+    # kana that are not in には at all, and nothing of the には.
+    pytest.param("來賓", "らいひん", "には", ("", "には", False), id="來賓[らいひん]には"),
+    # The piece the reading ends in is the one okurigana hangs on: ほう is a noun, so the する
+    # after it is found as it is after 来訪.
+    pytest.param("來訪", "らいほう", "する", ("する", "", True), id="來訪[らいほう]する"),
+    # ばたく is cut into ば and たく, and たく is not okurigana of ば either. It came back as
+    # ("たく", ""), which is how 羽搏[はばた]く was once written out as 羽搏[はばた]たく. The く
+    # is okurigana in truth; half a word's reading is too little for mecab to see that by.
+    pytest.param("搏", "ばた", "く", ("", "く", False), id="搏[ばた]く"),
+    # 五分の is cut 五|分の and 老人たち is cut 老|人たち. A noun that begins on the word's last
+    # kanji is another word, and its tail is neither okurigana nor a suffix of this one.
+    pytest.param("五分", "ごぶ", "の", ("", "の", False), id="五分[ごぶ]の"),
+    pytest.param("老人", "ろうじん", "たちは", ("", "たちは", False), id="老人[ろうじん]たちは"),
+    # Degenerate: mecab is not given markup and hands back no spaces, so past either its tokens
+    # are no longer what the text goes on with. The okurigana ends there. What these pin is
+    # that the two parts are still the text that was given: they used to be ("している", "る")
+    # and ("している", ">いる</b>").
+    pytest.param(
+        "勉強", "べんきょう", "して いる", ("して", " いる", True), id="勉強[べんきょう]して いる"
+    ),
+    pytest.param(
+        "勉強",
+        "べんきょう",
+        "して<b>いる</b>",
+        ("して", "<b>いる</b>", True),
+        id="勉強[べんきょう]して<b>いる</b>",
+    ),
 ]
 
 
@@ -183,6 +212,35 @@ def test_get_conjugated_okuri_with_mecab(
     expected: tuple[str, str, bool],
 ):
     result, is_suru_verb = get_conjugated_okuri_with_mecab(word, reading, maybe_okuri)
+    assert (result.okurigana, result.rest_kana, is_suru_verb) == expected
+
+
+# Asked the way the jukujikun processor asks for its last kanji: the reading is the prefix, it
+# is only that kanji's share of the word's reading, and inflection is held to strictly. Half a
+# word's reading is rarely a word, so mecab cuts these somewhere inside it.
+READING_PREFIX_CASES = [
+    # つま|づい|て: the verb begins inside the reading, but what it holds after the kanji is its
+    # inflection all the same, and the て goes on from there.
+    pytest.param("躓", "つまづ", "いて", ("いて", "", False), id="躓[つまづ]いて"),
+    # に|きまっ|て|いる, from the phrase に決まっている with its reading in one bracket.
+    pytest.param("決", "にき", "まっている", ("まっている", "", False), id="決[にき]まっている"),
+    # ま|おも: おも is the bare stem of おもい, which has no ending in it for the も to be.
+    pytest.param("猫", "まお", "も", ("", "も", False), id="猫[まお]も"),
+    # ば|たく, and たく is an auxiliary here, not a verb: nothing to go by.
+    pytest.param("搏", "ばた", "く", ("", "く", False), id="搏[ばた]く"),
+]
+
+
+@pytest.mark.parametrize("word, reading, maybe_okuri, expected", READING_PREFIX_CASES)
+def test_get_conjugated_okuri_with_mecab_from_the_reading(
+    word: str,
+    reading: str,
+    maybe_okuri: str,
+    expected: tuple[str, str, bool],
+):
+    result, is_suru_verb = get_conjugated_okuri_with_mecab(
+        word, reading, maybe_okuri, okuri_prefix="reading", strict_inflection=True
+    )
     assert (result.okurigana, result.rest_kana, is_suru_verb) == expected
 
 

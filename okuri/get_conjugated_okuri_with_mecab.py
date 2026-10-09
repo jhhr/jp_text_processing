@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 
 from ..all_types.main_types import (
     OkuriResults,
@@ -16,6 +17,32 @@ from .mecab_common import (
 )
 
 
+def find_stem_token(
+    tokens: Sequence[MecabParsedToken], text: str, prefix_length: int
+) -> tuple[int, str] | None:
+    """
+    The token the okurigana is read from, as `(index, part)`: the token the prefix ends in, and
+    the part of it that lies past the prefix. `None` when the tokens do not spell `text` that
+    far, which is mecab having dropped or rewritten something it was given.
+
+    Mecab gets the prefix and the kana after it as one text and cuts that where it sees words.
+    A word it knows comes back as one token running on into its inflection (食べ of 食べた), and
+    that token is the stem. A word it does not know can come back in pieces, every one of them
+    still the word: 來賓 is no word to it, and neither is らいひん, which it reads as the noun
+    らい and the Kansai negative ひん. Only the piece the prefix ends in can carry okurigana, and
+    the pieces before it are skipped. Taking the first token for the stem whatever its length
+    made ひん the okurigana of らい, and 來賓[らいひん]には was written back as 來賓[らいひん]ひん.
+    """
+    spelled = ""
+    for index, token in enumerate(tokens):
+        spelled += token.word
+        if not text.startswith(spelled):
+            return None
+        if len(spelled) >= prefix_length:
+            return index, spelled[prefix_length:]
+    return None
+
+
 def get_conjugated_okuri_with_mecab(
     word: str,
     reading: str,
@@ -25,6 +52,11 @@ def get_conjugated_okuri_with_mecab(
 ) -> tuple[OkuriResults, bool]:
     """
     Determines the portion of text that is the conjugated okurigana for a kanji reading.
+
+    Whatever is found, the okurigana is the start of `maybe_okuri` and the rest is what remains
+    of it: `okurigana + rest_kana == maybe_okuri`. The callers write both back out, so anything
+    else would change the text.
+
     :param word: The kanji or word
     :param maybe_okuri: The okurigana to check
     :param reading: The reading of the kanji or word occurring before the okurigana
@@ -105,26 +137,45 @@ def get_conjugated_okuri_with_mecab(
             text_to_parse,
         )
         return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
-    first_token = tokens[0]
-    if not first_token.part_of_speech:
+    stem = find_stem_token(tokens, text_to_parse, len(parse_text_prefix))
+    if stem is None:
+        logger.debug(
+            "get_conjugated_okuri - The tokens do not spell %s as far as its prefix %s,"
+            " returning no okuri.",
+            text_to_parse,
+            parse_text_prefix,
+        )
+        return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
+    stem_index, conjugated_okuri = stem
+    stem_token = tokens[stem_index]
+    if not stem_token.part_of_speech:
         logger.error("get_conjugated_okuri - No PartOfSpeech found for %s", text_to_parse)
         return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
 
-    word_type = get_word_type_from_mecab_token(first_token)
+    word_type = get_word_type_from_mecab_token(stem_token)
+    # A token that begins part-way through the prefix and runs on past its end is not the word
+    # that was asked about, it only ends in the same place. A verb there still shows where the
+    # ending is, because what a verb token holds after the kanji is its inflection: づい of
+    # 躓[つまづ]いて, which mecab cuts つま|づい|て, or きまっ of に決[にき]まって. Nothing else
+    # does. 分の in 五分の and 人たち in 老人たち are nouns that begin on the word's last kanji,
+    # and their tails would pass for a lexical suffix of 五分 and 老人, which turns an onyomi
+    # into a kunyomi; おも in 猫[まお]も is an adjective's bare stem, with no ending in it.
+    if stem_index > 0 and conjugated_okuri and word_type != "verb":
+        word_type = None
     logger.debug(
-        "First token: %s,  PartOfSpeech: %s, first_token word_type: %s",
-        first_token.word,
-        first_token.part_of_speech,
+        "Stem token: %s,  PartOfSpeech: %s, word_type: %s",
+        stem_token.word,
+        stem_token.part_of_speech,
         word_type,
     )
     if not word_type:
-        # If the first token is not one of the processable types, try again with kanji_reading
+        # If the stem token is not one of the processable types, try again with kanji_reading
         # as the prefix
         if okuri_prefix == "word":
             logger.debug(
-                "First token not valid: %s, PartOfSpeech: %s, Retrying with reading as prefix.",
-                first_token.word,
-                first_token.part_of_speech,
+                "Stem token not valid: %s, PartOfSpeech: %s, Retrying with reading as prefix.",
+                stem_token.word,
+                stem_token.part_of_speech,
             )
             if reading:
                 return get_conjugated_okuri_with_mecab(
@@ -139,21 +190,21 @@ def get_conjugated_okuri_with_mecab(
                 return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         elif okuri_prefix == "reading":
             logger.debug(
-                "First token is not a verb or adjective: %s, PartOfSpeech: %s, Returning empty"
+                "Stem token is not a verb or adjective: %s, PartOfSpeech: %s, Returning empty"
                 " okuri.",
-                first_token.word,
-                first_token.part_of_speech,
+                stem_token.word,
+                stem_token.part_of_speech,
             )
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
         else:
             logger.error("Unknown okuri_prefix: %s. Expected 'word' or 'reading'.", okuri_prefix)
             return OkuriResults("", maybe_okuri, "no_okuri", None), is_suru_verb
-    # The first token will actually include the conjugation stem, so we need to extract it
-    conjugated_okuri = first_token.word[len(parse_text_prefix) :]
+    # The stem token runs on past the prefix into the conjugation stem, and that part of it is
+    # the okurigana so far.
     # Exception for nouns like 恥ずかしげな where the げ should be considered not a conjugation
     # as it is in fact 恥ずかし気な
-    if word_type == "noun" and first_token.word.endswith("げ"):
-        conjugated_okuri = first_token.word[len(parse_text_prefix) : -1]
+    if word_type == "noun" and stem_token.word.endswith("げ"):
+        conjugated_okuri = conjugated_okuri[:-1]
         okuri_type = "full_okuri"
         logger.debug(
             "Detected okuri for noun: %s, rest: %s",
@@ -166,13 +217,13 @@ def get_conjugated_okuri_with_mecab(
         )
     rest_kana = maybe_okuri[len(conjugated_okuri) :]
     logger.debug(
-        "Initial conjugated okuri: %s, rest_kana: %s, first token: %s, PartOfSpeech: %s",
+        "Initial conjugated okuri: %s, rest_kana: %s, stem token: %s, PartOfSpeech: %s",
         conjugated_okuri,
         rest_kana,
-        first_token.word,
-        first_token.part_of_speech,
+        stem_token.word,
+        stem_token.part_of_speech,
     )
-    rest_tokens = tokens[1:]
+    rest_tokens = tokens[stem_index + 1 :]
     added_conjugation_token = False
     for token in rest_tokens:
         add_to_conjugated_okuri, was_suru_verb = get_all_conjugation_conditions(
@@ -180,7 +231,10 @@ def get_conjugated_okuri_with_mecab(
             rest_tokens,
             word_type,
         )
-        if add_to_conjugated_okuri:
+        # Mecab is not given markup and hands back no spaces, so a token is not always what
+        # the text goes on with. One that is not ends the okurigana, like a token that does
+        # not conjugate.
+        if add_to_conjugated_okuri and rest_kana.startswith(token.word):
             added_conjugation_token = True
             conjugated_okuri += token.word
             # Remove the text from the rest of the okurigana
@@ -219,7 +273,7 @@ def get_conjugated_okuri_with_mecab(
             " okuri, conjugated_okuri: %s, maybe_okuri: %s, token: %s",
             conjugated_okuri,
             maybe_okuri,
-            first_token.word,
+            stem_token.word,
         )
         return OkuriResults("", maybe_okuri, "rejected_lexical_suffix", None), is_suru_verb
 
