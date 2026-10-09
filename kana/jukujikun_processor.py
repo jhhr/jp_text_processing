@@ -330,34 +330,17 @@ def process_jukujikun_positions(
             strict_inflection=True,
         )
 
-        # Whatever is taken as okurigana has to be spent out of the kana that follow the word:
-        # okurigana + rest_kana == remaining_kana. A candidate claiming more than that has taken
-        # the difference from the kanji's own reading, which stays in the furigana as well. For
-        # 羽搏[はばた]く the last kanji offered たく, and writing that out gave 羽搏[はばた]たく.
-        def spends_only_following_kana(result) -> bool:
-            return result.okurigana + result.rest_kana == remaining_kana
-
-        word_usable = spends_only_following_kana(word_okuri_result)
-        kanji_usable = spends_only_following_kana(kanji_okuri_result)
-        # Of the candidates that do, the longest okurigana is still the most specific one.
-        if (
-            word_usable
-            and word_okuri_result.okurigana
-            and (
-                not kanji_usable
-                or len(word_okuri_result.okurigana) > len(kanji_okuri_result.okurigana)
-            )
-        ):
+        # Both spend their okurigana out of the kana that follow the word and nothing else, which
+        # get_conjugated_okuri_with_mecab answers for, so either can be written out as it is. The
+        # longest is the most specific one.
+        if len(word_okuri_result.okurigana) > len(kanji_okuri_result.okurigana):
             okuri_result = word_okuri_result
             is_noun_suru_verb = word_is_noun_suru_verb
-        elif kanji_usable and kanji_okuri_result.okurigana:
+        elif kanji_okuri_result.okurigana:
             okuri_result = kanji_okuri_result
             is_noun_suru_verb = kanji_is_noun_suru_verb
-        elif word_usable:
-            okuri_result = word_okuri_result
-            is_noun_suru_verb = word_is_noun_suru_verb
         else:
-            okuri_result = word_okuri_result._replace(okurigana="", rest_kana=remaining_kana)
+            okuri_result = word_okuri_result
             is_noun_suru_verb = word_is_noun_suru_verb
         juku_entry["is_noun_suru_verb"] = is_noun_suru_verb
 
