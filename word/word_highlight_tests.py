@@ -629,6 +629,32 @@ CASES = [
         "Ｔ 字[じ]の 道[みち]を 歩[ある]く",
         id="Latin letters - the letters without the katakana after them are not the word",
     ),
+    # A reading in the text is the reading of all the letters before it, so letters that are
+    # only part of that run are not the word, with the reading or cut off from it
+    pytest.param(
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]２０ ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        "ｍ[めーとる]",
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]２０ ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        id="Latin letters - the end of a longer run of letters with a reading is not the word",
+    ),
+    pytest.param(
+        "ＮＨＫ[えぬえいちけい]の 番組[ばんぐみ]を 見[み]る",
+        "Ｋ[けー]",
+        "ＮＨＫ[えぬえいちけい]の 番組[ばんぐみ]を 見[み]る",
+        id="Latin letters - the end of a longer run of letters with a reading is not the word /2",
+    ),
+    pytest.param(
+        "ＮＨＫ[えぬえいちけい]の 番組[ばんぐみ]を 見[み]る",
+        "ＮＨ[えぬえいち]",
+        "ＮＨＫ[えぬえいちけい]の 番組[ばんぐみ]を 見[み]る",
+        id="Latin letters - the start of a longer run of letters with a reading is not the word",
+    ),
+    pytest.param(
+        "白[しろ]いＴシャツと ＣＤ[しーでぃー]を 買[か]う",
+        "Ｔ",
+        "白[しろ]い<b>Ｔ</b>シャツと ＣＤ[しーでぃー]を 買[か]う",
+        id="Latin letters - letters before kana are a run of their own",
+    ),
     # A kanji said twice is written twice or with 々, and the furigana splitting keeps the two
     # spellings apart: 駄々 stays one token and 駄駄 becomes two. A word not found as written is
     # looked for in the spelling the text has.

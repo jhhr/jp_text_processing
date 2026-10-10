@@ -43,8 +43,9 @@ CONSECUTIVE_FURI_WORD_RE = (
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
 KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
+LATIN_CHAR_RE = "[A-Za-zＡ-Ｚａ-ｚ]"
 # (1) A run of Latin letters of either width, and the reading the word may have on it
-LATIN_RUN_AND_MAYBE_FURIGANA_RE = r"([A-Za-zＡ-Ｚａ-ｚ]+)(?:\[[^\]]*\])?"
+LATIN_RUN_AND_MAYBE_FURIGANA_RE = rf"({LATIN_CHAR_RE}+)(?:\[[^\]]*\])?"
 # A katakana word a word ends in: (1) the last kanji with its reading, (2) the okurigana that
 # kanji may have, (3) the katakana. The long vowel mark is katakana here though ァ-ン stops
 # short of it: without it 神[かみ]ゲー has no such tail and is searched for bracket and all,
@@ -93,10 +94,23 @@ def word_part_pattern(word_part: str) -> str:
     without one, whether the word gives them one or not, and the two readings are not held
     against each other: the letters are the word, and how a reading spells them out is not
     settled (えい and えー).
+
+    A reading in the text is the reading of the whole run of letters before it, and with the
+    readings out of the comparison nothing else says so. So the word's letters take a bracket
+    along only as all of its run, and inside a run that has one they are not found at all:
+    ｍ[めーとる] is not the ｍ of ｃｍ[せんち], nor Ｋ the end of ＮＨＫ[えぬえいちけい] with
+    the highlight closing between the letters and their reading. In letters the text gives
+    no reading the word is found as far as it goes, as it always was.
     """
+
+    def letters_pattern(letters: str) -> str:
+        whole_run_with_reading = rf"(?<!{LATIN_CHAR_RE}){letters}\[[^\]]*\]"
+        not_in_a_run_with_reading = rf"{letters}(?!{LATIN_CHAR_RE}*\[)"
+        return rf"(?:{whole_run_with_reading}|{not_in_a_run_with_reading})"
+
     # Split with a capturing group: the letters are the odd parts, and their reading goes
     return "".join(
-        rf"{re.escape(part)}(?:\[[^\]]*\])?"
+        letters_pattern(re.escape(part))
         if index % 2
         else replace_hiragana_in_pattern(whole_number_pattern(part))
         for index, part in enumerate(re.split(LATIN_RUN_AND_MAYBE_FURIGANA_RE, word_part))
