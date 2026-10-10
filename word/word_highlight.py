@@ -359,6 +359,18 @@ def word_highlight(text: str, word: str) -> str:
     word_highlight("安[やす]くて 良[い]いな～", "安[やす]い") --> "<b>安[やす]くて</b> 良[い]いな～"
     word_highlight("高[たか]いでも 良[よ]かろう", "良[い]い") --> "高[たか]いでも<b> 良[よ]かろう</b>"
 
+    The word is looked for in three steps. It is first brought into ordinary furigana syntax,
+    when it comes in another shape a note's field can hold it in (`word_normalizer`): one
+    bracket reading a whole expression, a trailing space, a tag. It is then searched for as
+    it is written (`highlight_as_written`), and where that finds nothing, as it reads, for a
+    text that spells the same word another way (`reading_highlight`):
+
+    word_highlight("土地[とち]に 買[か]い 手[て]が 付[つ]いた", "買い手が付く[かいてがつく]")
+        --> "土地[とち]に<b> 買[か]い 手[て]が 付[つ]いた</b>"
+    word_highlight("バツが 三[みっ]つ", "罰[ばつ]") --> "<b>バツ</b>が 三[みっ]つ"
+    word_highlight("酷[ひど]い 有[あ]り 様[さま]でした", "有様[ありさま]")
+        --> "酷[ひど]い<b> 有[あ]り 様[さま]</b>でした"
+
     A text the word does not occur in comes back exactly as it was given.
 
     Args:

@@ -40,7 +40,7 @@ the highlight is placed around it rather than through it.
 | `all_types/main_types.py` | The shared `TypedDict`s and `Literal`s: `MoraAlignment`, `ReadingMatchInfo`, `WrapMatchEntry`, `FinalResult`, `WithTagsDef`, parts of speech. |
 | `kana/` | The `kana_highlight` pipeline: cleaning replacers, the exception table, furigana normalisation, mora splitting, the reading matcher, the mora-to-kanji alignment search, jukujikun handling, reconstruction. |
 | `okuri/` | Okurigana: the conjugation dictionary, inflection checks, and the MeCab-backed okurigana detection. `mecab_common.py` holds the one `MecabController` instance. |
-| `word/` | The `word_highlight` pipeline: patterns, tag storage and restoration, `<b>` balancing, MeCab-backed inflected matching. |
+| `word/` | The `word_highlight` pipeline, in the order it runs: the word brought into ordinary furigana syntax (`word_normalizer.py`), the search for it as written (`word_highlight.py`, with `text_spelling.py` for numbers and repeated kanji, `reading_variants.py` for readings that differ by a sound change, and `highlight_inflected_words_with_mecab.py` for an inflected kana word), and the search by reading for a text that spells it another way (`reading_highlight.py`). Under them: tag storage and restoration, `<b>` balancing. |
 | `kanji/` | `all_kanji_data.json` (about 11 000 kanji, each with its onyomi and kunyomi as strings) and the digit-to-kanji converter. |
 | `regex/` | Character classes and tables: kanji ranges, mora lists, rendaku conversions. |
 | `utils/logger.py` | The package logger. |
