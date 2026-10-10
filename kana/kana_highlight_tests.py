@@ -3916,9 +3916,28 @@ CASES = [
         },
         id="A word mecab cuts the reading of still gets its okurigana",
     ),
-    # つまづ is the old spelling of つまず, so 躓 is read as jukujikun and its okurigana is
-    # looked for after the reading, which mecab cuts つま|づい|て. The verb begins inside the
-    # reading, and what it holds after the kanji is its inflection all the same.
+    # ばた is no reading of 撃, only its share of 羽撃く, so 撃 is read as jukujikun and its
+    # okurigana is looked for after the reading, which mecab cuts ば|たい|て. The verb begins
+    # inside the reading, and what it holds after the kanji is its inflection all the same.
+    pytest.param(
+        "",
+        "羽[は] 撃[ばた]いて",
+        False,
+        {
+            "kana_only": "は ばたいて",
+            "furigana": " 羽[は] 撃[ばた]いて",
+            "furikanji": " は[羽] ばた[撃]いて",
+            "kana_only split": "<kun>は</kun> <juk>ばた</juk><oku>いて</oku>",
+            "furigana split": "<kun> 羽[は]</kun><juk> 撃[ばた]</juk><oku>いて</oku>",
+            "furikanji split": "<kun> は[羽]</kun><juk> ばた[撃]</juk><oku>いて</oku>",
+            "kana_only merged": "<kun>は</kun> <juk>ばた</juk><oku>いて</oku>",
+            "furigana merged": "<kun> 羽[は]</kun><juk> 撃[ばた]</juk><oku>いて</oku>",
+            "furikanji merged": "<kun> は[羽]</kun><juk> ばた[撃]</juk><oku>いて</oku>",
+        },
+        id="A verb mecab begins inside the reading still gives the okurigana",
+    ),
+    # つまづ is the other case, a spelling of the kunyomi itself: modern kana usage writes
+    # つまずく and permits つまづく beside it, so the data lists both for 躓.
     pytest.param(
         "",
         "躓[つまづ]いて",
@@ -3927,14 +3946,14 @@ CASES = [
             "kana_only": "つまづいて",
             "furigana": " 躓[つまづ]いて",
             "furikanji": " つまづ[躓]いて",
-            "kana_only split": "<juk>つまづ</juk><oku>いて</oku>",
-            "furigana split": "<juk> 躓[つまづ]</juk><oku>いて</oku>",
-            "furikanji split": "<juk> つまづ[躓]</juk><oku>いて</oku>",
-            "kana_only merged": "<juk>つまづ</juk><oku>いて</oku>",
-            "furigana merged": "<juk> 躓[つまづ]</juk><oku>いて</oku>",
-            "furikanji merged": "<juk> つまづ[躓]</juk><oku>いて</oku>",
+            "kana_only split": "<kun>つまづ</kun><oku>いて</oku>",
+            "furigana split": "<kun> 躓[つまづ]</kun><oku>いて</oku>",
+            "furikanji split": "<kun> つまづ[躓]</kun><oku>いて</oku>",
+            "kana_only merged": "<kun>つまづ</kun><oku>いて</oku>",
+            "furigana merged": "<kun> 躓[つまづ]</kun><oku>いて</oku>",
+            "furikanji merged": "<kun> つまづ[躓]</kun><oku>いて</oku>",
         },
-        id="A verb mecab begins inside the reading still gives the okurigana",
+        id="つまづく is a kunyomi of 躓 as つまずく is",
     ),
     # 五分の is cut 五|分の, the 分の of 三分の一. That is a noun begun on the word's last kanji
     # and not a tail of 五分: taken for a lexical suffix, the way こ is one in 餡こ, it would
