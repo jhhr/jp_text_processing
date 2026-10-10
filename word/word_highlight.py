@@ -43,6 +43,11 @@ CONSECUTIVE_FURI_WORD_RE = (
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
 KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
+# (1) A run of Latin letters of either width, and the reading the word may have on it
+LATIN_RUN_AND_MAYBE_FURIGANA_RE = r"([A-Za-zＡ-Ｚａ-ｚ]+)(?:\[[^\]]*\])?"
+# A katakana word a word ends in: (1) the last kanji with its reading, (2) the okurigana that
+# kanji may have, (3) the katakana
+KATAKANA_SUFFIX_RE = rf"({KANJI_RUN_CHAR_RE}\[[^\]]*?\])([ぁ-ん]*)([ァ-ン]+)$"
 
 
 def kanji_run_with_maybe_furigana(escaped_kanji: str, run_may_continue: bool = True) -> str:
@@ -76,6 +81,26 @@ def replace_hiragana_in_pattern(text: str) -> str:
     return re.sub(r"[ぁ-ん]", replace_hiragana, text)
 
 
+def word_part_pattern(word_part: str) -> str:
+    """Create a pattern for what the word has outside its kanji runs and their readings.
+
+    Kana match in either script, and a number left here by the splitting only a whole number.
+
+    Latin letters can carry a reading the way kanji do, ＡＢＣ[えいびーしー] and
+    ｎｍ[なのめーとる], in the word or in the text. They match with a reading after them and
+    without one, whether the word gives them one or not, and the two readings are not held
+    against each other: the letters are the word, and how a reading spells them out is not
+    settled (えい and えー).
+    """
+    # Split with a capturing group: the letters are the odd parts, and their reading goes
+    return "".join(
+        rf"{re.escape(part)}(?:\[[^\]]*\])?"
+        if index % 2
+        else replace_hiragana_in_pattern(whole_number_pattern(part))
+        for index, part in enumerate(re.split(LATIN_RUN_AND_MAYBE_FURIGANA_RE, word_part))
+    )
+
+
 def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     """Create a regex pattern matching the word, with or without the text's furigana.
 
@@ -95,7 +120,7 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     for index, match in enumerate(kanji_matches):
         literal_prefix = word[cursor : match.start()]
         if literal_prefix:
-            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            pattern_parts.append(word_part_pattern(literal_prefix))
             pattern_parts.append(r"\s?")
         kanji, kanji_furigana = match.group(1), match.group(2)
         if kanji_furigana:
@@ -111,7 +136,7 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
-        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+        pattern_parts.append(word_part_pattern(literal_suffix))
     return "".join(pattern_parts)
 
 
@@ -138,9 +163,7 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReadin
         if literal_prefix:
             without_space = literal_prefix.rstrip(" ")
             if without_space:
-                pattern_parts.append(
-                    replace_hiragana_in_pattern(whole_number_pattern(without_space))
-                )
+                pattern_parts.append(word_part_pattern(without_space))
             if without_space != literal_prefix:
                 pattern_parts.append(r"\s?")
         kanji = match.group(1)
@@ -155,7 +178,7 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReadin
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
-        pattern_parts.append(replace_hiragana_in_pattern(whole_number_pattern(literal_suffix)))
+        pattern_parts.append(word_part_pattern(literal_suffix))
     return "".join(pattern_parts), expected_readings
 
 
@@ -434,7 +457,10 @@ def highlight_spelling(text: str, word: str) -> str:
 
     # Strip trailing katakana suffix after furigana (with optional hiragana okuri)
     # before to_hiragana so it is not mistaken for inflectable okurigana.
-    katakana_suffix_after_furi_match = re.search(r"(\[[^\]]*?\])([ぁ-ん]*)([ァ-ン]+)$", word)
+    # Only after a kanji's reading: the two paths that put the suffix back are the ones a
+    # kanji with a reading leads to. Letters with a reading (Ｔ[てぃー]シャツ) take the path
+    # that matches the word as it stands, which would look for the letters alone.
+    katakana_suffix_after_furi_match = re.search(KATAKANA_SUFFIX_RE, word)
     katakana_fixed_suffix = (
         katakana_suffix_after_furi_match.group(3) if katakana_suffix_after_furi_match else ""
     )

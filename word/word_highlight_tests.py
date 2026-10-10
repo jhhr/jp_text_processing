@@ -572,6 +572,63 @@ CASES = [
         "<b>一[ひと]</b> 人[り]で１ 個[こ] 食[た]べた",
         id="Number - a word found as written is not looked for in digits as well",
     ),
+    # Latin letters can carry a reading like kanji do, in the word or in the text. They are
+    # the same letters with it and without, and whatever it says: the letters are the word.
+    pytest.param(
+        "ＡＢＣ[えいびーしー]ニュースに<k> 依[よ]れば</k>、もう一 機[き]のジェット 旅客機[りょかくき]が",
+        "ＡＢＣニュース",
+        "<b>ＡＢＣ[えいびーしー]ニュース</b>に<k> 依[よ]れば</k>、もう一 機[き]のジェット 旅客機[りょかくき]が",
+        id="Latin letters - a reading on them in the text, none in the word",
+    ),
+    pytest.param(
+        "私[わたし]は Ｒ[あーる]．バートンの「 歴史[れきし]叢書[そうしょ]」を 買[か]う",
+        "Ｒ．バートン",
+        "私[わたし]は<b> Ｒ[あーる]．バートン</b>の「 歴史[れきし]叢書[そうしょ]」を 買[か]う",
+        id="Latin letters - a reading on them in the text, none in the word, a space before them",
+    ),
+    pytest.param(
+        "表面[ひょうめん]に１ｎｍ 程度[ていど]の 厚[あつ]さの 酸化[さんか]アルミニウムが<k> 出来[でき]る</k>。",
+        "ｎｍ[なのめーとる]",
+        "表面[ひょうめん]に１<b>ｎｍ</b> 程度[ていど]の 厚[あつ]さの 酸化[さんか]アルミニウムが<k> 出来[でき]る</k>。",
+        id="Latin letters - a reading on them in the word, none in the text",
+    ),
+    pytest.param(
+        "ＡＢＣ[えいびーしー]ニュースに<k> 依[よ]れば</k>",
+        "ＡＢＣ[えーびーしー]ニュース",
+        "<b>ＡＢＣ[えいびーしー]ニュース</b>に<k> 依[よ]れば</k>",
+        id="Latin letters - a reading on them spelled otherwise in the text",
+    ),
+    pytest.param(
+        "右側[みぎがわ]<k> 丈[だけ]</k>４Ｋテレビ<k> 見[み]たいだ</k>な…",
+        "四Ｋ[よんけー]",
+        "右側[みぎがわ]<k> 丈[だけ]</k><b>４Ｋ</b>テレビ<k> 見[み]たいだ</k>な…",
+        id="Latin letters - a reading on them in the word, after a numeral the text has as a digit",
+    ),
+    pytest.param(
+        "ＮＨＫ[えぬえいちけい] 教育[きょういく]テレビを 見[み]る",
+        "ＮＨＫ 教育[きょういく]",
+        "<b>ＮＨＫ[えぬえいちけい] 教育[きょういく]</b>テレビを 見[み]る",
+        id="Latin letters - a reading on them in the text, before a kanji with one in the word",
+    ),
+    pytest.param(
+        "ＮＨＫ 教育[きょういく]テレビを 見[み]る",
+        "ＮＨＫ[えぬえいちけい] 教育[きょういく]",
+        "<b>ＮＨＫ 教育[きょういく]</b>テレビを 見[み]る",
+        id="Latin letters - a reading on them in the word, before a kanji with one in the text",
+    ),
+    # The katakana after the letters' reading is part of the word like any other kana
+    pytest.param(
+        "白[しろ]いＴシャツを 着[き]る",
+        "Ｔ[てぃー]シャツ",
+        "白[しろ]い<b>Ｔシャツ</b>を 着[き]る",
+        id="Latin letters - a reading on them in the word, katakana after it",
+    ),
+    pytest.param(
+        "Ｔ 字[じ]の 道[みち]を 歩[ある]く",
+        "Ｔ[てぃー]シャツ",
+        "Ｔ 字[じ]の 道[みち]を 歩[ある]く",
+        id="Latin letters - the letters without the katakana after them are not the word",
+    ),
     pytest.param(
         "家で居る、家出はしない",
         "家",
