@@ -64,10 +64,22 @@ highlighted, again as for a word found as written. A kana word in a place the te
 kanji in (3) is only taken with an inflection the check accepts.
 
 A stem that the text has in kana (4) proves nothing: the い of 言う begins いる, and the check
-would read the る as its ending. For such a word the kana path's own search is asked instead,
-`highlight_inflected_words_with_mecab` with the word's bare reading: it wants a MeCab token
-that has the word for its headword, and it follows irregular stems (きます of 来[く]る) because
-it never looks at the stem's kana. It is asked only when no place was found any other way.
+would read the る as its ending. For such a word MeCab's headwords are asked instead, and
+only when no place was found any other way:
+
+- First the kana path's own search, `highlight_inflected_words_with_mecab` with the word's
+  bare reading. It wants one token that has the whole word for its headword and is a verb or
+  an adjective as the word is, and it knows the stem of a verb MeCab does not (テンパってた).
+- Then `find_by_last_headword`. The word is cut into a front and a rest; the rest has to be
+  the headword of a token the text writes in kana, and the front a place that ends where the
+  token starts. That finds what has neither one token nor a stem's kana to go by: a phrase
+  whose last word inflects (であった of で 有[あ]る), a last word whose stem changes
+  (行ってきました of 行[い]って 来[く]る), and a word MeCab takes for an auxiliary (あり of
+  有[あ]る). The token's own conjugation is followed by the conditions the kana path uses.
+
+A headword is only asked of a token the text writes in kana. Where the text writes the kanji
+it gives them a reading of its own, which is compared as any other place is; MeCab's
+headword for 行った is 行く or 行う by what stands around it, whatever the bracket says.
 """
 
 import re
@@ -79,7 +91,7 @@ from ..mecab_controller.basic_types import MecabParsedToken
 from ..mecab_controller.kana_conv import is_kana_str, to_hiragana
 from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..okuri.mecab_common import mecab
+from ..okuri.mecab_common import MecabWordType, get_all_conjugation_conditions, mecab
 from ..regex.kanji_furi import KANA_CHAR_RE, KANJI_CHAR_RE
 from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import highlight_inflected_words_with_mecab
@@ -469,11 +481,91 @@ def end_of_word_at(
         if place.by_stem:
             return inflection_end(text_atoms, place, word_stem_atoms)
         return place.last
-    # Rule 4. The kana of a stem are left to the kana path, see highlight_by_reading
+    # Rule 4. The kana of a stem say nothing; MeCab's headwords are asked for an inflected
+    # word instead, see highlight_by_reading
     if place.by_stem or tokens is None:
         return None
     reading_length = sum(len(atom.reading) for atom in text_atoms[place.first : place.last])
     return place.last if kana_place_is_words(place, reading_length, tokens) else None
+
+
+def front_can_lead_to_headword(place: Place, tokens: WrittenTokens) -> bool:
+    """
+    Decide whether a place found for the front of the word can be the start of the word, the
+    token after it having the rest of the word for headword.
+
+    The headword is most of the evidence, so the front needs less than a word of its own
+    would: a kanji shared, or a start where MeCab starts a token too (で of である, not the で
+    that ends まで). What rules 3 and 5 refuse is refused here as well.
+    """
+    evidence = place.evidence
+    if evidence.shared_kanji:
+        return True
+    if evidence.text_kanji_as_kana and (evidence.word_kanji_as_kana or not evidence.shared_kana):
+        return False
+    start = tokens.atom_offsets[place.first]
+    return any(span[0] == start for span in tokens.spans)
+
+
+def find_by_last_headword(
+    word_atoms: Sequence[Atom],
+    text_atoms: Sequence[Atom],
+    tokens: WrittenTokens,
+    word_type: MecabWordType,
+) -> list[tuple[int, int]]:
+    """
+    Find the word where its last word is a kana token of the text that has it for headword.
+
+    The word is cut in two at each of its atoms in turn, the longer rest first: the rest has
+    to be the headword of a token the text writes in kana, and the front, if there is one, a
+    place that ends where the token starts. The highlight goes on over the tokens that are
+    the token's conjugation, by the conditions the kana path uses.
+
+    Returns `(first atom, atom after the last)` for each place of the first cut that has any.
+    """
+    atom_at = {offset: index for index, offset in enumerate(tokens.atom_offsets)}
+    all_tokens = [token for _start, _end, token in tokens.spans]
+    for cut in range(len(word_atoms)):
+        front_atoms, rest_atoms = word_atoms[:cut], word_atoms[cut:]
+        rest_reading = "".join(atom.reading for atom in rest_atoms)
+        if len(rest_reading) < 2:
+            # One kana is the ending alone, and no word
+            break
+        front_places = find_places(front_atoms, text_atoms, by_stem=False)
+        found: list[tuple[int, int]] = []
+        for token_index, (start, end, token) in enumerate(tokens.spans):
+            if fold(token.headword) != rest_reading or start not in atom_at or end not in atom_at:
+                continue
+            first = atom_at[start]
+            if not all(
+                KANA_CHAR_REC.fullmatch(atom.written) for atom in text_atoms[first : atom_at[end]]
+            ):
+                # A kana headword is that of a kana token as a rule. Should MeCab have one for
+                # a token with kanji in it, the text has a reading for those kanji that the
+                # headword says nothing about
+                continue
+            if front_atoms:
+                fronts = [
+                    place
+                    for place in front_places
+                    if place.last == first and front_can_lead_to_headword(place, tokens)
+                ]
+                if not fronts:
+                    continue
+                first = fronts[0].first
+            # The tokens after it that are its conjugation, as far as they are whole atoms
+            for next_start, next_end, next_token in tokens.spans[token_index + 1 :]:
+                if (
+                    next_start != end
+                    or next_end not in atom_at
+                    or not get_all_conjugation_conditions(next_token, all_tokens, word_type)[0]
+                ):
+                    break
+                end = next_end
+            found.append((first, atom_at[end]))
+        if found:
+            return found
+    return []
 
 
 def bare_reading(word: str) -> str:
@@ -555,12 +647,20 @@ def highlight_by_reading(text: str, word: str) -> str:
         highlights.append((text_atoms[place.first].start, text_atoms[end - 1].end))
         taken_until = end
 
+    if not highlights and inflects and any(kanji_in(atom.written) for atom in word_atoms):
+        kana_word = bare_reading(word)
+        if kana_word and is_kana_str(kana_word):
+            logger.debug("No place found, asking the kana path for '%s'", kana_word)
+            by_kana_path = highlight_inflected_words_with_mecab(text, kana_word)
+            if by_kana_path != text:
+                return by_kana_path
+        tokens = tokens or mecab_tokens(text_atoms)
+        if tokens:
+            word_type: MecabWordType = "i_adjective" if last_atom.reading == "い" else "verb"
+            for first, end in find_by_last_headword(word_atoms, text_atoms, tokens, word_type):
+                logger.debug("Taking atoms %s to %s for the word, by its last headword", first, end)
+                highlights.append((text_atoms[first].start, text_atoms[end - 1].end))
     if not highlights:
-        if inflects and any(kanji_in(atom.written) for atom in word_atoms):
-            kana_word = bare_reading(word)
-            if kana_word and is_kana_str(kana_word):
-                logger.debug("No place found, asking the kana path for '%s'", kana_word)
-                return highlight_inflected_words_with_mecab(text, kana_word)
         return text
 
     result = tag_free_text

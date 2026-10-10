@@ -1926,6 +1926,47 @@ CASES = [
         "<k> 蛙[カエル]</k>が<k> 跳[は]ねている</k>ね。",
         id="Reading - the kana of a verb's stem are not the verb",
     ),
+    # The headword also finds the last word of a phrase, with the words before it found by
+    # their reading, and a word whose stem is other kana in the inflected form.
+    pytest.param(
+        "液体[えきたい]は 硫酸[りゅうさん]であった。",
+        "で 有[あ]る",
+        "液体[えきたい]は 硫酸[りゅうさん]<b>であった</b>。",
+        id="Reading - the verb of a phrase is kana in the text, inflected",
+    ),
+    pytest.param(
+        "本日[ほんじつ]のランチはハンバーグでございます。",
+        "で 御座[ござ]る",
+        "本日[ほんじつ]のランチはハンバーグ<b>でございます</b>。",
+        id="Reading - the verb of a phrase is kana in the text, inflected /2",
+    ),
+    pytest.param(
+        "駅[えき]まであった。",
+        "で 有[あ]る",
+        "駅[えき]まであった。",
+        id="Reading - the kana before the verb are the end of another word: not the phrase",
+    ),
+    pytest.param(
+        "昨日[きのう]、 絵[え]の 展覧[てんらん] 会[かい]に 行[い]ってきました。",
+        "行[い]って 来[く]る",
+        "昨日[きのう]、 絵[え]の 展覧[てんらん] 会[かい]に<b> 行[い]ってきました</b>。",
+        id="Reading - the verb of a phrase is kana in the text and its stem changes",
+    ),
+    pytest.param(
+        "<k> 咄嗟[とっさ]</k>に 彼[かれ]の 名前[なまえ]が 出[で]てこなかった。",
+        "出[で]て 来[く]る",
+        "<k> 咄嗟[とっさ]</k>に 彼[かれ]の 名前[なまえ]が<b> 出[で]てこなかった</b>。",
+        id="Reading - the verb of a phrase is kana in the text and its stem changes /2",
+    ),
+    pytest.param(
+        "彼[かれ]は 非常[ひじょう]に 博学[はくがく]であり、 多[おお]くの 文字[もじ]を 読[よ]む。",
+        "有[あ]る",
+        (
+            "彼[かれ]は 非常[ひじょう]に 博学[はくがく]で<b>あり</b>、 多[おお]くの 文字[もじ]を"
+            " 読[よ]む。"
+        ),
+        id="Reading - a verb MeCab takes for an auxiliary is kana in the text",
+    ),
     # A kana word the text has in kanji needs one of its kana written out in the text as well:
     # a reading in a bracket alone is not the word occurring (see "Kana only - a kana word is
     # not the reading in a bracket").

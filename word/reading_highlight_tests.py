@@ -240,6 +240,21 @@ HIGHLIGHT_CASES = [
         "<k> 棲[す]んでいます</k>か。",
         id="the kana of a stem in another word's ending",
     ),
+    # The headword of a token the text writes in kanji is not asked: the text gives that kanji
+    # a reading of its own, here another verb's, and MeCab's headword for 行った is 行く or 行う
+    # by what stands around it.
+    pytest.param(
+        "式[しき]を 行[おこな]った。",
+        "行[い]く",
+        "式[しき]を 行[おこな]った。",
+        id="a headword is not asked where the text writes the token in kanji",
+    ),
+    pytest.param(
+        "店[みせ]に 行[おこな]った。",
+        "行[い]く",
+        "店[みせ]に 行[おこな]った。",
+        id="a headword is not asked where the text writes the token in kanji /2",
+    ),
     pytest.param(
         "<span>バツ</span>が 三[みっ]つ",
         "<i>罰[ばつ]</i>",
