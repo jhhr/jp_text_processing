@@ -12,6 +12,7 @@ from .highlight_inflected_words_with_mecab import (
 )
 from .use_tag_cleaning import (
     FURIGANA_PART_RE,
+    SPLITTER_DOT_RE,
     TAG_AND_BARE_DOT_PART_RE,
     TAG_AND_DOT_PART_RE,
     TAG_PART_RE,
@@ -335,6 +336,16 @@ def highlight_as_written(text: str, word: str) -> str:
     Returns the text with the occurrences in <b> tags. Without one the text can still come
     back with its furigana grouped differently, which the caller has to tell apart.
     """
+    # A splitter dot the word is written with (ヘレン・ケラー, 報・連・相) is no more a character
+    # to match than one in the text is. The searches below store the text's dots away before
+    # matching, so the word goes into them without its own; with them it could match nothing.
+    word_has_splitter_dot = "・" in word
+    if word_has_splitter_dot:
+        word = re.sub(SPLITTER_DOT_RE, "", word)
+        logger.debug("Word without its splitter dots: '%s'", word)
+        if not word.strip():
+            return text
+
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
         # This is either a simple case or a complex one needing inflection matching
@@ -346,8 +357,12 @@ def highlight_as_written(text: str, word: str) -> str:
         # and not only on the mecab path below. Only the tags are stored: the pattern matches
         # the space before a word, and the furigana brackets have to stay for the readings in
         # them to be recognized as readings.
+        # This is the one search where the text's dots stay as well, unless the word was
+        # written with one itself. A kana word is short and turns up across a dot by accident
+        # (トラ in テスト・ライブ), where the dot is what keeps two words apart; a word that has
+        # its own dot says that it runs across one.
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text, part_regex=TAG_PART_RE
+            text, part_regex=TAG_AND_BARE_DOT_PART_RE if word_has_splitter_dot else TAG_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
         furigana_spans = [m.span() for m in re.finditer(FURIGANA_PART_RE, html_free_text)]

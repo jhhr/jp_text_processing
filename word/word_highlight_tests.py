@@ -677,6 +677,60 @@ CASES = [
         "ファックスか<b> 電子メール[でんしめーる]</b>で 申[もう]し 込[こ]む。",
         id="Word shape - the text has the word's own misplaced bracket",
     ),
+    # A splitter dot the word is written with is no more a character to match than the text's
+    # are (see the "Splitter dot" cases below): the word is found where the text has the dot
+    # and where it does not.
+    pytest.param(
+        "ヘレン・ケラーは 盲人[もうじん]で、 聾唖[ろうあ]者[しゃ]です。",
+        "ヘレン・ケラー",
+        "<b>ヘレン・ケラー</b>は 盲人[もうじん]で、 聾唖[ろうあ]者[しゃ]です。",
+        id="Word shape - a splitter dot in a kana word",
+    ),
+    pytest.param(
+        "晒[さら]す「イキュラス・エル・ラン」の 呪符[じゅふ]…！",
+        "イキュラス・エル・ラン",
+        "晒[さら]す「<b>イキュラス・エル・ラン</b>」の 呪符[じゅふ]…！",
+        id="Word shape - two splitter dots in a kana word",
+    ),
+    pytest.param(
+        "ヘレンケラーは 盲人[もうじん]です。",
+        "ヘレン・ケラー",
+        "<b>ヘレンケラー</b>は 盲人[もうじん]です。",
+        id="Word shape - a splitter dot in a kana word, none in the text",
+    ),
+    pytest.param(
+        "私への 報・ 連・ 相を 行っていただきます",
+        "報・連・相",
+        "私への<b> 報・ 連・ 相</b>を 行っていただきます",
+        id="Word shape - splitter dots in a kanji word without furigana",
+    ),
+    pytest.param(
+        "阪神[はんしん]・ 淡路大震災[あわじだいしんさい]では、 何[なん] 千[せん] 人[にん]もの 命[いのち]が",
+        "阪神・ 淡路大震災[はんしんあわじだいしんさい]",
+        "<b>阪神[はんしん]・ 淡路大震災[あわじだいしんさい]</b>では、 何[なん] 千[せん] 人[にん]もの 命[いのち]が",
+        id="Word shape - a splitter dot in a kanji word, one bracket reading both parts",
+    ),
+    # A kana word written without a dot keeps to the text as it stands. Kana words are short,
+    # and between two katakana words a dot is what keeps one from running into the other.
+    pytest.param(
+        "テスト・ライブを 見[み]た",
+        "トラ",
+        "テスト・ライブを 見[み]た",
+        id="Word shape - a kana word written without a dot is not found across the text's",
+    ),
+    pytest.param(
+        "ヘレン・ケラーは 盲人[もうじん]です。",
+        "ケラー",
+        "ヘレン・<b>ケラー</b>は 盲人[もうじん]です。",
+        id="Word shape - a kana word written without a dot, beside the text's",
+    ),
+    # Degenerate: with its dot gone there is no word left. The point is not crashing.
+    pytest.param(
+        "ヘレン・ケラーは 盲人[もうじん]です。",
+        "・",
+        "ヘレン・ケラーは 盲人[もうじん]です。",
+        id="Word shape - nothing but a splitter dot",
+    ),
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     pytest.param(
         "タレコミがあった",
