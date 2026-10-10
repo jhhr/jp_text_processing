@@ -4,7 +4,7 @@ from ..all_types.main_types import OkuriResults
 from ..kana.kana_highlight import WithTagsDef, kana_highlight
 from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..regex.kanji_furi import KANJI_RANGES
+from ..regex.kanji_furi import KANJI_RANGES, LATIN_CHAR_RE
 from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
@@ -43,7 +43,6 @@ CONSECUTIVE_FURI_WORD_RE = (
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
 KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
-LATIN_CHAR_RE = "[A-Za-zＡ-Ｚａ-ｚ]"
 # (1) A run of Latin letters of either width, and the reading the word may have on it
 LATIN_RUN_AND_MAYBE_FURIGANA_RE = rf"({LATIN_CHAR_RE}+)(?:\[[^\]]*\])?"
 # A katakana word a word ends in: (1) the last kanji with its reading, (2) the okurigana that

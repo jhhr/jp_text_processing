@@ -70,6 +70,13 @@ ATOM_CASES = [
         [("罰", "罰"), ("[]", "[]"), ("が", "が")],
         id="an empty bracket is no reading",
     ),
+    # The bracket is how the letters are said, which a word written with the letters alone
+    # does not say, so the piece reads as the letters do without one.
+    pytest.param(
+        "は ＯＬ[おーえる]です",
+        [("は", "は"), ("ＯＬ", "ol"), ("で", "で"), ("す", "す")],
+        id="letters with a reading are one piece that reads as the letters",
+    ),
 ]
 
 

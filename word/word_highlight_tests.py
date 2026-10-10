@@ -2310,6 +2310,28 @@ CASES = [
         "<k> 此[こ]の</k>ケースには<b>ＣＤ</b>が５０ 枚[まい] 入[はい]ります。",
         id="Reading - half-width letters in the word, full-width in the text",
     ),
+    # Letters the text gives a reading are found with it: the bracket belongs to the letters
+    # and goes into the highlight with them, whatever the width the word has them in.
+    pytest.param(
+        "彼女[かのじょ]は ＯＬ[おーえる]です。",
+        "OL",
+        "彼女[かのじょ]は<b> ＯＬ[おーえる]</b>です。",
+        id="Reading - letters of the other width that have a reading in the text",
+    ),
+    pytest.param(
+        " ＡＢＣ[えいびーしー]ニュースに<k> 依[よ]れば</k>",
+        "ABCニュース",
+        "<b> ＡＢＣ[えいびーしー]ニュース</b>に<k> 依[よ]れば</k>",
+        id="Reading - letters of the other width that have a reading, kana after them",
+    ),
+    # ...and only as the whole run the bracket reads. Ｋ is not a word of this text, and a
+    # highlight on it would leave the reading of three letters standing after one.
+    pytest.param(
+        " ＮＨＫ[えぬえいちけい]を 見[み]る",
+        "k",
+        " ＮＨＫ[えぬえいちけい]を 見[み]る",
+        id="Reading - a letter inside a run of letters that has a reading is not the word",
+    ),
     pytest.param(
         "<k> 内[うち]</k> 2人[ふたり]は 重体[じゅうたい]です。",
         "２人[ふたり]",

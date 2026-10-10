@@ -20,6 +20,12 @@ reading is folded so that hiragana and katakana, full and half width and upper a
 are the same; tags and whitespace are not read at all. Neither are splitter dots, except the
 text's for a kana word that is written without one (`highlight_by_reading` says why).
 
+A run of Latin letters with a bracket after it (ＯＬ[おーえる]) is an atom too, and the one kind
+that does not read as its bracket says. A word has such letters with a reading or without, and
+no two notes spell the reading alike (えーびーしー, えいびーしー), so the letters read as
+themselves, as they do without a bracket. The bracket only goes where they go: OL is found as
+the whole of ＯＬ[おーえる], and Ｋ is not found inside ＮＨＫ[えぬえいちけい].
+
 A place is a run of the text's atoms that reads exactly what the word reads. It starts and
 ends where an atom does, since half a bracket cannot be highlighted.
 
@@ -120,7 +126,7 @@ from ..okuri.mecab_common import (
     get_word_type_from_mecab_token,
     mecab,
 )
-from ..regex.kanji_furi import KANA_CHAR_RE, KANJI_CHAR_RE
+from ..regex.kanji_furi import KANA_CHAR_RE, KANJI_CHAR_RE, LATIN_CHAR_RE
 from ..utils.logger import package_logger as logger
 from .use_tag_cleaning import (
     TAG_AND_BARE_DOT_PART_RE,
@@ -133,6 +139,9 @@ ATOM_REC = re.compile(
     # A kanji run with its reading, and the space furigana syntax puts before the run. The
     # reading has to have something in it: an empty bracket says nothing about the kanji.
     (?P<furigana>\ ?(?P<kanji>{KANJI_CHAR_RE}+)\[(?P<reading>[^\]]+)\])
+    # A run of Latin letters with a reading, and the space before it. The bracket is part of
+    # the piece and not what it reads; see the module docstring.
+    |(?P<letters_with_reading>\ ?(?P<letters>{LATIN_CHAR_RE}+)\[[^\]]+\])
     # Any other bracket: [sound:...], or one that follows no kanji. It is not text.
     |(?P<bracket>\[[^\]]*\])
     # Whitespace, which is not read
@@ -246,6 +255,9 @@ def read_atoms(text: str) -> list[Atom]:
             continue
         if match.group("furigana"):
             written, reading = match.group("kanji"), fold(match.group("reading"))
+        elif match.group("letters_with_reading"):
+            written = match.group("letters")
+            reading = fold(written)
         else:
             # Anything else reads as itself. For a bracket that is a reading no word has, so
             # it is never part of a place; it stays an atom so that nothing is found across it.

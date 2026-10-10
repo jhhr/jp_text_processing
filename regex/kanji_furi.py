@@ -32,3 +32,7 @@ KANJI_AND_FURIGANA_AND_OKURIGANA_REC = re.compile(KANJI_AND_FURIGANA_AND_OKURIGA
 KANA_CHARS = "ぁ-ゖゝゞァ-ヴヽヾー゚"  # the last one is U+309A
 KANA_CHAR_RE = rf"[{KANA_CHARS}]"
 NON_KANA_REC = re.compile(rf"[^{KANA_CHARS}]")
+
+# A Latin letter of either width. A run of them can have a reading in a bracket after it the
+# way a kanji run does (ＮＨＫ[えぬえいちけい]), though nothing in the kana pipeline reads it.
+LATIN_CHAR_RE = "[A-Za-zＡ-Ｚａ-ｚ]"
