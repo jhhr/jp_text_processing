@@ -158,6 +158,36 @@ RESPELLING_CASES = [
         " 一[いち]",
         id="number - a run of digits too long to be a number",
     ),
+    pytest.param(
+        "駄駄[だだ]",
+        "そんなに<k> 駄々[だだ]</k>を<k> 捏[こ]ねる 物[もん]</k>じゃない。",
+        "駄々[だだ]",
+        id="repeated kanji - written twice for 々",
+    ),
+    pytest.param(
+        " 民主々義[みんしゅしゅぎ]",
+        " 民主[みんしゅ]主義[しゅぎ]に<k> 就[つ]いて</k>",
+        " 民主主義[みんしゅしゅぎ]",
+        id="repeated kanji - 々 for the kanji again, across the text's brackets",
+    ),
+    pytest.param(
+        "主々[しゅしゅ]",
+        "主[しゅ] 主[しゅ]",
+        "主主[しゅしゅ]",
+        id="repeated kanji - 々 for the kanji again, across the text's space",
+    ),
+    pytest.param(
+        "時々[ときどき]",
+        "時[とき]が 経[た]つ",
+        "時々[ときどき]",
+        id="repeated kanji - a text with the kanji once",
+    ),
+    pytest.param(
+        " 百十九番[ひゃくじゅうきゅうばん]",
+        "１１９ 番[ばん]の 人々[ひとびと]",
+        " １１９番[ひゃくじゅうきゅうばん]",
+        id="repeated kanji - a word without one",
+    ),
 ]
 
 

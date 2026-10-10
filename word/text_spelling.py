@@ -32,11 +32,21 @@ number of the text, respelled or not.
 What a digit run has no say about is its reading. ７[なな] has to agree with the word's
 reading like any kanji; a bare ２０ has nothing to agree or disagree with, and its digits are
 all there is to compare.
+
+Repeated kanji
+--------------
+A kanji said twice is written twice or with the repeater: 駄駄 and 駄々. The furigana
+splitting keeps the two apart, 駄々[だだ] staying one token and 駄駄[だだ] becoming two, so
+the word is only found in the spelling it has. Where the text has the pair the other way, the
+word gets the text's. That holds across what stands between the two kanji in the text, a
+reading or a space: the 主主 of 民主[みんしゅ]主義[しゅぎ] is the 主々 of a word field that
+writes 民主々義.
 """
 
 import re
 
 from ..kanji.number_to_kanji import KANJI_NUMERALS, SUB_MYRIAD_UNITS, number_to_kanji
+from ..regex.kanji_furi import KANJI_RANGES
 from ..utils.logger import package_logger as logger
 from .use_tag_cleaning import FURIGANA_PART_RE, TAG_PART_RE
 
@@ -61,6 +71,8 @@ WHOLE_NUMBER_REC = re.compile(
 # (1) A number as it is written in digits, with the separators inside it
 WRITTEN_NUMBER_REC = re.compile(rf"([{DIGITS}]+(?:[{SEPARATORS}][{DIGITS}]+)*)")
 DIGIT_REC = re.compile(rf"[{DIGITS}]")
+# A kanji said twice: (1) the kanji, (2) the repeater or the kanji again
+REPEATED_KANJI_REC = re.compile(rf"([{KANJI_RANGES}])(々|\1)")
 
 
 def whole_number_pattern(word_part: str) -> str:
@@ -115,6 +127,24 @@ def numbers_as_in_text(word: str, bare_text: str) -> str:
     return respelled
 
 
+def repeated_kanji_as_in_text(word: str, bare_text: str) -> str:
+    """Write the word's repeated kanji twice or with 々, whichever the text has them in.
+
+    :param word: The word, in furigana syntax
+    :param bare_text: The text without its tags and readings
+    :return: The word, the same string when the text has none of its pairs the other way
+    """
+    # The text's two kanji can be two furigana words, with a space between them
+    text_kanji = re.sub(r"\s", "", bare_text)
+
+    def as_in_text(pair: re.Match[str]) -> str:
+        kanji, repeat = pair.groups()
+        other_spelling = kanji + (kanji if repeat == "々" else "々")
+        return other_spelling if other_spelling in text_kanji else pair.group()
+
+    return REPEATED_KANJI_REC.sub(as_in_text, word)
+
+
 def spelled_as_in_text(word: str, text: str) -> str:
     """Give the word with what the text spells another way spelled as the text has it.
 
@@ -124,7 +154,7 @@ def spelled_as_in_text(word: str, text: str) -> str:
         another way in the text
     """
     bare_text = re.sub(rf"{TAG_PART_RE}|{FURIGANA_PART_RE}", "", text)
-    respelled = numbers_as_in_text(word, bare_text)
+    respelled = repeated_kanji_as_in_text(numbers_as_in_text(word, bare_text), bare_text)
     if respelled != word:
         logger.debug("spelled_as_in_text: '%s' -> '%s'", word, respelled)
     return respelled

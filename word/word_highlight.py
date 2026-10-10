@@ -380,8 +380,8 @@ def highlight_as_written(text: str, word: str) -> str:
     word is inflected; see word_highlight for what counts as an occurrence.
 
     A word that is not found so is looked for once more spelled as the text spells it, where
-    the two spellings are the same word by rule: a number in digits on one side and in kanji
-    numerals on the other. text_spelling has the rules.
+    the two spellings are the same word by rule: a number in digits or in kanji numerals, a
+    kanji said twice written twice or with 々. text_spelling has the rules.
 
     Returns the text with the occurrences in <b> tags. Without one the text can still come
     back with its furigana grouped differently, which the caller has to tell apart.

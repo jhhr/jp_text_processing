@@ -629,6 +629,29 @@ CASES = [
         "Ｔ 字[じ]の 道[みち]を 歩[ある]く",
         id="Latin letters - the letters without the katakana after them are not the word",
     ),
+    # A kanji said twice is written twice or with 々, and the furigana splitting keeps the two
+    # spellings apart: 駄々 stays one token and 駄駄 becomes two. A word not found as written is
+    # looked for in the spelling the text has.
+    pytest.param(
+        "そんなに<k> 駄々[だだ]</k>を<k> 捏[こ]ねる 物[もん]</k>じゃない。",
+        "駄駄[だだ]",
+        "そんなに<k><b> 駄々[だだ]</b></k>を<k> 捏[こ]ねる 物[もん]</k>じゃない。",
+        id="Repeated kanji - written twice in the word, with 々 in the text",
+    ),
+    # The text's two brackets come back as one: with no space between them they are one kanji
+    # run, which the furigana paths put together again after splitting it, here as anywhere
+    pytest.param(
+        " 民主[みんしゅ]主義[しゅぎ]に<k> 就[つ]いて</k> 勉強[べんきょう]<k> 為[し]ました</k>。",
+        " 民主々義[みんしゅしゅぎ]",
+        "<b> 民主主義[みんしゅしゅぎ]</b>に<k> 就[つ]いて</k> 勉強[べんきょう]<k> 為[し]ました</k>。",
+        id="Repeated kanji - with 々 in the word, written twice across two brackets in the text",
+    ),
+    pytest.param(
+        "日日[にちにち]の 記録[きろく]を 付[つ]ける",
+        "日々[ひび]",
+        "日日[にちにち]の 記録[きろく]を 付[つ]ける",
+        id="Repeated kanji - the text's spelling read otherwise is not the word",
+    ),
     pytest.param(
         "家で居る、家出はしない",
         "家",
