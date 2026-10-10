@@ -1893,9 +1893,8 @@ CASES = [
         "芸術[げいじゅつ]の 高[たか]みから 見[み]る",
         id="Reading - one kana is never the word",
     ),
-    # An inflecting kanji word the text has in kana is the kana path's to find: its stem's kana
-    # prove nothing (the い of 言う begins いる), so a MeCab token has to have the word for its
-    # headword.
+    # The kana of an inflecting kanji word's stem prove nothing (the い of 言う begins いる), so
+    # where the text has the word in kana a MeCab token has to have it for its headword.
     pytest.param(
         "垂[タ]レを 付[つ]けて 焼[や]いてみるか",
         "見[み]る",
@@ -1913,12 +1912,6 @@ CASES = [
         "居[お]る",
         "一切[いっさい] 着色[ちゃくしょく]<k> 為[し]て<b>おりません</b></k>。",
         id="Reading - a verb is kana in the text, inflected, inside a k tag",
-    ),
-    pytest.param(
-        "「<k> 否[いや]</k>テンパってた<k> 丈[だけ]</k>で…」",
-        "聴牌[テンパ]る",
-        "「<k> 否[いや]</k><b>テンパってた</b><k> 丈[だけ]</k>で…」",
-        id="Reading - a verb MeCab does not know is katakana in the text, inflected",
     ),
     pytest.param(
         "<k> 蛙[カエル]</k>が<k> 跳[は]ねている</k>ね。",
@@ -1957,15 +1950,6 @@ CASES = [
         "出[で]て 来[く]る",
         "<k> 咄嗟[とっさ]</k>に 彼[かれ]の 名前[なまえ]が<b> 出[で]てこなかった</b>。",
         id="Reading - the verb of a phrase is kana in the text and its stem changes /2",
-    ),
-    pytest.param(
-        "彼[かれ]は 非常[ひじょう]に 博学[はくがく]であり、 多[おお]くの 文字[もじ]を 読[よ]む。",
-        "有[あ]る",
-        (
-            "彼[かれ]は 非常[ひじょう]に 博学[はくがく]で<b>あり</b>、 多[おお]くの 文字[もじ]を"
-            " 読[よ]む。"
-        ),
-        id="Reading - a verb MeCab takes for an auxiliary is kana in the text",
     ),
     # A kana word the text has in kanji needs one of its kana written out in the text as well:
     # a reading in a bracket alone is not the word occurring (see "Kana only - a kana word is
@@ -2006,7 +1990,7 @@ CASES = [
         "欲[よく]に<k> 駆[か]られて</k> 大局[たいきょく]を 誤[あやま]る",
         id="Reading - a kana verb is not the reading in a bracket and an ending",
     ),
-    # Width, kana type and spaces are not part of how a word reads.
+    # Width and spaces are not part of how a word reads.
     pytest.param(
         "<k> 此[こ]の</k>ケースにはＣＤが５０ 枚[まい] 入[はい]ります。",
         "CD",
@@ -2024,12 +2008,6 @@ CASES = [
         "ノーダメージノーデス",
         "<k> 通[どお]り</k> <b>ノーダメージ ノーデス</b>だぜ。",
         id="Reading - a space in the text where the word has none",
-    ),
-    pytest.param(
-        "ちーずを 一切[ひとき]れ 下[くだ]さい。",
-        "チーズ",
-        "<b>ちーず</b>を 一切[ひとき]れ 下[くだ]さい。",
-        id="Reading - a katakana word is hiragana in the text",
     ),
 ]
 
