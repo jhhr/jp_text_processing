@@ -2,26 +2,39 @@ import re
 
 from ..all_types.main_types import OkuriResults
 from ..kana.kana_highlight import WithTagsDef, kana_highlight
-from ..kana.reading_matcher import check_reading_match
 from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
-from ..regex.kanji_furi import KANJI_RANGES
+from ..regex.kanji_furi import KANJI_RANGES, LATIN_CHAR_RE
 from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
+from .reading_highlight import highlight_by_reading
+from .reading_variants import (
+    ReadingAgreement,
+    WordKanjiReading,
+    last_kanji_agreement,
+    reading_agreement,
+)
+from .text_spelling import spelled_as_in_text, whole_number_pattern
 from .use_tag_cleaning import (
     FURIGANA_PART_RE,
+    SPLITTER_DOT_RE,
     TAG_AND_BARE_DOT_PART_RE,
     TAG_AND_DOT_PART_RE,
     TAG_PART_RE,
     use_tag_cleaning_with_b_insertion,
 )
+from .word_normalizer import normalize_word
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = rf"([{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
+# The last kanji of a word that was split into one reading per kanji: (1) the kanji, which is
+# anything a kanji run can hold, or a number with all its digits, which the splitting keeps
+# under one reading, (2) the repeater sharing its bracket, if there is one, and (3) the
+# reading. A bare repeater, which only a degenerate word has, is taken as (1).
+LAST_KANJI_FURIGANA_RE = rf"(\d+|[々{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
     rf"(?: ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])(?:"
@@ -30,6 +43,13 @@ CONSECUTIVE_FURI_WORD_RE = (
 FURIGANA_TOKEN_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\]"
 KANJI_RUN_AND_MAYBE_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ]+)(\[[^\]]*\])?"
 KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
+# (1) A run of Latin letters of either width, and the reading the word may have on it
+LATIN_RUN_AND_MAYBE_FURIGANA_RE = rf"({LATIN_CHAR_RE}+)(?:\[[^\]]*\])?"
+# A katakana word a word ends in: (1) the last kanji with its reading, (2) the okurigana that
+# kanji may have, (3) the katakana. The long vowel mark is katakana here though ァ-ン stops
+# short of it: without it 神[かみ]ゲー has no such tail and is searched for bracket and all,
+# which only a text cut into the same brackets has.
+KATAKANA_SUFFIX_RE = rf"({KANJI_RUN_CHAR_RE}\[[^\]]*?\])([ぁ-ん]*)([ァ-ンー]+)$"
 
 
 def kanji_run_with_maybe_furigana(escaped_kanji: str, run_may_continue: bool = True) -> str:
@@ -63,6 +83,39 @@ def replace_hiragana_in_pattern(text: str) -> str:
     return re.sub(r"[ぁ-ん]", replace_hiragana, text)
 
 
+def word_part_pattern(word_part: str) -> str:
+    """Create a pattern for what the word has outside its kanji runs and their readings.
+
+    Kana match in either script, and a number left here by the splitting only a whole number.
+
+    Latin letters can carry a reading the way kanji do, ＡＢＣ[えいびーしー] and
+    ｎｍ[なのめーとる], in the word or in the text. They match with a reading after them and
+    without one, whether the word gives them one or not, and the two readings are not held
+    against each other: the letters are the word, and how a reading spells them out is not
+    settled (えい and えー).
+
+    A reading in the text is the reading of the whole run of letters before it, and with the
+    readings out of the comparison nothing else says so. So the word's letters take a bracket
+    along only as all of its run, and inside a run that has one they are not found at all:
+    ｍ[めーとる] is not the ｍ of ｃｍ[せんち], nor Ｋ the end of ＮＨＫ[えぬえいちけい] with
+    the highlight closing between the letters and their reading. In letters the text gives
+    no reading the word is found as far as it goes, as it always was.
+    """
+
+    def letters_pattern(letters: str) -> str:
+        whole_run_with_reading = rf"(?<!{LATIN_CHAR_RE}){letters}\[[^\]]*\]"
+        not_in_a_run_with_reading = rf"{letters}(?!{LATIN_CHAR_RE}*\[)"
+        return rf"(?:{whole_run_with_reading}|{not_in_a_run_with_reading})"
+
+    # Split with a capturing group: the letters are the odd parts, and their reading goes
+    return "".join(
+        letters_pattern(re.escape(part))
+        if index % 2
+        else replace_hiragana_in_pattern(whole_number_pattern(part))
+        for index, part in enumerate(re.split(LATIN_RUN_AND_MAYBE_FURIGANA_RE, word_part))
+    )
+
+
 def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     """Create a regex pattern matching the word, with or without the text's furigana.
 
@@ -70,6 +123,9 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     also matches the reading the text has for it, together with the space furigana syntax
     puts before the kanji and the rest of the text's kanji run that reading covers. Where the
     word has okurigana after its last kanji, the text's run has to end at that kanji.
+
+    Digits are part of a kanji run, and a number among them is the text's whole number or
+    nothing: ２ does not match in １２, whatever else the run it stands in may take along.
     """
     # Remove first space
     word = re.sub(r"^ ", "", word)
@@ -79,36 +135,42 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     for index, match in enumerate(kanji_matches):
         literal_prefix = word[cursor : match.start()]
         if literal_prefix:
-            pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_prefix)))
+            pattern_parts.append(word_part_pattern(literal_prefix))
             pattern_parts.append(r"\s?")
         kanji, kanji_furigana = match.group(1), match.group(2)
         if kanji_furigana:
-            pattern_parts.append(re.escape(kanji))
+            pattern_parts.append(whole_number_pattern(kanji))
             pattern_parts.append(replace_hiragana_in_pattern(re.escape(kanji_furigana)))
         else:
             run_ends_word = followed_by_okurigana and index == len(kanji_matches) - 1
             pattern_parts.append(
-                kanji_run_with_maybe_furigana(re.escape(kanji), run_may_continue=not run_ends_word)
+                kanji_run_with_maybe_furigana(
+                    whole_number_pattern(kanji), run_may_continue=not run_ends_word
+                )
             )
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
-        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+        pattern_parts.append(word_part_pattern(literal_suffix))
     return "".join(pattern_parts)
 
 
-def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
+def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReading]]:
     """Create a regex pattern that captures furigana sections for variant checking.
 
     The generated pattern keeps kanji and separators strict, but allows the furigana
     inside brackets to vary. Captured furigana values can then be validated via
-    check_reading_match (rendaku/small-tsu/vowel-change, etc.).
+    reading_agreement (rendaku/small-tsu/vowel-change, etc.), which is given each kanji as
+    the word reads it; those come back in the order of the pattern's furi_ groups.
 
     A text written without furigana has neither the brackets nor the space before a kanji, so
     both are optional; a bracket that is there still has to agree with the word's reading.
+
+    A number of the word, which the splitting leaves as one token under one reading, matches
+    the same number of the text in digits of either width and no part of a longer one.
     """
     word = re.sub(r"^ ", "", word)
-    expected_readings: list[str] = []
+    expected_readings: list[WordKanjiReading] = []
     pattern_parts: list[str] = [r"\s?"]
     cursor = 0
     for idx, match in enumerate(re.finditer(FURIGANA_TOKEN_RE, word)):
@@ -116,22 +178,28 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
         if literal_prefix:
             without_space = literal_prefix.rstrip(" ")
             if without_space:
-                pattern_parts.append(replace_hiragana_in_pattern(re.escape(without_space)))
+                pattern_parts.append(word_part_pattern(without_space))
             if without_space != literal_prefix:
                 pattern_parts.append(r"\s?")
         kanji = match.group(1)
-        expected_readings.append(to_hiragana(match.group(2)))
-        pattern_parts.append(rf"{re.escape(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
+        expected_readings.append(
+            WordKanjiReading(
+                kanji=kanji,
+                reading=to_hiragana(match.group(2)),
+                begins_word=not word[: match.start()].strip(),
+            )
+        )
+        pattern_parts.append(rf"{whole_number_pattern(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
-        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+        pattern_parts.append(word_part_pattern(literal_suffix))
     return "".join(pattern_parts), expected_readings
 
 
 def furigana_captures_match_readings(
     match: re.Match,
-    expected_readings: list[str],
+    expected_readings: list[WordKanjiReading],
 ) -> bool:
     """Validate captured furigana readings against expected readings with variants.
 
@@ -141,13 +209,7 @@ def furigana_captures_match_readings(
         captured = match.group(f"furi_{idx}")
         if captured is None:
             continue
-        observed = to_hiragana(captured)
-        _, reading_match_type = check_reading_match(
-            reading=expected,
-            mora_string=observed,
-            okurigana="",
-        )
-        if reading_match_type == "none":
+        if reading_agreement(expected, to_hiragana(captured)) == "none":
             return False
     return True
 
@@ -297,17 +359,83 @@ def word_highlight(text: str, word: str) -> str:
     word_highlight("安[やす]くて 良[い]いな～", "安[やす]い") --> "<b>安[やす]くて</b> 良[い]いな～"
     word_highlight("高[たか]いでも 良[よ]かろう", "良[い]い") --> "高[たか]いでも<b> 良[よ]かろう</b>"
 
+    The word is looked for in three steps. It is first brought into ordinary furigana syntax,
+    when it comes in another shape a note's field can hold it in (`word_normalizer`): one
+    bracket reading a whole expression, a trailing space, a tag. It is then searched for as
+    it is written (`highlight_as_written`), and where that finds nothing, as it reads, for a
+    text that spells the same word another way (`reading_highlight`):
+
+    word_highlight("土地[とち]に 買[か]い 手[て]が 付[つ]いた", "買い手が付く[かいてがつく]")
+        --> "土地[とち]に<b> 買[か]い 手[て]が 付[つ]いた</b>"
+    word_highlight("バツが 三[みっ]つ", "罰[ばつ]") --> "<b>バツ</b>が 三[みっ]つ"
+    word_highlight("酷[ひど]い 有[あ]り 様[さま]でした", "有様[ありさま]")
+        --> "酷[ひど]い<b> 有[あ]り 様[さま]</b>でした"
+
+    A text the word does not occur in comes back exactly as it was given.
+
     Args:
         text (str): The input text where the word needs to be highlighted.
         word (str): The word to highlight.
 
     Returns:
-        list[tuple[int,int]]: A list of tuples containing the start and end indices of the
-        word occurrences in the text.
+        str: The text with <b> tags around each occurrence of the word.
     """
     logger.debug("word_highlight: text='%s', word='%s'", text, word)
     if not text or not word or not word.strip():
         return text
+
+    word = normalize_word(word, text)
+    result = highlight_as_written(text, word)
+    if bold_count(result) > bold_count(text):
+        return result
+    # Looking for the word can regroup the text's furigana on the way, which is the price of
+    # a highlight and nothing a text without one should pay. So it is the text as given that
+    # is searched for another spelling of the word, and that comes back when there is none.
+    return highlight_by_reading(text, word)
+
+
+def bold_count(text: str) -> int:
+    """Count the highlights in the text, to tell whether one was added to it."""
+    return len(re.findall(r"<b>", text))
+
+
+def highlight_as_written(text: str, word: str) -> str:
+    """Highlight the word where the text writes it with the characters the word is given in.
+
+    The word's kanji have to be the text's kanji and its kana the text's kana, hiragana and
+    katakana taken as the same. Which of the two has furigana is free, and so is how the
+    word is inflected; see word_highlight for what counts as an occurrence.
+
+    A word that is not found so is looked for once more spelled as the text spells it, where
+    the two spellings are the same word by rule: a number in digits or in kanji numerals, a
+    kanji said twice written twice or with 々. text_spelling has the rules.
+
+    Returns the text with the occurrences in <b> tags. Without one the text can still come
+    back with its furigana grouped differently, which the caller has to tell apart.
+    """
+    result = highlight_spelling(text, word)
+    if bold_count(result) > bold_count(text):
+        return result
+    respelled = spelled_as_in_text(word, text)
+    if respelled == word:
+        return result
+    return highlight_spelling(text, respelled)
+
+
+def highlight_spelling(text: str, word: str) -> str:
+    """Highlight the word where the text has it in the one spelling the word is given in.
+
+    This is the search highlight_as_written describes, and it returns what that one does.
+    """
+    # A splitter dot the word is written with (ヘレン・ケラー, 報・連・相) is no more a character
+    # to match than one in the text is. The searches below store the text's dots away before
+    # matching, so the word goes into them without its own; with them it could match nothing.
+    word_has_splitter_dot = "・" in word
+    if word_has_splitter_dot:
+        word = re.sub(SPLITTER_DOT_RE, "", word)
+        logger.debug("Word without its splitter dots: '%s'", word)
+        if not word.strip():
+            return text
 
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
@@ -320,8 +448,12 @@ def word_highlight(text: str, word: str) -> str:
         # and not only on the mecab path below. Only the tags are stored: the pattern matches
         # the space before a word, and the furigana brackets have to stay for the readings in
         # them to be recognized as readings.
+        # This is the one search where the text's dots stay as well, unless the word was
+        # written with one itself. A kana word is short and turns up across a dot by accident
+        # (トラ in テスト・ライブ), where the dot is what keeps two words apart; a word that has
+        # its own dot says that it runs across one.
         html_free_text, increment_tag_indexes, restore_tags, _ = use_tag_cleaning_with_b_insertion(
-            text, part_regex=TAG_PART_RE
+            text, part_regex=TAG_AND_BARE_DOT_PART_RE if word_has_splitter_dot else TAG_PART_RE
         )
         logger.debug("html_free_text for matching: '%s'", html_free_text)
         furigana_spans = [m.span() for m in re.finditer(FURIGANA_PART_RE, html_free_text)]
@@ -352,7 +484,10 @@ def word_highlight(text: str, word: str) -> str:
 
     # Strip trailing katakana suffix after furigana (with optional hiragana okuri)
     # before to_hiragana so it is not mistaken for inflectable okurigana.
-    katakana_suffix_after_furi_match = re.search(r"(\[[^\]]*?\])([ぁ-ん]*)([ァ-ン]+)$", word)
+    # Only after a kanji's reading: the two paths that put the suffix back are the ones a
+    # kanji with a reading leads to. Letters with a reading (Ｔ[てぃー]シャツ) take the path
+    # that matches the word as it stands, which would look for the letters alone.
+    katakana_suffix_after_furi_match = re.search(KATAKANA_SUFFIX_RE, word)
     katakana_fixed_suffix = (
         katakana_suffix_after_furi_match.group(3) if katakana_suffix_after_furi_match else ""
     )
@@ -442,28 +577,26 @@ def word_highlight(text: str, word: str) -> str:
 
         def replace_match(match: re.Match) -> str:
             nonlocal b_tags_inserted
-            has_variant = False
+            has_sound_change = False
             for idx, expected in enumerate(expected_readings):
                 captured = match.group(f"furi_{idx}")
                 if captured is None:
                     # No furigana in the text for this kanji, so nothing to disagree about
                     continue
-                observed = to_hiragana(captured)
-                _, reading_match_type = check_reading_match(
-                    reading=expected,
-                    mora_string=observed,
-                    okurigana="",
-                )
-                if reading_match_type == "none":
+                agreement = reading_agreement(expected, to_hiragana(captured))
+                if agreement == "none":
                     return match.group(0)
-                if reading_match_type != "plain":
-                    has_variant = True
+                if agreement == "sound_change":
+                    has_sound_change = True
 
             match_text = match.group(0)
             split_start = match.start(0)
             split_end = match.end(0)
             leading_ws = ""
-            if has_variant and split_start > 0 and match_text[:1].isspace():
+            # A reading the text changed (及び 腰[ごし] for 腰[こし]) leaves the space before the
+            # word outside the highlight. Only that kind of difference does; the ones that are
+            # the word's own doing keep the space inside, where every other path has it
+            if has_sound_change and split_start > 0 and match_text[:1].isspace():
                 leading_ws = match_text[0]
                 match_text = match_text[1:]
                 split_start += 1
@@ -590,7 +723,7 @@ def word_highlight(text: str, word: str) -> str:
             nonlocal last_kanji, repeater, last_kanji_furigana
             last_kanji = match.group(1) if match else ""
             repeater = match.group(2) if match else ""
-            last_kanji_furigana = match.group(3) if match else ""
+            last_kanji_furigana = (match.group(3) if match else "") or ""
             logger.debug(
                 "Found last kanji in split word: '%s', repeater: '%s', last_kanji_furigana: '%s'",
                 last_kanji,
@@ -610,6 +743,18 @@ def word_highlight(text: str, word: str) -> str:
             last_kanji_furigana,
             word_with_readings_split,
         )
+        if not last_kanji:
+            # Everything below is about the word's last kanji: its reading is the one held
+            # against the text's and its okurigana the one inflected. A word that could not
+            # be split (a bracket that holds no kana comes back wrapped in <err>) has none,
+            # and the pattern would have no furigana group to read, so it is not found
+            logger.debug("The split word does not end in a kanji, nothing to match")
+            return text
+        last_word_kanji = WordKanjiReading(
+            kanji=f"{last_kanji}{repeater}",
+            reading=last_kanji_furigana,
+            begins_word=not word_with_readings_split.strip(),
+        )
         # Split the whole text similarly
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug("text_with_readings_split: %s", text_with_readings_split)
@@ -618,8 +763,7 @@ def word_highlight(text: str, word: str) -> str:
         # Replace the furigana part for the last kanji in the regex pattern so that all
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
-        if last_kanji:
-            pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
+        pattern += rf"{whole_number_pattern(last_kanji)}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 
@@ -630,7 +774,11 @@ def word_highlight(text: str, word: str) -> str:
         logger.debug("html_free_text for matching: '%s', pattern: '%s'", html_free_text, pattern)
         matches = list(re.finditer(pattern, html_free_text))
         logger.debug("Found %s matches", len(matches))
-        result_indices = []
+        # The places found are kept apart by how the text reads the word's last kanji there:
+        # as the word does, or otherwise. Which of the two get the highlight is decided
+        # below, once the whole text has been looked at.
+        word_reading_indices: list[tuple[int, int]] = []
+        other_reading_indices: list[tuple[int, int]] = []
         for m in matches:
             if not furigana_captures_match_readings(m, prefix_expected_readings):
                 logger.debug("Skipping match; prefix furigana does not match expected readings")
@@ -643,15 +791,19 @@ def word_highlight(text: str, word: str) -> str:
             # reading for it is the one to inflect with
             furigana = m.group("furigana") or last_kanji_furigana
             maybe_okuri = m.group("maybe_okuri")
-            reading_match_type = "plain"
-            if last_kanji and furigana:
-                _, reading_match_type = check_reading_match(
-                    reading=last_kanji_furigana,
-                    mora_string=to_hiragana(furigana),
-                    okurigana=to_hiragana(maybe_okuri),
+            agreement: ReadingAgreement = "same"
+            if furigana:
+                agreement = last_kanji_agreement(
+                    last_word_kanji,
+                    ending_okurigana,
+                    to_hiragana(furigana),
+                    to_hiragana(maybe_okuri),
                 )
+            found_indices = word_reading_indices if agreement != "none" else other_reading_indices
             if maybe_okuri == ending_okurigana:
-                if reading_match_type == "none":
+                if agreement == "none":
+                    # The dictionary form itself under another reading is another word
+                    # (捌[さば]ける for 捌[は]ける), whatever else the text holds
                     logger.debug(
                         "Skipping exact okuri match; furigana '%s' does not match last kanji"
                         " reading '%s'",
@@ -665,14 +817,14 @@ def word_highlight(text: str, word: str) -> str:
                     matched_text,
                     maybe_okuri,
                 )
-                result_indices.append((m.start(0), m.end(0)))
+                found_indices.append((m.start(0), m.end(0)))
                 continue
             na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
-            if na_okuri and reading_match_type != "none":
+            if na_okuri and agreement != "none":
                 # MeCab reads the whole な form as one adnominal word, so the stem is checked
                 # against the word's own okurigana instead
                 logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
-                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
+                found_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
                 continue
             logger.debug(
                 "Matched text for kana_highlight inflection check: '%s', maybe_okuri: '%s', match:"
@@ -695,7 +847,12 @@ def word_highlight(text: str, word: str) -> str:
                 okurigana="",
                 rest_kana="",
             )
-            if last_kanji and furigana and reading_match_type != "none":
+            # The word's own reading is the one MeCab knows the kanji by where the text only
+            # changed its sound (付[づ]けた). Where the bracket holds other kana than the
+            # word's, by its stem, by where it ends or because it is another reading, the
+            # text's reading is what the kana after the kanji continue, and the check below
+            # uses that one
+            if furigana and agreement in ("same", "sound_change"):
                 kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
                     word=last_kanji,
                     reading=last_kanji_furigana,
@@ -738,7 +895,7 @@ def word_highlight(text: str, word: str) -> str:
                     okuri_result.okurigana,
                     maybe_okuri,
                 )
-                result_indices.append(
+                found_indices.append(
                     (
                         m.start(0),
                         m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
@@ -746,7 +903,7 @@ def word_highlight(text: str, word: str) -> str:
                 )
             else:
                 logger.debug("No valid inflected form found with kana_highlight")
-                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
+                found_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
         # Extend each end index to include the fixed katakana suffix when present in the text
@@ -756,13 +913,31 @@ def word_highlight(text: str, word: str) -> str:
             logger.debug(
                 "Extending result_indices end by fixed katakana suffix '%s'", katakana_fixed_suffix
             )
-            # Only keep matches where the suffix is present immediately after the okuri end;
-            # filter out incidental matches that lack the suffix (e.g. 彫[ほ]る without ナイフ).
-            result_indices = [
-                (start, end + suffix_len)
-                for start, end in result_indices
-                if re.match(katakana_suffix_re, html_free_text[end:])
-            ]
+
+            def with_suffix(indices: list[tuple[int, int]]) -> list[tuple[int, int]]:
+                # Only keep matches where the suffix is present immediately after the okuri
+                # end; filter out incidental matches that lack the suffix (e.g. 彫[ほ]る
+                # without ナイフ).
+                return [
+                    (start, end + suffix_len)
+                    for start, end in indices
+                    if re.match(katakana_suffix_re, html_free_text[end:])
+                ]
+
+            word_reading_indices = with_suffix(word_reading_indices)
+            other_reading_indices = with_suffix(other_reading_indices)
+        # A text that has the word under its own reading has answered where the word is, and
+        # the same kanji read another way elsewhere in it is another word: 出[だ]す beside
+        # 出[で]てくる, the 紡[ぼう] of 紡錘 beside 紡[つむ]ぎ. A text that has the kanji only
+        # under another reading is still best answered with that place. Often it is the word
+        # after all and the word was given with the wrong one of the kanji's readings
+        # (潜[もぐ]る for a text that has 潜[くぐ]って), which nothing here can tell from the
+        # other case.
+        result_indices = word_reading_indices or other_reading_indices
+        if word_reading_indices and other_reading_indices:
+            logger.debug(
+                "Leaving out %s matches the text reads otherwise", len(other_reading_indices)
+            )
         result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]
