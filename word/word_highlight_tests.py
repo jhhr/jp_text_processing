@@ -591,6 +591,92 @@ CASES = [
         "量[りょう]を<b> 少[すこ]し 宛[ずつ]</b> 増[ふ]やす",
         id="Word shape - a tag inside the word",
     ),
+    pytest.param(
+        "言[い]う<k> 迄[まで]</k>も<k> 無[な]く</k>、サーバの 負荷[ふか]が 増大[ぞうだい]する",
+        "言う迄も無く[いうまでもなく]",
+        "<b>言[い]う<k> 迄[まで]</k>も<k> 無[な]く</k></b>、サーバの 負荷[ふか]が 増大[ぞうだい]する",
+        id="Word shape - one bracket after a whole expression",
+    ),
+    pytest.param(
+        "<k> 其[そ]の</k> 土地[とち]に 買[か]い 手[て]が 付[つ]いた。",
+        "買い手が付く[かいてがつく]",
+        "<k> 其[そ]の</k> 土地[とち]に<b> 買[か]い 手[て]が 付[つ]いた</b>。",
+        id="Word shape - one bracket after a whole expression, inflected in the text",
+    ),
+    pytest.param(
+        "楽[たの]しめるなぁ。 神[かみ]ゲーの 名[な]は 伊達[だて]じゃないってか。",
+        "神ゲー[かみげー]",
+        "楽[たの]しめるなぁ。<b> 神[かみ]ゲー</b>の 名[な]は 伊達[だて]じゃないってか。",
+        id="Word shape - one bracket after kanji and a katakana word",
+    ),
+    pytest.param(
+        "匿名[とくめい]で<k> 垂[タ]レ 込[コ]ミ</k>が<k> 有[あ]った</k>！",
+        "垂レ込ミ[たれこみ]",
+        "匿名[とくめい]で<k><b> 垂[タ]レ 込[コ]ミ</b></k>が<k> 有[あ]った</k>！",
+        id="Word shape - one bracket after kanji with katakana okurigana",
+    ),
+    pytest.param(
+        "折[お]れたり<k> 為[し]てなくて</k>。 ピリ<k> 付[つ]いた</k>わ～。",
+        "ピリ付く[ぴりつく]",
+        "折[お]れたり<k> 為[し]てなくて</k>。<b> ピリ<k> 付[つ]いた</k></b>わ～。",
+        id="Word shape - one bracket after katakana and an inflecting kanji",
+    ),
+    pytest.param(
+        "彼女[かのじょ]はスペイン 語[ご]に 取[と]り 組[く]んでいます。",
+        "スペイン 語[すぺいんご]",
+        "彼女[かのじょ]は<b>スペイン 語[ご]</b>に 取[と]り 組[く]んでいます。",
+        id="Word shape - a bracket that reads the katakana before its kanji",
+    ),
+    pytest.param(
+        "彼女[かのじょ]は 人[ひと]に 対[たい]してやいばを<k> 研[と]いでいます</k>。",
+        "に 対[にたい]して",
+        "彼女[かのじょ]は 人[ひと]<b>に 対[たい]して</b>やいばを<k> 研[と]いでいます</k>。",
+        id="Word shape - a bracket that reads the particle before its kanji",
+    ),
+    pytest.param(
+        "<k> 其[そ]の</k> 事故[じこ]で 多量[たりょう]のガス 漏[も]れが<k> 有[あ]った</k>ね。",
+        "ガス 漏[がすも]れ",
+        "<k> 其[そ]の</k> 事故[じこ]で 多量[たりょう]の<b>ガス 漏[も]れ</b>が<k> 有[あ]った</k>ね。",
+        id="Word shape - a bracket that reads the katakana before its kanji, okurigana after",
+    ),
+    pytest.param(
+        "<k> 皆[みんな]</k> 聞[き]き 耳[みみ]を<k> 立[た]てた</k>。",
+        "聞き 耳[ききみみ]を 立[た]てる",
+        "<k> 皆[みんな]</k><b> 聞[き]き 耳[みみ]を<k> 立[た]てた</k></b>。",
+        id="Word shape - a bracket that reads the kanji before its own too",
+    ),
+    pytest.param(
+        "口[くち]は 災[わざわ]いの 元[もと]です。",
+        "口は 災[くちはわざわ]いの 元[もと]",
+        "<b>口[くち]は 災[わざわ]いの 元[もと]</b>です。",
+        id="Word shape - a bracket that reads the kanji before its own, an ordinary one after",
+    ),
+    pytest.param(
+        "彼[かれ]は 長[なが]い 間[あいだ]、 海[うみ]に 潜[もぐ]っていたの。",
+        " 長[ながいあ]い 間[だ]",
+        "彼[かれ]は<b> 長[なが]い 間[あいだ]</b>、 海[うみ]に 潜[もぐ]っていたの。",
+        id="Word shape - two brackets cut at the wrong い",
+    ),
+    pytest.param(
+        "甲[こう]の 薬[くすり]は 乙[おつ]の 毒[どく]。",
+        "甲の薬は 乙[こう]の 毒[くすりはおつのどく]",
+        "<b>甲[こう]の 薬[くすり]は 乙[おつ]の 毒[どく]</b>。",
+        id="Word shape - two brackets cut at the wrong の",
+    ),
+    # Re-cutting a word gives it no licence to match a reading it does not have
+    pytest.param(
+        "長[なが]い 間[ま]が 空[あ]いた",
+        " 長[ながいあ]い 間[だ]",
+        "長[なが]い 間[ま]が 空[あ]いた",
+        id="Word shape - a re-cut word still has to agree with the text's reading",
+    ),
+    # A sentence written with the same misplaced bracket is matched by the word as it was given
+    pytest.param(
+        "ファックスか 電子メール[でんしめーる]で 申[もう]し 込[こ]む。",
+        "電子メール[でんしめーる]",
+        "ファックスか<b> 電子メール[でんしめーる]</b>で 申[もう]し 込[こ]む。",
+        id="Word shape - the text has the word's own misplaced bracket",
+    ),
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     pytest.param(
         "タレコミがあった",

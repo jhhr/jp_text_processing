@@ -311,7 +311,7 @@ def word_highlight(text: str, word: str) -> str:
     if not text or not word or not word.strip():
         return text
 
-    word = normalize_word(word)
+    word = normalize_word(word, text)
     result = highlight_as_written(text, word)
     if bold_count(result) > bold_count(text):
         return result
