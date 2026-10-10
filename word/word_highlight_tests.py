@@ -1042,6 +1042,32 @@ CASES = [
         "今回[こんかい] 夜雲[やくも]さんは<b>おちゃらけてない</b>のに～～！",
         id="Kana only - a character MeCab rewrites comes back as the text has it /2",
     ),
+    # ある after で and じゃ is an auxiliary to MeCab, which is the job it does there and not
+    # another way of inflecting
+    pytest.param(
+        "非常[ひじょう]に 博学[はくがく]であり、 多[おお]くの 文字[もじ]を 読[よ]む",
+        "ある",
+        "非常[ひじょう]に 博学[はくがく]で<b>あり</b>、 多[おお]くの 文字[もじ]を 読[よ]む",
+        id="Kana only - verb MeCab tags as an auxiliary",
+    ),
+    pytest.param(
+        "移動[いどう]<k> 為[し]てる</k> 場合[ばあい]じゃありませんね｡",
+        "ある",
+        "移動[いどう]<k> 為[し]てる</k> 場合[ばあい]じゃ<b>ありません</b>ね｡",
+        id="Kana only - verb MeCab tags as an auxiliary /2",
+    ),
+    pytest.param(
+        "本日[ほんじつ]のランチはハンバーグでございます。",
+        "ござる",
+        "本日[ほんじつ]のランチはハンバーグで<b>ございます</b>。",
+        id="Kana only - verb MeCab tags as an auxiliary /3",
+    ),
+    pytest.param(
+        "そうでした",
+        "です",
+        "そう<b>でした</b>",
+        id="Kana only - an auxiliary is found as a word too",
+    ),
     pytest.param(
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
         "総[そう]勃ち",

@@ -8,9 +8,10 @@ katakana are the same kana throughout: グレちゃった is ぐれる.
 Where an occurrence starts
 --------------------------
 
-1. A token whose headword is the word (はしっ of はしって is はしる), when the token is of
-   the type the word's last kana says the word is: a verb for a word ending in an う-row kana,
-   an adjective for one ending in い.
+1. A token whose headword is the word (はしっ of はしって is はしる). The token has to
+   inflect the way the word does: a verb for a word ending in an う-row kana and an adjective
+   for one ending in い, or what MeCab calls an auxiliary (助動詞), which is its name for the
+   job a word does and not for how it inflects. ある is an auxiliary to it after で and じゃ.
 2. A token whose headword is the word's stem, with a conjugation of the word after it. This is
    how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た.
 
@@ -42,6 +43,7 @@ from typing import NamedTuple
 
 from ..all_types.main_types import PartOfSpeech
 from ..mecab_controller.basic_types import MecabParsedToken
+from ..mecab_controller.basic_types import PartOfSpeech as MecabPartOfSpeech
 from ..mecab_controller.kana_conv import to_hiragana
 from ..okuri.get_conjugatable_okurigana_stem import CONJUGATABLE_LAST_OKURI_PART_OF_SPEECH
 from ..okuri.mecab_common import (
@@ -189,13 +191,23 @@ def parse_text(text: str) -> ParsedText | None:
     return ParsedText(tokens, spans, to_hiragana(text))
 
 
+def inflects_as(token: MecabParsedToken, word: InflectingWord) -> bool:
+    """
+    Whether a token with the word for a headword can be the word.
+
+    MeCab's 助動詞 says what a word does in the sentence, not how it inflects: ある after で is
+    one and conjugates as the verb ある all the same.
+    """
+    return (
+        get_word_type_from_mecab_token(token) == word.word_type
+        or token.part_of_speech == MecabPartOfSpeech.bound_auxiliary
+    )
+
+
 def headword_occurrence(parsed: ParsedText, word: InflectingWord, index: int) -> Occurrence | None:
     """Rule 1: the word begins at this token when the token has it for a headword."""
     token = parsed.tokens[index]
-    if (
-        to_hiragana(token.headword) != word.dictionary_form
-        or get_word_type_from_mecab_token(token) != word.word_type
-    ):
+    if to_hiragana(token.headword) != word.dictionary_form or not inflects_as(token, word):
         return None
     return Occurrence(parsed.spans[index][1], word.word_type, "headword")
 
