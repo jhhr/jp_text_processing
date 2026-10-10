@@ -36,6 +36,23 @@ Four things make two spellings one reading:
    first kana. Two stems that merely take the same okurigana are two words, 捌[は]ける and
    捌[さば]ける, and so are 居[い]る and 居[お]る, which inflect differently.
 
+The word's last kanji, the one its okurigana follows, has two more ways to agree, both to do
+with the reading meeting the okurigana there:
+
+5. The stem itself inflects. Two verbs do that: する is し, さ or せ in its other forms and
+   くる is き or こ, so 為[す]る is found in 為[し]た and 来[く]る in 来[こ]ない. They are told by
+   their kanji, the way okuri/ tells 為る; 摩[す]る and 繰[く]る are ordinary verbs.
+
+6. The bracket ends at another kana. The text's can hold the start of the word's okurigana,
+   溜[たま]っている for 溜[た]まる and 流行[はやり] for 流行[はや]り, the noun form of the
+   okurigana included: 引[びき] in 字引 is ひき, voiced, for 引[ひ]く. Or the word's holds what
+   the text writes after the kanji, 錆[さび]る against 錆[さ]びて. Kana that are not the
+   okurigana's make another word: 突[つつ]いて is つつく, not 突[つ]く.
+
+Everything else is another reading: 出[だ]す for 出[で]る, 潜[くぐ]って for 潜[もぐ]る, the
+紡[ぼう] of 紡錘 for 紡[つむ]ぎ. What a path does with a place the text reads otherwise is that
+path's own rule; this module only says that it does.
+
 What is deliberately not here: voicing anywhere but in a reading's first kana (端[はし] and
 端[はじ]), and the ち of an onyomi against じ (朝 チョウ and ジョウ in 晨朝), which is how 心中
 differs too.
@@ -47,17 +64,34 @@ from typing import Literal, NamedTuple
 from ..kana.reading_matcher import check_reading_match
 from ..kanji.all_kanji_data import all_kanji_data
 from ..mecab_controller.kana_conv import to_hiragana
+from ..okuri.okurigana_dict import get_verb_noun_form_okuri
 
 # How a text's reading of a kanji is the word's reading of it: not at all, the same kana (or
 # the same sound, 2 above), a sound change on the text's side (1), the word's rendaku undone
-# (3), or the other pronunciation of the stem (4)
-ReadingAgreement = Literal["none", "same", "sound_change", "rendaku_undone", "other_stem"]
+# (3), or the other pronunciation of the stem (4); and for the word's last kanji also the
+# stem in another inflection (5), or the same kana with the bracket ending elsewhere (6)
+ReadingAgreement = Literal[
+    "none",
+    "same",
+    "sound_change",
+    "rendaku_undone",
+    "other_stem",
+    "inflected_stem",
+    "okurigana_moved",
+]
 
 # ぢ and づ written as the じ and ず they sound like
 YOTSUGANA_AS_SPOKEN = str.maketrans("ぢづ", "じず")
 
 # The two kana a stem said two ways can begin with (4 above), each pair written newer, older
 STEM_KANA_PAIRS = frozenset(frozenset(pair) for pair in ("いゆ", "いよ", "えう", "えよ"))
+
+# The verbs whose stem inflects (5 above), as kanji, stem and okurigana of the dictionary
+# form, with the kana the stem is in the other forms
+INFLECTED_STEMS = {
+    ("為", "す", "る"): frozenset("しさせ"),
+    ("来", "く", "る"): frozenset("きこ"),
+}
 
 
 class WordKanjiReading(NamedTuple):
@@ -162,4 +196,56 @@ def reading_agreement(
         return "rendaku_undone"
     if is_other_stem(word_kanji.kanji, word_kanji.reading, text_reading):
         return "other_stem"
+    return "none"
+
+
+def reads_into_okurigana(
+    word_kanji: WordKanjiReading, word_okurigana: str, text_reading: str
+) -> bool:
+    """Tell whether the text's bracket holds the word's reading and the start of its okurigana."""
+    in_bracket = [word_okurigana[:length] for length in range(1, len(word_okurigana) + 1)]
+    noun_form = get_verb_noun_form_okuri(word_okurigana, word_kanji.kanji, word_kanji.reading)
+    if noun_form:
+        in_bracket.append(noun_form)
+    # The sound changes work on what the bracket holds as a whole: the voicing of 引[びき] is
+    # on the reading, and the small っ of 切[きっ] in 切符 on the okurigana
+    return any(
+        reading_agreement(word_kanji._replace(reading=word_kanji.reading + kana), text_reading)
+        != "none"
+        for kana in in_bracket
+    )
+
+
+def reads_into_text_kana(word_kanji: WordKanjiReading, text_reading: str, text_kana: str) -> bool:
+    """Tell whether the word's bracket holds the text's reading and the kana the text has next."""
+    reading = word_kanji.reading
+    return any(
+        text_kana.startswith(reading[cut:])
+        and reading_agreement(word_kanji._replace(reading=reading[:cut]), text_reading) != "none"
+        for cut in range(1, len(reading))
+    )
+
+
+def last_kanji_agreement(
+    word_kanji: WordKanjiReading, word_okurigana: str, text_reading: str, text_kana: str
+) -> ReadingAgreement:
+    """
+    Say how the reading the text gives the word's last kanji is the reading the word gives it.
+
+    :param word_kanji: The word's last kanji as the word reads it
+    :param word_okurigana: The kana the word has after it, in the dictionary form
+    :param text_reading: The reading the text has on the same kanji, in hiragana
+    :param text_kana: The kana after the kanji in the text, in hiragana
+    :return: How they agree, "none" when the text's is another reading or either is empty
+    """
+    agreement = reading_agreement(word_kanji, text_reading, text_kana)
+    if agreement != "none" or not word_kanji.reading or not text_reading:
+        return agreement
+    inflected = INFLECTED_STEMS.get((word_kanji.kanji, word_kanji.reading, word_okurigana))
+    if inflected and text_reading in inflected:
+        return "inflected_stem"
+    if reads_into_okurigana(word_kanji, word_okurigana, text_reading):
+        return "okurigana_moved"
+    if reads_into_text_kana(word_kanji, text_reading, text_kana):
+        return "okurigana_moved"
     return "none"

@@ -9,7 +9,12 @@ from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
-from .reading_variants import ReadingAgreement, WordKanjiReading, reading_agreement
+from .reading_variants import (
+    ReadingAgreement,
+    WordKanjiReading,
+    last_kanji_agreement,
+    reading_agreement,
+)
 from .use_tag_cleaning import (
     FURIGANA_PART_RE,
     SPLITTER_DOT_RE,
@@ -685,7 +690,11 @@ def highlight_as_written(text: str, word: str) -> str:
         logger.debug("html_free_text for matching: '%s', pattern: '%s'", html_free_text, pattern)
         matches = list(re.finditer(pattern, html_free_text))
         logger.debug("Found %s matches", len(matches))
-        result_indices = []
+        # The places found are kept apart by how the text reads the word's last kanji there:
+        # as the word does, or otherwise. Which of the two get the highlight is decided
+        # below, once the whole text has been looked at.
+        word_reading_indices: list[tuple[int, int]] = []
+        other_reading_indices: list[tuple[int, int]] = []
         for m in matches:
             if not furigana_captures_match_readings(m, prefix_expected_readings):
                 logger.debug("Skipping match; prefix furigana does not match expected readings")
@@ -700,11 +709,17 @@ def highlight_as_written(text: str, word: str) -> str:
             maybe_okuri = m.group("maybe_okuri")
             agreement: ReadingAgreement = "same"
             if furigana:
-                agreement = reading_agreement(
-                    last_word_kanji, to_hiragana(furigana), to_hiragana(maybe_okuri)
+                agreement = last_kanji_agreement(
+                    last_word_kanji,
+                    ending_okurigana,
+                    to_hiragana(furigana),
+                    to_hiragana(maybe_okuri),
                 )
+            found_indices = word_reading_indices if agreement != "none" else other_reading_indices
             if maybe_okuri == ending_okurigana:
                 if agreement == "none":
+                    # The dictionary form itself under another reading is another word
+                    # (捌[さば]ける for 捌[は]ける), whatever else the text holds
                     logger.debug(
                         "Skipping exact okuri match; furigana '%s' does not match last kanji"
                         " reading '%s'",
@@ -718,14 +733,14 @@ def highlight_as_written(text: str, word: str) -> str:
                     matched_text,
                     maybe_okuri,
                 )
-                result_indices.append((m.start(0), m.end(0)))
+                found_indices.append((m.start(0), m.end(0)))
                 continue
             na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
             if na_okuri and agreement != "none":
                 # MeCab reads the whole な form as one adnominal word, so the stem is checked
                 # against the word's own okurigana instead
                 logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
-                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
+                found_indices.append((m.start(0), m.end(0) - len(maybe_okuri) + len(na_okuri)))
                 continue
             logger.debug(
                 "Matched text for kana_highlight inflection check: '%s', maybe_okuri: '%s', match:"
@@ -748,7 +763,12 @@ def highlight_as_written(text: str, word: str) -> str:
                 okurigana="",
                 rest_kana="",
             )
-            if furigana and agreement != "none":
+            # The word's own reading is the one MeCab knows the kanji by where the text only
+            # changed its sound (付[づ]けた). Where the bracket holds other kana than the
+            # word's, by its stem, by where it ends or because it is another reading, the
+            # text's reading is what the kana after the kanji continue, and the check below
+            # uses that one
+            if furigana and agreement in ("same", "sound_change"):
                 kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
                     word=last_kanji,
                     reading=last_kanji_furigana,
@@ -791,7 +811,7 @@ def highlight_as_written(text: str, word: str) -> str:
                     okuri_result.okurigana,
                     maybe_okuri,
                 )
-                result_indices.append(
+                found_indices.append(
                     (
                         m.start(0),
                         m.end(0) - len(maybe_okuri) + len(okuri_result.okurigana),
@@ -799,7 +819,7 @@ def highlight_as_written(text: str, word: str) -> str:
                 )
             else:
                 logger.debug("No valid inflected form found with kana_highlight")
-                result_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
+                found_indices.append((m.start(0), m.end(0) - len(maybe_okuri)))
 
         # Insert <b> tags into the text at the found indices
         # Extend each end index to include the fixed katakana suffix when present in the text
@@ -809,13 +829,31 @@ def highlight_as_written(text: str, word: str) -> str:
             logger.debug(
                 "Extending result_indices end by fixed katakana suffix '%s'", katakana_fixed_suffix
             )
-            # Only keep matches where the suffix is present immediately after the okuri end;
-            # filter out incidental matches that lack the suffix (e.g. 彫[ほ]る without ナイフ).
-            result_indices = [
-                (start, end + suffix_len)
-                for start, end in result_indices
-                if re.match(katakana_suffix_re, html_free_text[end:])
-            ]
+
+            def with_suffix(indices: list[tuple[int, int]]) -> list[tuple[int, int]]:
+                # Only keep matches where the suffix is present immediately after the okuri
+                # end; filter out incidental matches that lack the suffix (e.g. 彫[ほ]る
+                # without ナイフ).
+                return [
+                    (start, end + suffix_len)
+                    for start, end in indices
+                    if re.match(katakana_suffix_re, html_free_text[end:])
+                ]
+
+            word_reading_indices = with_suffix(word_reading_indices)
+            other_reading_indices = with_suffix(other_reading_indices)
+        # A text that has the word under its own reading has answered where the word is, and
+        # the same kanji read another way elsewhere in it is another word: 出[だ]す beside
+        # 出[で]てくる, the 紡[ぼう] of 紡錘 beside 紡[つむ]ぎ. A text that has the kanji only
+        # under another reading is still best answered with that place. Often it is the word
+        # after all and the word was given with the wrong one of the kanji's readings
+        # (潜[もぐ]る for a text that has 潜[くぐ]って), which nothing here can tell from the
+        # other case.
+        result_indices = word_reading_indices or other_reading_indices
+        if word_reading_indices and other_reading_indices:
+            logger.debug(
+                "Leaving out %s matches the text reads otherwise", len(other_reading_indices)
+            )
         result = html_free_text
         for idx in range(len(result_indices)):
             start, end = result_indices[idx]

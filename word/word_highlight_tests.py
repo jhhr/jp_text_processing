@@ -1406,6 +1406,90 @@ CASES = [
         "米[こめ]は<k> 其処[そこ]</k>なら<k> 直[す]ぐ 捌[さば]ける</k>。",
         id="Reading variant - another stem with the same okurigana is not the word",
     ),
+    # A place where the text reads the word's last kanji otherwise is judged by the rest of the
+    # text. A text that also has the word under its own reading has answered where the word
+    # is, and the same kanji read another way in it is another word: it is not marked, not in
+    # an inflected form and not as a bare kanji, and its furigana stays grouped as it was.
+    pytest.param(
+        "面白[おもしろ]いとか 言[い]い 出[だ]す 人[ひと]が 出[で]てくるけど",
+        "出[で]てくる",
+        "面白[おもしろ]いとか 言[い]い 出[だ]す 人[ひと]が<b> 出[で]てくる</b>けど",
+        id="Other reading - another verb of the kanji beside the word is not marked",
+    ),
+    pytest.param(
+        "地下[ちか]に 潜[もぐ]り 索敵網[さくてきもう]を<k> 潜[くぐ]り</k> 抜[ぬ]ける。",
+        "潜[もぐ]る",
+        "地下[ちか]に<b> 潜[もぐ]り</b> 索敵網[さくてきもう]を<k> 潜[くぐ]り</k> 抜[ぬ]ける。",
+        id="Other reading - another verb of the kanji beside the word is not marked /2",
+    ),
+    pytest.param(
+        "そんな 所[ところ]に 居[お]りますか、 居[い]ませんか",
+        "居[い]る",
+        "そんな 所[ところ]に 居[お]りますか、<b> 居[い]ません</b>か",
+        id="Other reading - おります beside いません is not いる",
+    ),
+    pytest.param(
+        "紡錘[ぼうすい]で 糸[いと]を 紡[つむ]ぎ、 布[ぬの]を 織[お]る。",
+        "紡[つむ]ぎ",
+        "紡錘[ぼうすい]で 糸[いと]を<b> 紡[つむ]ぎ</b>、 布[ぬの]を 織[お]る。",
+        id="Other reading - the kanji of a compound beside the word is not marked",
+    ),
+    pytest.param(
+        "子供[こども]が 紙[かみ] 飛行機[ひこうき]を 飛[と]ばしています。",
+        "飛[と]ばす",
+        "子供[こども]が 紙[かみ] 飛行機[ひこうき]を<b> 飛[と]ばしています</b>。",
+        id="Other reading - the kanji of a compound beside the word is not marked /2",
+    ),
+    # A text that has the kanji only under another reading is still answered with that place.
+    # It is as often the word after all, given with the wrong one of the kanji's readings, as
+    # it is another word, and nothing in the two arguments tells which.
+    pytest.param(
+        "<k> 其[そ]の</k> 門[もん]を<k> 潜[くぐ]って</k> 来[き]て<k> 下[くだ]さい</k>。",
+        "潜[もぐ]る",
+        "<k> 其[そ]の</k> 門[もん]を<k><b> 潜[くぐ]って</b></k> 来[き]て<k> 下[くだ]さい</k>。",
+        id="Other reading - the only place the text has the kanji is marked",
+    ),
+    pytest.param(
+        "紡錘[ぼうすい]で 糸[いと]を 巻[ま]く。",
+        "紡[つむ]ぎ",
+        "<b>紡[ぼう]</b> 錘[すい]で 糸[いと]を 巻[ま]く。",
+        id="Other reading - the only place the text has the kanji is marked, a bare kanji",
+    ),
+    # What counts as the word's own reading, and so is marked beside a plain occurrence: the
+    # two irregular verbs in the forms where the stem itself changes,
+    pytest.param(
+        "勉強[べんきょう]<k> 為[す]る</k>と 言[い]ったのに<k> 為[し]なかった</k>。",
+        "為[す]る",
+        "勉強[べんきょう]<k><b> 為[す]る</b></k>と 言[い]ったのに<k><b> 為[し]なかった</b></k>。",
+        id="Inflected stem - しなかった beside する is the word too",
+    ),
+    pytest.param(
+        "来[く]ると 言[い]ったのに 来[こ]なかった。",
+        "来[く]る",
+        "<b>来[く]る</b>と 言[い]ったのに<b> 来[こ]なかった</b>。",
+        id="Inflected stem - こなかった beside くる is the word too",
+    ),
+    # and a bracket that ends at another kana than the word's: the text's holds the start of
+    # the okurigana, or the word's holds kana the text writes after the kanji. (The noun form
+    # in the text's bracket is the case with 字引[じびき] further up.)
+    pytest.param(
+        "水[みず]が 溜[た]まる 所[ところ]にごみも 溜[たま]っている。",
+        "溜[た]まる",
+        "水[みず]が<b> 溜[た]まる</b> 所[ところ]にごみも<b> 溜[たま]っている</b>。",
+        id="Okurigana moved - the start of the okurigana in the text's bracket is the word too",
+    ),
+    pytest.param(
+        "鉄[てつ]は 錆[さび]る。 包丁[ほうちょう]も 錆[さ]びてしまった。",
+        "錆[さび]る",
+        "鉄[てつ]は<b> 錆[さび]る</b>。 包丁[ほうちょう]も<b> 錆[さ]びて</b>しまった。",
+        id="Okurigana moved - the end of the word's bracket after the kanji is the word too",
+    ),
+    pytest.param(
+        "棒[ぼう]で 突[つ]いて、 指[ゆび]で 突[つつ]いている。",
+        "突[つ]く",
+        "棒[ぼう]で<b> 突[つ]いて</b>、 指[ゆび]で 突[つつ]いている。",
+        id="Okurigana moved - kana in the bracket that are not the okurigana's are another word",
+    ),
     # Without the word's own reading the text's reading cannot be split between the kanji it
     # covers, so a word that is only part of a kanji run takes the whole run and its bracket.
     pytest.param(

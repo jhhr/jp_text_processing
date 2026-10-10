@@ -1,4 +1,4 @@
-"""Cases for `reading_agreement`, run with pytest from `anki_shared/`:
+"""Cases for `reading_agreement` and `last_kanji_agreement`, run with pytest from `anki_shared/`:
 
     python -m pytest jp_text_processing/word/reading_variants_tests.py
 
@@ -6,11 +6,14 @@ A case is one kanji of a word, the reading the word gives it, whether it begins 
 the reading a text has on the same kanji; its id says which rule of the module it is about.
 The cases that have to come out as "none" matter as much as the others: each is a pair that
 looks like a sound change and is two words.
+
+The cases for the word's last kanji also give the okurigana the word has after it and the kana
+the text has after it.
 """
 
 import pytest
 
-from .reading_variants import WordKanjiReading, reading_agreement
+from .reading_variants import WordKanjiReading, last_kanji_agreement, reading_agreement
 
 CASES = [
     pytest.param("腰", "こし", True, "こし", "same", id="the same kana"),
@@ -59,6 +62,57 @@ def test_reading_agreement(
 ):
     word_kanji = WordKanjiReading(kanji=kanji, reading=word_reading, begins_word=begins_word)
     assert reading_agreement(word_kanji, text_reading) == expected
+
+
+LAST_KANJI_CASES = [
+    pytest.param("食", "た", "べる", "た", "べた", "same", id="the same kana"),
+    pytest.param("付", "つ", "ける", "づ", "けた", "sound_change", id="rendaku in the text"),
+    pytest.param("良", "い", "い", "よ", "かった", "other_stem", id="いい said よかった"),
+    # The two irregular verbs
+    pytest.param("為", "す", "る", "し", "た", "inflected_stem", id="する as した"),
+    pytest.param("為", "す", "る", "さ", "せる", "inflected_stem", id="する as させる"),
+    pytest.param("為", "す", "る", "せ", "ず", "inflected_stem", id="する as せず"),
+    pytest.param("来", "く", "る", "き", "ます", "inflected_stem", id="くる as きます"),
+    pytest.param("来", "く", "る", "こ", "ない", "inflected_stem", id="くる as こない"),
+    pytest.param("為", "な", "す", "し", "た", "none", id="なす is not した"),
+    pytest.param("摩", "す", "る", "さ", "すった", "none", id="another する is not irregular"),
+    pytest.param("繰", "く", "る", "き", "", "none", id="another くる is not irregular"),
+    # The okurigana, or the start of it, inside the text's bracket
+    pytest.param("溜", "た", "まる", "たま", "っている", "okurigana_moved", id="たま|っている"),
+    pytest.param("行", "や", "り", "やり", "です", "okurigana_moved", id="はやり in one bracket"),
+    pytest.param("向", "む", "こう", "むこ", "うに", "okurigana_moved", id="むこ|う"),
+    pytest.param("引", "ひ", "く", "びき", "で", "okurigana_moved", id="the noun form, voiced"),
+    pytest.param("切", "き", "る", "きっ", "", "okurigana_moved", id="the noun form, with っ"),
+    pytest.param("突", "つ", "く", "つつ", "いている", "none", id="つつく is not つく"),
+    pytest.param("疎", "おろ", "か", "おろそ", "か", "none", id="おろそか is not おろか"),
+    pytest.param("何", "か", "なる", "かん", "に", "none", id="いかん is not いかなる"),
+    # The end of the word's reading written after the kanji in the text
+    pytest.param("錆", "さび", "る", "さ", "びてしまった", "okurigana_moved", id="さ|びて"),
+    pytest.param("籠", "ごも", "る", "ご", "もった", "okurigana_moved", id="ご|もった"),
+    pytest.param("装", "よそお", "う", "よそ", "います", "none", id="よそう is not よそおう"),
+    pytest.param("合", "あわせ", "る", "あ", "った", "none", id="あう is not あわせる"),
+    # Readings that are simply another word's
+    pytest.param("出", "で", "る", "だ", "した", "none", id="だす is not でる"),
+    pytest.param("潜", "もぐ", "る", "くぐ", "って", "none", id="くぐる is not もぐる"),
+    pytest.param("行", "い", "く", "おこな", "った", "none", id="おこなう is not いく"),
+    pytest.param("居", "い", "る", "お", "ります", "none", id="おる is not いる"),
+    pytest.param("紡", "つむ", "ぎ", "ぼう", "", "none", id="an onyomi is not the kunyomi"),
+]
+
+
+@pytest.mark.parametrize(
+    "kanji, word_reading, word_okurigana, text_reading, text_kana, expected", LAST_KANJI_CASES
+)
+def test_last_kanji_agreement(
+    kanji: str,
+    word_reading: str,
+    word_okurigana: str,
+    text_reading: str,
+    text_kana: str,
+    expected: str,
+):
+    word_kanji = WordKanjiReading(kanji=kanji, reading=word_reading, begins_word=True)
+    assert last_kanji_agreement(word_kanji, word_okurigana, text_reading, text_kana) == expected
 
 
 if __name__ == "__main__":
