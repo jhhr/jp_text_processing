@@ -1008,6 +1008,40 @@ CASES = [
         ),
         id="Kana only - furigana & tags in text, inflectable word /4",
     ),
+    # MeCab writes a verb's headword with the scripts the text has: a katakana stem with a
+    # hiragana ending. The word is the same word in either script.
+    pytest.param(
+        "一人[ひとり] 親[おや]だから <k> 到頭[とうとう]</k>グレちゃったかと",
+        "ぐれる",
+        "一人[ひとり] 親[おや]だから <k> 到頭[とうとう]</k><b>グレ</b>ちゃったかと",
+        id="Kana only - katakana stem in the text, word in hiragana",
+    ),
+    pytest.param(
+        "犯人[はんにん]がフケちまう…",
+        "ふける",
+        "犯人[はんにん]が<b>フケ</b>ちまう…",
+        id="Kana only - katakana stem in the text, word in hiragana /2",
+    ),
+    pytest.param(
+        "思[おも]いと 反比例[はんぴれい]<k> 為[す]る 様[よう]に</k>、ダサさ、 弱[よわ]さが",
+        "ださい",
+        "思[おも]いと 反比例[はんぴれい]<k> 為[す]る 様[よう]に</k>、<b>ダサさ</b>、 弱[よわ]さが",
+        id="Kana only - katakana stem of an adjective in the text, word in hiragana",
+    ),
+    # MeCab hands ～ back as ~. The text that comes back is the text that went in, with the
+    # highlight added and nothing else different.
+    pytest.param(
+        "「しっかし<k> 其[そ]の</k>チクられた 子[こ] ああ～<k> 何[なん]</k>だっけ？」",
+        "ちくる",
+        "「しっかし<k> 其[そ]の</k><b>チクられた</b> 子[こ] ああ～<k> 何[なん]</k>だっけ？」",
+        id="Kana only - a character MeCab rewrites comes back as the text has it",
+    ),
+    pytest.param(
+        "今回[こんかい] 夜雲[やくも]さんはおちゃらけてないのに～～！",
+        "おちゃらける",
+        "今回[こんかい] 夜雲[やくも]さんは<b>おちゃらけてない</b>のに～～！",
+        id="Kana only - a character MeCab rewrites comes back as the text has it /2",
+    ),
     pytest.param(
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
         "総[そう]勃ち",
