@@ -8,6 +8,8 @@ katakana are the same kana throughout: グレちゃった is ぐれる.
 Where an occurrence starts
 --------------------------
 
+Two rules are MeCab reading the word:
+
 1. A token whose headword is the word (はしっ of はしって is はしる). The token has to
    inflect the way the word does: a verb for a word ending in an う-row kana and an adjective
    for one ending in い, or what MeCab calls an auxiliary (助動詞), which is its name for the
@@ -19,8 +21,26 @@ Where an occurrence starts
    ピントがずれています, あっ in であった, くら in ぼったくられた. A word MeCab knows as one
    word is not put together like that. は and いない spell a form of はいる and are not one.
 2. A token whose headword is the word's stem, with a conjugation of the word after it. This is
-   how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た. The stem has
-   to be two kana or more. One kana and a conjugation is に before ない and て before いる.
+   how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た.
+
+When those find the word nowhere in the text, it can still be there in a form MeCab read as
+something else, and the form is then known by its spelling, the stem and a conjugation:
+
+3. A token whose headword is such a form. MeCab's dictionary has some inflected forms as
+   entries of their own: the negative そぐわない as an adjective, the stem ときめき as a noun.
+4. Such a form in the text from the start of a token on, the stem running past the end of that
+   token, when MeCab reads the form on its own as the word. In 毛へばってるぞ it cuts へ/ばっ/てる,
+   and へばって alone is へばる to it.
+
+The spelling is weaker evidence than MeCab's reading, so it is asked for less often and for
+more:
+
+- Rules 3 and 4 are only asked when 1 and 2 have nothing. かえって is a form of かえる and
+  also the adverb 却って, which is not the word in a text that has かえった as well.
+- Rules 2 to 4 want a stem of two kana or more. One kana and a conjugation is あれ, おれ, かれ,
+  みたい, and に before ない.
+- Rule 3, which has nothing but the spelling of one token, wants a form of four kana or more.
+  A shorter one is another word more often than not: わたし, おもい, くらい, あたり.
 
 What a conjugation of the word is comes from the okurigana progression of its inflection
 class, which the word's last kana gives: the godan row, the adjective for い, and for る the
@@ -28,24 +48,34 @@ godan row plus the ichidan forms when the stem ends in an い- or え-row kana, 
 stem does. する's forms are left out: they are conjugations of する, which rule 1 finds as
 the last word of a phrase (びっくりした), and with them ミスした would be a form of ミスる.
 
+Not found, on purpose: the word as one part of what MeCab has as one word (がる in 嫌がる,
+かける in 出かける) and a bare stem with no conjugation (へぼ, キツ). A kana string inside a
+longer word is as often another word (こえる in 聞こえる), and はし is 橋 as much as it is the
+stem of はしる.
+
 Where an occurrence ends
 ------------------------
 
-After a token found by rule 1, with each following token that conjugates it, as
-`get_all_conjugation_conditions` judges for the word's type: ている, the passive and the
-causative, ない, た and the like are the word, a particle or the copula is not.
+After a token found by rule 1 or 3, with each following token that conjugates it, as
+`get_all_conjugation_conditions` judges: ている, the passive and the causative, ない, た and
+the like are the word, a particle or the copula is not. After rule 1 that is judged for the
+word's type, after rule 3 for the type of the entry MeCab has the form as, and a form it has
+as a noun or a conjunction takes nothing after it.
 
-After a stem found by rule 2 MeCab's tokens are not the word's (バズった gives っ the headword
-く), so the conjugation is read off the text against the progression and the highlight ends
-where the longest one does, inside a token if need be (バズって of バズってる). Only when that
-is the end of a token are the tokens after it asked as above.
+After a stem found by rule 2 or 4 MeCab's tokens are not the word's (バズった gives っ the
+headword く), so the conjugation is read off the text against the progression and the
+highlight ends where the longest one does, inside a token if need be (バズって of バズってる).
+Only when that is the end of a token are the tokens after it asked as above. Where the
+progression finds no conjugation after a stem token and MeCab reads the next token as a
+passive or causative verb of its own (られ after バズ), that token is the conjugation.
 
 The text that comes back
 ------------------------
 
 The highlight is cut out of the text by position. MeCab does not hand back every character it
 was given (～ comes back as ~), so nothing of the output is made from its tokens: without the
-`<b>` tags the output is the input.
+`<b>` tags the output is the input, but for a tag of the text that a highlight would cross,
+which `use_tag_cleaning` closes and opens again around it.
 """
 
 from collections.abc import Iterator
@@ -76,6 +106,11 @@ from .use_tag_cleaning import (
 # The shortest stem a form is recognised by. One kana and a conjugation spells too many other
 # words (あれ, おれ, かれ, みたい) and too many particles followed by one (に/ない, か/って).
 MIN_STEM_LENGTH = 2
+
+# The shortest form that is taken for the word when MeCab has it as another word and nothing
+# but its spelling says so. A stem of two kana and a conjugation of one is another word more
+# often than not: わたし, おもい, くらい, あたり, あまり.
+MIN_LEXICALISED_FORM_LENGTH = 4
 
 # The inflection classes whose forms belong to する and not to a word that merely ends in る
 SURU_PARTS_OF_SPEECH: tuple[PartOfSpeech, ...] = ("vs", "vs-i", "vs-s")
@@ -304,6 +339,67 @@ def stem_token_occurrence(
     return Occurrence(token_end + okurigana_len, word.word_type, "stem token")
 
 
+def lexicalised_form_occurrence(
+    parsed: ParsedText, word: InflectingWord, index: int
+) -> Occurrence | None:
+    """
+    Rule 3: this token is the word when its headword is the word's stem and a conjugation.
+
+    That is an inflected form MeCab's dictionary has as an entry of its own. The headword is
+    what is compared and not the token as written, which can be that entry inflected in turn
+    (そぐわなかっ of そぐわない). What can follow the token is then up to the entry, not the word.
+    """
+    headword = to_hiragana(parsed.tokens[index].headword)
+    if (
+        len(word.stem) < MIN_STEM_LENGTH
+        or len(headword) < MIN_LEXICALISED_FORM_LENGTH
+        or not headword.startswith(word.stem)
+    ):
+        return None
+    conjugation = headword[len(word.stem) :]
+    if not conjugation or conjugation_length(word.conjugations, conjugation) != len(conjugation):
+        return None
+    token_type = get_word_type_from_mecab_token(parsed.tokens[index])
+    return Occurrence(
+        parsed.spans[index][1],
+        token_type if token_type in ("verb", "i_adjective") else None,
+        "lexicalised form",
+    )
+
+
+def cut_apart_form_occurrence(
+    parsed: ParsedText, text: str, word: InflectingWord, index: int
+) -> Occurrence | None:
+    """
+    Rule 4: the word begins at this token when the text from here on spells its stem and a
+    conjugation, and MeCab reads that form on its own as the word.
+
+    For a stem that runs past the end of this token, which is MeCab having cut the word in an
+    odd place: after a noun it reads the へ of へばってる as the particle. Which reading it
+    takes depends on what stands around the form, and the caller asking for the word is a
+    reason to take the other one. A stem this token holds whole is rule 2's or 3's.
+    """
+    start, token_end = parsed.spans[index]
+    stem_end = start + len(word.stem)
+    if (
+        len(word.stem) < MIN_STEM_LENGTH
+        or token_end >= stem_end
+        or not parsed.folded.startswith(word.stem, start)
+    ):
+        return None
+    form_end = stem_end + conjugation_length(word.conjugations, parsed.folded[stem_end:])
+    if form_end == stem_end:
+        return None
+    form_tokens = mecab.translate(text[start:form_end])
+    if (
+        not form_tokens
+        or to_hiragana(form_tokens[0].headword) != word.dictionary_form
+        or not inflects_as(form_tokens[0], word)
+    ):
+        return None
+    return Occurrence(form_end, word.word_type, "form cut apart")
+
+
 def conjugated_end(parsed: ParsedText, occurrence: Occurrence) -> tuple[int, int]:
     """
     Where the occurrence ends with what conjugates it, and the token to look on from.
@@ -358,25 +454,37 @@ def find_inflected_word(text: str, base_form_word: str) -> list[tuple[int, int]]
         word.stem,
         word.conjugations,
     )
-    found: list[tuple[int, int]] = []
-    index = 0
-    while index < len(parsed.tokens):
-        occurrence = headword_occurrence(parsed, word, index) or stem_token_occurrence(
+
+    def read_by_mecab(index: int) -> Occurrence | None:
+        return headword_occurrence(parsed, word, index) or stem_token_occurrence(
             parsed, word, index
         )
-        if occurrence is None:
-            index += 1
-            continue
-        start = parsed.spans[index][0]
-        end, index = conjugated_end(parsed, occurrence)
-        logger.debug(
-            "Found '%s' by rule '%s', as far as '%s' with its conjugation",
-            text[start : occurrence.end],
-            occurrence.rule,
-            text[start:end],
+
+    def known_by_spelling(index: int) -> Occurrence | None:
+        return lexicalised_form_occurrence(parsed, word, index) or cut_apart_form_occurrence(
+            parsed, text, word, index
         )
-        found.append((start, end))
-    return found
+
+    for occurrence_at in (read_by_mecab, known_by_spelling):
+        found: list[tuple[int, int]] = []
+        index = 0
+        while index < len(parsed.tokens):
+            occurrence = occurrence_at(index)
+            if occurrence is None:
+                index += 1
+                continue
+            start = parsed.spans[index][0]
+            end, index = conjugated_end(parsed, occurrence)
+            logger.debug(
+                "Found '%s' by rule '%s', as far as '%s' with its conjugation",
+                text[start : occurrence.end],
+                occurrence.rule,
+                text[start:end],
+            )
+            found.append((start, end))
+        if found:
+            return found
+    return []
 
 
 def highlight_inflected_words_with_mecab(text: str, base_form_word: str) -> str:

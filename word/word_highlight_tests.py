@@ -1152,6 +1152,77 @@ CASES = [
         "それはミスしたね",
         id="Kana only - する's forms after the stem are not a conjugation of the word",
     ),
+    # MeCab's dictionary has some inflected forms as entries of their own, with their own
+    # headword: the negative そぐわない is an adjective to it and the stem ときめき a noun
+    pytest.param(
+        "人[ひと]の 倫理観[りんりかん]にそぐわない 術[じゅつ]は 使[つか]うのが",
+        "そぐう",
+        "人[ひと]の 倫理観[りんりかん]に<b>そぐわない</b> 術[じゅつ]は 使[つか]うのが",
+        id="Kana only - negative form MeCab has as an adjective of its own",
+    ),
+    pytest.param(
+        "倫理観[りんりかん]にそぐわなくなった",
+        "そぐう",
+        "倫理観[りんりかん]に<b>そぐわなく</b>なった",
+        id="Kana only - negative form MeCab has as an adjective of its own, inflected",
+    ),
+    pytest.param(
+        "我[が]の 強[つよ]い 男[おとこ]にときめき<k> 勝[が]ち</k>だわ．",
+        "ときめく",
+        "我[が]の 強[つよ]い 男[おとこ]に<b>ときめき</b><k> 勝[が]ち</k>だわ．",
+        id="Kana only - verb stem MeCab has as a noun of its own",
+    ),
+    # Such a form is the word by its spelling alone, which is weaker than MeCab saying so: it
+    # is only asked when MeCab finds the word nowhere in the text. かえって is 却って here.
+    pytest.param(
+        "かえって 疲[つか]れたので 家[いえ]にかえった",
+        "かえる",
+        "かえって 疲[つか]れたので 家[いえ]に<b>かえった</b>",
+        id="Kana only - a word spelled like a form of the word is not it where MeCab finds the word",
+    ),
+    # A stem of two kana and a conjugation of one is another word more often than not
+    pytest.param(
+        "わたしは 知[し]らない",
+        "わたす",
+        "わたしは 知[し]らない",
+        id="Kana only - a three-kana word spelled like a form of the word is not the word",
+    ),
+    # One kana and a conjugation is a word in its own right too often: あれ, おれ, かれ, みたい
+    pytest.param(
+        "あれは 何[なに]？",
+        "ある",
+        "あれは 何[なに]？",
+        id="Kana only - a one-kana stem and a conjugation is not the word",
+    ),
+    pytest.param(
+        "猫[ねこ]みたいな 顔[かお]",
+        "みる",
+        "猫[ねこ]みたいな 顔[かお]",
+        id="Kana only - a one-kana stem and a conjugation is not the word /2",
+    ),
+    # After 毛 MeCab cuts へ/ばっ/てる, and おち/ょくって… before んじゃねえ, though it knows
+    # both verbs: on their own it reads へばって and おちょくって as their forms
+    pytest.param(
+        "<k> 御[お]</k> 前[まえ]の 後[うし]ろに<k> 居[い]る 跳[ハ]ネ</k>っ 毛[け]へばってるぞ",
+        "へばる",
+        (
+            "<k> 御[お]</k> 前[まえ]の 後[うし]ろに<k> 居[い]る 跳[ハ]ネ</k>っ 毛[け]"
+            "<b>へばって</b>るぞ"
+        ),
+        id="Kana only - form MeCab cuts apart in this text and reads as the word on its own",
+    ),
+    pytest.param(
+        "「おちょくってんじゃねえの？」",
+        "おちょくる",
+        "「<b>おちょくって</b>んじゃねえの？」",
+        id="Kana only - form MeCab cuts apart in this text and reads as the word on its own /2",
+    ),
+    pytest.param(
+        "それはしないで",
+        "はしる",
+        "それはしないで",
+        id="Kana only - kana spelling a form MeCab does not read as the word is not the word",
+    ),
     pytest.param(
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
         "総[そう]勃ち",
