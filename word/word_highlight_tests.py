@@ -1132,6 +1132,26 @@ CASES = [
         "彼[かれ]はいないよ",
         id="Kana only - a particle and a shorter verb are not the verb they spell together",
     ),
+    # One kana and a conjugation is too little to know a stem by: に before ない, か before って
+    pytest.param(
+        "ここにないよ",
+        "にる",
+        "ここにないよ",
+        id="Kana only - a particle spelling a one-kana stem is not the word",
+    ),
+    pytest.param(
+        "行[い]くかって 聞[き]いた",
+        "かる",
+        "行[い]くかって 聞[き]いた",
+        id="Kana only - a particle spelling a one-kana stem is not the word /2",
+    ),
+    # し, した and して are forms of する, which a verb ending in る does not turn into
+    pytest.param(
+        "それはミスしたね",
+        "ミスる",
+        "それはミスしたね",
+        id="Kana only - する's forms after the stem are not a conjugation of the word",
+    ),
     pytest.param(
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
         "総[そう]勃ち",

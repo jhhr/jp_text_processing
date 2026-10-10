@@ -29,18 +29,33 @@ INFLECTING_WORD_CASES = [
     pytest.param("ださい", ("ださい", "ださ", ["adj-i"], "i_adjective"), id="adjective"),
     pytest.param(
         "ぐれる",
-        ("ぐれる", "ぐれ", ["v5r", "v1", "vs", "vs-i", "vs-s"], "verb"),
-        id="verb in る is any of the classes that end in it",
+        ("ぐれる", "ぐれ", ["v5r", "v1"], "verb"),
+        id="verb in る with an え-row stem is godan or ichidan",
+    ),
+    pytest.param(
+        "いじる",
+        ("いじる", "いじ", ["v5r", "v1"], "verb"),
+        id="verb in る with a voiced い-row stem is godan or ichidan",
+    ),
+    pytest.param(
+        "へばる",
+        ("へばる", "へば", ["v5r"], "verb"),
+        id="verb in る with a stem no ichidan verb has is godan",
     ),
     pytest.param(
         "グレる",
-        ("ぐれる", "ぐれ", ["v5r", "v1", "vs", "vs-i", "vs-s"], "verb"),
+        ("ぐれる", "ぐれ", ["v5r", "v1"], "verb"),
         id="katakana is read as hiragana",
     ),
     pytest.param(
         "バズり",
-        ("ばずる", "ばず", ["v5r", "v1", "vs", "vs-i", "vs-s"], "verb"),
+        ("ばずる", "ばず", ["v5r"], "verb"),
         id="godan verb's noun form is the verb",
+    ),
+    pytest.param(
+        "びっくりする",
+        ("びっくりする", "びっくりす", ["v5r"], "verb"),
+        id="する verb gets none of する's own forms",
     ),
     pytest.param("ピント", ("ぴんと", "ぴん", [], None), id="word that does not inflect"),
 ]

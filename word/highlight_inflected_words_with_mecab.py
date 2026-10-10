@@ -19,10 +19,14 @@ Where an occurrence starts
    ピントがずれています, あっ in であった, くら in ぼったくられた. A word MeCab knows as one
    word is not put together like that. は and いない spell a form of はいる and are not one.
 2. A token whose headword is the word's stem, with a conjugation of the word after it. This is
-   how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た.
+   how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た. The stem has
+   to be two kana or more. One kana and a conjugation is に before ない and て before いる.
 
 What a conjugation of the word is comes from the okurigana progression of its inflection
-class, which the word's last kana gives.
+class, which the word's last kana gives: the godan row, the adjective for い, and for る the
+godan row plus the ichidan forms when the stem ends in an い- or え-row kana, as an ichidan
+stem does. する's forms are left out: they are conjugations of する, which rule 1 finds as
+the last word of a phrase (びっくりした), and with them ミスした would be a form of ミスる.
 
 Where an occurrence ends
 ------------------------
@@ -59,6 +63,7 @@ from ..okuri.mecab_common import (
     mecab,
 )
 from ..okuri.okurigana_dict import (
+    E_I_ENDING_KANA,
     GODAN_FORM_VERB_STARTINGS,
     POSSIBLE_OKURIGANA_PROGRESSION_DICT,
 )
@@ -67,6 +72,13 @@ from .use_tag_cleaning import (
     TAG_SPACE_AND_FURIGANA_PART_RE,
     use_tag_cleaning_with_b_insertion,
 )
+
+# The shortest stem a form is recognised by. One kana and a conjugation spells too many other
+# words (あれ, おれ, かれ, みたい) and too many particles followed by one (に/ない, か/って).
+MIN_STEM_LENGTH = 2
+
+# The inflection classes whose forms belong to する and not to a word that merely ends in る
+SURU_PARTS_OF_SPEECH: tuple[PartOfSpeech, ...] = ("vs", "vs-i", "vs-s")
 
 
 class InflectingWord(NamedTuple):
@@ -172,6 +184,14 @@ def inflecting_word(base_form_word: str) -> InflectingWord:
         word_type = "verb"
     elif "adj-i" in conjugations:
         word_type = "i_adjective"
+    # A word in る is a godan verb or an ichidan one, and nothing in its kana says which,
+    # except that an ichidan stem ends in an い- or え-row kana
+    conjugations = [
+        part_of_speech
+        for part_of_speech in conjugations
+        if part_of_speech not in SURU_PARTS_OF_SPEECH
+        and (part_of_speech != "v1" or stem[-1:] in E_I_ENDING_KANA)
+    ]
     return InflectingWord(word, stem, conjugations, word_type)
 
 
@@ -264,7 +284,7 @@ def stem_token_occurrence(
     after the token has to go on as one of the conjugations possible for this word.
     """
     token = parsed.tokens[index]
-    if to_hiragana(token.headword) != word.stem:
+    if len(word.stem) < MIN_STEM_LENGTH or to_hiragana(token.headword) != word.stem:
         return None
     token_end = parsed.spans[index][1]
     okurigana_len = conjugation_length(word.conjugations, parsed.folded[token_end:])
