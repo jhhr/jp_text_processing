@@ -23,7 +23,11 @@ from .word_normalizer import normalize_word
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
-LAST_KANJI_FURIGANA_RE = rf"([{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
+# The last kanji of a word that was split into one reading per kanji: (1) the kanji, which is
+# anything a kanji run can hold, a digit included, (2) the repeater sharing its bracket, if
+# there is one, and (3) the reading. A bare repeater, which only a degenerate word has, is
+# taken as (1).
+LAST_KANJI_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
     rf"(?: ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])(?:"
@@ -651,6 +655,13 @@ def highlight_as_written(text: str, word: str) -> str:
             last_kanji_furigana,
             word_with_readings_split,
         )
+        if not last_kanji:
+            # Everything below is about the word's last kanji: its reading is the one held
+            # against the text's and its okurigana the one inflected. A word that could not
+            # be split (a bracket that holds no kana comes back wrapped in <err>) has none,
+            # and the pattern would have no furigana group to read, so it is not found
+            logger.debug("The split word does not end in a kanji, nothing to match")
+            return text
         # Split the whole text similarly
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug("text_with_readings_split: %s", text_with_readings_split)
@@ -659,8 +670,7 @@ def highlight_as_written(text: str, word: str) -> str:
         # Replace the furigana part for the last kanji in the regex pattern so that all
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
-        if last_kanji:
-            pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
+        pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 

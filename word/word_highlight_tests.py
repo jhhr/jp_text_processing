@@ -1263,6 +1263,44 @@ CASES = [
         "その 人[ひと]が",
         id="Furigana mismatch - a reading the word disagrees with is still not the word",
     ),
+    # A digit counts as a kanji everywhere, so it can also be the last kanji of a word with
+    # okurigana: the one whose reading is checked and whose okurigana is inflected. These
+    # raised while the word's last kanji was looked for among the ideographs only.
+    pytest.param(
+        "７[なな]つの 海[うみ]を 渡[わた]る",
+        "７[なな]つ",
+        "<b>７[なな]つ</b>の 海[うみ]を 渡[わた]る",
+        id="Digit word - a reading on a digit with kana after it",
+    ),
+    pytest.param(
+        "サイトを 閉鎖[へいさ]に 追[お]い 込[こ]んだり、2ちゃんねる 内[ない]に",
+        " 2[に]ちゃんねる",
+        "サイトを 閉鎖[へいさ]に 追[お]い 込[こ]んだり、<b>2ちゃんねる</b> 内[ない]に",
+        id="Digit word - the text writes the digit without the reading the word gives it",
+    ),
+    pytest.param(
+        " 第２[だいに]の 人生[じんせい]",
+        "第２[だいに]の",
+        "<b> 第２[だいに]の</b> 人生[じんせい]",
+        id="Digit word - a digit ending the word's kanji run",
+    ),
+    # Degenerate: a repeater with no kanji before it repeats nothing. It is taken as the
+    # kanji it stands for, which is as sensible as anything; the point is not raising.
+    pytest.param(
+        "その 々[びと]の 声[こえ]",
+        "々[びと]の",
+        "その<b> 々[びと]の</b> 声[こえ]",
+        id="Crash test - a word that is a bare repeater with a reading and kana",
+    ),
+    # Degenerate: a bracket that holds no kana is no reading, so the word cannot be split
+    # into a reading per kanji and has no last kanji to check and inflect. It is not found,
+    # in a text that writes the same thing either.
+    pytest.param(
+        "これは 独[x]りだった",
+        "独[x]り",
+        "これは 独[x]りだった",
+        id="Crash test - a word whose bracket holds no kana, with kana after it",
+    ),
     # Without the word's own reading the text's reading cannot be split between the kanji it
     # covers, so a word that is only part of a kanji run takes the whole run and its bracket.
     pytest.param(
