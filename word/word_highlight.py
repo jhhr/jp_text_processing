@@ -46,8 +46,10 @@ KANJI_RUN_CHAR_RE = rf"[\d々{KANJI_RANGES}ヶヵ]"
 # (1) A run of Latin letters of either width, and the reading the word may have on it
 LATIN_RUN_AND_MAYBE_FURIGANA_RE = r"([A-Za-zＡ-Ｚａ-ｚ]+)(?:\[[^\]]*\])?"
 # A katakana word a word ends in: (1) the last kanji with its reading, (2) the okurigana that
-# kanji may have, (3) the katakana
-KATAKANA_SUFFIX_RE = rf"({KANJI_RUN_CHAR_RE}\[[^\]]*?\])([ぁ-ん]*)([ァ-ン]+)$"
+# kanji may have, (3) the katakana. The long vowel mark is katakana here though ァ-ン stops
+# short of it: without it 神[かみ]ゲー has no such tail and is searched for bracket and all,
+# which only a text cut into the same brackets has.
+KATAKANA_SUFFIX_RE = rf"({KANJI_RUN_CHAR_RE}\[[^\]]*?\])([ぁ-ん]*)([ァ-ンー]+)$"
 
 
 def kanji_run_with_maybe_furigana(escaped_kanji: str, run_may_continue: bool = True) -> str:

@@ -652,6 +652,45 @@ CASES = [
         "日日[にちにち]の 記録[きろく]を 付[つ]ける",
         id="Repeated kanji - the text's spelling read otherwise is not the word",
     ),
+    # The katakana word a word ends in is written with the long vowel mark as often as not.
+    # It is the same fixed tail with one: the kanji before it are matched by their readings,
+    # however the text cuts them into brackets, and the tail has to follow them.
+    pytest.param(
+        "『 骨[こつ] 伝導[でんどう]マインドスピーカー』 注視[ちゅうし]<k> 為[し]ている</k> 相手[あいて]の 心[こころ]の 声[こえ]が 聞[き]こえる。",
+        "骨伝導マインドスピーカー[こつでんどうまいんどすぴーかー]",
+        "『<b> 骨[こつ] 伝導[でんどう]マインドスピーカー</b>』 注視[ちゅうし]<k> 為[し]ている</k> 相手[あいて]の 心[こころ]の 声[こえ]が 聞[き]こえる。",
+        id="Katakana tail - a long vowel mark in it, the kanji in two furigana words in the text",
+    ),
+    pytest.param(
+        "爆釣[ばくちょう]伝説[でんせつ]アングラーヒーロー 以降[いこう]では 極端[きょくたん]な 描写[びょうしゃ]は 抑[おさ]えられている",
+        "爆釣伝説アングラーヒーロー[ばくちょうでんせつあんぐらーひーろー]",
+        "<b>爆釣伝説[ばくちょうでんせつ]アングラーヒーロー</b> 以降[いこう]では 極端[きょくたん]な 描写[びょうしゃ]は 抑[おさ]えられている",
+        id="Katakana tail - a long vowel mark in it, the kanji in two brackets in the text",
+    ),
+    pytest.param(
+        "<k> 此[こ]れ</k>が『 絶対[ぜったい] 破壊[はかい]<k> 為[す]る</k>ビーム』、<k> 此[こ]れ</k>を 君[きみ]に 向[む]ける",
+        "絶対破壊為るビーム[ぜったいはかいするびーむ]",
+        "<k> 此[こ]れ</k>が『<b> 絶対[ぜったい] 破壊[はかい]<k> 為[す]る</k>ビーム</b>』、<k> 此[こ]れ</k>を 君[きみ]に 向[む]ける",
+        id="Katakana tail - a long vowel mark in it, okurigana before it",
+    ),
+    pytest.param(
+        "凄[すげ]ーな、これ",
+        "凄[すげ]ー",
+        "<b>凄[すげ]ー</b>な、これ",
+        id="Katakana tail - nothing but a long vowel mark",
+    ),
+    pytest.param(
+        "神[しん]ゲーム 理論[りろん]を 学[まな]ぶ",
+        "神ゲー[かみげー]",
+        "神[しん]ゲーム 理論[りろん]を 学[まな]ぶ",
+        id="Katakana tail - the kanji before it read otherwise are not the word",
+    ),
+    pytest.param(
+        "粘着[ねんちゃく]して 取[と]れない。テープを 貼[は]る",
+        "粘着[ねんちゃく]テープ",
+        "粘着[ねんちゃく]して 取[と]れない。テープを 貼[は]る",
+        id="Katakana tail - the kanji without the tail after them are not the word",
+    ),
     pytest.param(
         "家で居る、家出はしない",
         "家",
