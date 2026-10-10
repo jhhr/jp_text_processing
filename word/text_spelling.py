@@ -27,11 +27,13 @@ their own, as are the numerals after it.
 
 The patterns of the search hold a digit run of the word to the same rule, and take a digit in
 either width (`whole_number_pattern`), so that a word in digits is not found inside a longer
-number of the text, respelled or not.
+number of the text, respelled or not. One thing the patterns cannot see: the searches take the
+splitter dots out of the text before they match, so the 2 and the 3 of ２・３ 人 stand side by
+side there and neither is found as a number of its own.
 
-What a digit run has no say about is its reading. ７[なな] has to agree with the word's
-reading like any kanji; a bare ２０ has nothing to agree or disagree with, and its digits are
-all there is to compare.
+None of this is about the reading. ７[なな] has to agree with the word's reading like any
+kanji, and a bare ２０ has no reading to agree or disagree, so that its digits are all there
+is to compare.
 
 Repeated kanji
 --------------
