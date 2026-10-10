@@ -17,6 +17,7 @@ from .use_tag_cleaning import (
     TAG_PART_RE,
     use_tag_cleaning_with_b_insertion,
 )
+from .word_normalizer import normalize_word
 
 KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
@@ -310,6 +311,7 @@ def word_highlight(text: str, word: str) -> str:
     if not text or not word or not word.strip():
         return text
 
+    word = normalize_word(word)
     result = highlight_as_written(text, word)
     if bold_count(result) > bold_count(text):
         return result

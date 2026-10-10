@@ -564,6 +564,33 @@ CASES = [
         "私への<b> 報・ 連・ 相</b>を 行っていただきます",
         id="No furigana with kanji - word split by ・ in text",
     ),
+    # A note's word field does not always hold the word alone, in ordinary furigana syntax. It
+    # is brought into that before it is searched for; `word_normalizer_tests.py` has the shapes
+    # one by one, these are what the search then makes of them.
+    pytest.param(
+        "玉葱[たまねぎ]をざくざくと 切[き]った",
+        "ざくざく ",
+        "玉葱[たまねぎ]を<b>ざくざく</b>と 切[き]った",
+        id="Word shape - a space after a kana word",
+    ),
+    pytest.param(
+        "そんな 冗談[じょうだん]<k> 素面[しらふ]</k>じゃ 言[い]えないよ。",
+        "素面[しらふ] ",
+        "そんな 冗談[じょうだん]<k><b> 素面[しらふ]</b></k>じゃ 言[い]えないよ。",
+        id="Word shape - a space after the word's bracket",
+    ),
+    pytest.param(
+        "例[れい]を<k> 幾[いく]つか</k> 見[み]せて<k> 下[くだ]さい</k>。",
+        " 幾[いく]つ[ ]か",
+        "例[れい]を<k><b> 幾[いく]つか</b></k> 見[み]せて<k> 下[くだ]さい</k>。",
+        id="Word shape - an empty bracket inside the word",
+    ),
+    pytest.param(
+        "量[りょう]を 少[すこ]し 宛[ずつ] 増[ふ]やす",
+        "少[すこ]し<k> 宛[ずつ]</k>",
+        "量[りょう]を<b> 少[すこ]し 宛[ずつ]</b> 増[ふ]やす",
+        id="Word shape - a tag inside the word",
+    ),
     # Mixing in katakana with the kana-only tests below to ensure conversion back to hiragana works
     pytest.param(
         "タレコミがあった",
