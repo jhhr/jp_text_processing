@@ -9,6 +9,7 @@ from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
+from .reading_highlight import highlight_by_reading
 from .reading_variants import (
     ReadingAgreement,
     WordKanjiReading,
@@ -327,8 +328,9 @@ def word_highlight(text: str, word: str) -> str:
     if bold_count(result) > bold_count(text):
         return result
     # Looking for the word can regroup the text's furigana on the way, which is the price of
-    # a highlight and nothing a text without one should pay
-    return text
+    # a highlight and nothing a text without one should pay. So it is the text as given that
+    # is searched for another spelling of the word, and that comes back when there is none.
+    return highlight_by_reading(text, word)
 
 
 def bold_count(text: str) -> int:

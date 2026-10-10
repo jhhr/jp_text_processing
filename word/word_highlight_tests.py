@@ -1293,12 +1293,13 @@ CASES = [
         id="Crash test - a word that is a bare repeater with a reading and kana",
     ),
     # Degenerate: a bracket that holds no kana is no reading, so the word cannot be split
-    # into a reading per kanji and has no last kanji to check and inflect. It is not found,
-    # in a text that writes the same thing either.
+    # into a reading per kanji and has no last kanji to check and inflect, and the as-written
+    # search gives it up. This text writes the very same thing, which the search by reading
+    # takes as it stands, bracket and all; the point is not raising.
     pytest.param(
         "これは 独[x]りだった",
         "独[x]り",
-        "これは 独[x]りだった",
+        "これは<b> 独[x]り</b>だった",
         id="Crash test - a word whose bracket holds no kana, with kana after it",
     ),
     # ず and づ are one sound, and which of them a reading is spelled with is not a difference.
@@ -1666,6 +1667,328 @@ CASES = [
         "はしる",
         "<span></span><b>はしって</b>",
         id="Html shape - an empty element next to the word is the caller's and stays",
+    ),
+    # A text can spell the word another way than the word field does and read the same: kana
+    # for one of its kanji or for all of them, kanji for its kana, okurigana inside the bracket
+    # on one side and written out on the other. Such a place is found by its reading
+    # (reading_highlight.py), and only where the word as written was found nowhere.
+    #
+    # A kanji that both sides write settles it, however the rest is spelled.
+    pytest.param(
+        "<k> 眼鏡[メガネ]</k>が 見[み]つかりません。",
+        "見付[みつ]かる",
+        "<k> 眼鏡[メガネ]</k>が<b> 見[み]つかりません</b>。",
+        id="Reading - a kanji of the word is kana in the text, inflected",
+    ),
+    pytest.param(
+        "雪[ゆき]の 重[おも]みで 枝[えだ]が 折[お]れそうだ。",
+        "重味[おもみ]",
+        "雪[ゆき]の<b> 重[おも]み</b>で 枝[えだ]が 折[お]れそうだ。",
+        id="Reading - the word's last kanji is kana in the text",
+    ),
+    pytest.param(
+        "木[こ]の 葉[は]がそよ 風[かぜ]に<k> 揺[ゆ]れている</k>。",
+        "微風[そよかぜ]",
+        "木[こ]の 葉[は]が<b>そよ 風[かぜ]</b>に<k> 揺[ゆ]れている</k>。",
+        id="Reading - the word's first kanji is kana in the text",
+    ),
+    pytest.param(
+        "彼[かれ]は 天[あま]の 邪鬼[じゃく]って 言[い]うか",
+        "天之邪鬼[あまのじゃく]",
+        "彼[かれ]は<b> 天[あま]の 邪鬼[じゃく]</b>って 言[い]うか",
+        id="Reading - a kanji in the middle of the word is kana in the text",
+    ),
+    pytest.param(
+        "彼[かれ]は<k> 飽[あ]くまで</k>自分[じぶん]の 主義[しゅぎ]を 通[とお]す。",
+        "飽[あ]く 迄[まで]",
+        "彼[かれ]は<k><b> 飽[あ]くまで</b></k>自分[じぶん]の 主義[しゅぎ]を 通[とお]す。",
+        id="Reading - the place is the whole of a k tag",
+    ),
+    pytest.param(
+        "場合[ばあい]、うどん<k> 粉[こ]</k> 病[びょう]を 発生[はっせい]<k> 為[す]る</k>。",
+        "饂飩粉病[うどんこびょう]",
+        "場合[ばあい]、<b>うどん<k> 粉[こ]</k> 病[びょう]</b>を 発生[はっせい]<k> 為[す]る</k>。",
+        id="Reading - the place holds a k tag",
+    ),
+    pytest.param(
+        "<k> 此[こ]の 挽[ひ]き</k> 肉[にく]でハンバーグを 作[つく]りましょう。",
+        "挽肉[ひきにく]",
+        "<k> 此[こ]の</k><b><k> 挽[ひ]き</k> 肉[にく]</b>でハンバーグを 作[つく]りましょう。",
+        id="Reading - the place starts inside a k tag and ends after it",
+    ),
+    pytest.param(
+        "<k> 酷[ひど]い</k> 有[あ]り 様[さま]でした。",
+        "有様[ありさま]",
+        "<k> 酷[ひど]い</k><b> 有[あ]り 様[さま]</b>でした。",
+        id="Reading - okurigana the word keeps in its bracket, between two kanji",
+    ),
+    pytest.param(
+        "彼[かれ]は 並[な]みの 人間[にんげん]ではありません。",
+        "並[なみ]",
+        "彼[かれ]は<b> 並[な]み</b>の 人間[にんげん]ではありません。",
+        id="Reading - okurigana the word keeps in its bracket, after the kanji",
+    ),
+    pytest.param(
+        "売主[うりぬし]は、 製品[せいひん]を 渡[わた]す。",
+        "売[う]り 主[ぬし]",
+        "<b>売主[うりぬし]</b>は、 製品[せいひん]を 渡[わた]す。",
+        id="Reading - okurigana the text keeps in its bracket",
+    ),
+    pytest.param(
+        "<k> 此奴[こいつ] 等[ら]</k>を<k> 摘[つ]まみ</k> 出[だ]せ。",
+        "摘[つま]み 出[だ]す",
+        "<k> 此奴[こいつ] 等[ら]</k>を<b><k> 摘[つ]まみ</k> 出[だ]せ</b>。",
+        id="Reading - the stem and the okurigana are cut at another kana, inflected",
+    ),
+    # The word's reading is compared as a whole, so where it is cut between the kanji does
+    # not have to be where the text cuts it.
+    pytest.param(
+        "私[わたし]の 住[す]まいは 東京[とうきょう]に<k> 有[あ]ります</k>。",
+        "住[すま]居[い]",
+        "私[わたし]の<b> 住[す]まい</b>は 東京[とうきょう]に<k> 有[あ]ります</k>。",
+        id="Reading - the word splits its reading between the kanji elsewhere than the text",
+    ),
+    pytest.param(
+        "ギリシア 軍[ぐん]は 立[た]ちはだかった。",
+        "立[た]ち 開[はだ]かる",
+        "ギリシア 軍[ぐん]は<b> 立[た]ちはだかった</b>。",
+        id="Reading - the second verb of a compound is kana in the text, inflected",
+    ),
+    pytest.param(
+        "靴[くつ]の 底[そこ]にガムがくっ 付[つ]いてしまった。",
+        "食[く]っ 付[つ]く",
+        "靴[くつ]の 底[そこ]にガムが<b>くっ 付[つ]いて</b>しまった。",
+        id="Reading - the first verb of a compound is kana in the text, inflected",
+    ),
+    pytest.param(
+        "彼[かれ]は 私[わたし]の 弱[よわ]みを 握[にぎ]っているんだ。",
+        "弱味[よわみ]を 握[にぎ]る",
+        "彼[かれ]は 私[わたし]の<b> 弱[よわ]みを 握[にぎ]っている</b>んだ。",
+        id="Reading - a phrase with a kanji in kana, its verb inflected",
+    ),
+    pytest.param(
+        "知[し]らないとは 情[なさ]けない。",
+        "情[なさ]け 無[な]い",
+        "知[し]らないとは<b> 情[なさ]けない</b>。",
+        id="Reading - the kanji of an adjective's ending is kana in the text",
+    ),
+    pytest.param(
+        "知[し]らないとは 情[なさ]けなくて 困[こま]る。",
+        "情[なさ]け 無[な]い",
+        "知[し]らないとは<b> 情[なさ]けなくて</b> 困[こま]る。",
+        id="Reading - the kanji of an adjective's ending is kana in the text, inflected",
+    ),
+    pytest.param(
+        "「 吝[やぶさ]かではない… 吝[やぶさ]かではないけど…」",
+        "吝[やぶさ]かでは 無[な]い",
+        "「<b> 吝[やぶさ]かではない</b>…<b> 吝[やぶさ]かではない</b>けど…」",
+        id="Reading - the word occurs twice",
+    ),
+    pytest.param(
+        "深[ふか]く<k> 御[お]</k> 詫[わ]び<k> 為[し]ます</k>。",
+        "お 詫[わ]び",
+        "深[ふか]く<b><k> 御[お]</k> 詫[わ]び</b><k> 為[し]ます</k>。",
+        id="Reading - kana of the word is kanji in the text",
+    ),
+    pytest.param(
+        "精一杯[せいいっぱい]の<k> 御[お] 粧[めか]し</k>を<k> 為[し]て</k>",
+        "お 粧[めか]し",
+        "精一杯[せいいっぱい]の<k><b> 御[お] 粧[めか]し</b></k>を<k> 為[し]て</k>",
+        id="Reading - kana of the word is kanji in the text, in one k tag with the rest",
+    ),
+    pytest.param(
+        (
+            "海[うみ]の 底[そこ]<k> 迄[まで]</k> 引[ひ]き<k> 摺[ず]り</k> 込[こ]まれて、"
+            " 命[いのち]を 奪[うば]われる。"
+        ),
+        "引[ひ]きずり 込[こ]む",
+        (
+            "海[うみ]の 底[そこ]<k> 迄[まで]</k><b> 引[ひ]き<k> 摺[ず]り</k> 込[こ]まれて</b>、"
+            " 命[いのち]を 奪[うば]われる。"
+        ),
+        id="Reading - kana in the middle of the word is kanji in the text, inflected",
+    ),
+    pytest.param(
+        "涼[すず]しくて<k> 良[い]い</k> 気持[きもち]なので",
+        "いい 気持[きも]ち",
+        "涼[すず]しくて<b><k> 良[い]い</k> 気持[きもち]</b>なので",
+        id="Reading - kana of the word is kanji in the text and its okurigana is in a bracket",
+    ),
+    # Where both sides write kanji they have to be the same kanji: a homophone is not the word.
+    pytest.param(
+        "糸[いと]を 紡[つむ]ぎ 出[だ]す",
+        "紬[つむぎ]",
+        "糸[いと]を 紡[つむ]ぎ 出[だ]す",
+        id="Reading - other kanji with the same reading are not the word",
+    ),
+    pytest.param(
+        "夕立[ゆうだち]に<k> 遭[あ]って</k> 本屋[ほんや]で 雨宿[あまやど]り<k> 為[し]た</k>。",
+        "有[あ]る",
+        "夕立[ゆうだち]に<k> 遭[あ]って</k> 本屋[ほんや]で 雨宿[あまやど]り<k> 為[し]た</k>。",
+        id="Reading - other kanji with the same reading are not the word, inflected",
+    ),
+    # With no kanji in common, a kanji word the text has in kana is only as sure as its
+    # reading is long, so MeCab has to read the kana as words of their own: two kana as one
+    # word in its dictionary form, three or more as whole words.
+    pytest.param(
+        "バツが 三[みっ]つ<k> 有[あ]る</k>ので８５ 点[てん]です。",
+        "罰[ばつ]",
+        "<b>バツ</b>が 三[みっ]つ<k> 有[あ]る</k>ので８５ 点[てん]です。",
+        id="Reading - the whole word is katakana in the text",
+    ),
+    pytest.param(
+        "仕事[しごと]がほぼ 終[お]わりました。",
+        "略[ほぼ]",
+        "仕事[しごと]が<b>ほぼ</b> 終[お]わりました。",
+        id="Reading - the whole word is kana in the text, two kana",
+    ),
+    pytest.param(
+        "さっきの 話[はなし]を 続[つづ]けましょう。",
+        "先程[さっき]",
+        "<b>さっき</b>の 話[はなし]を 続[つづ]けましょう。",
+        id="Reading - the whole word is kana in the text, three kana",
+    ),
+    pytest.param(
+        "もしかしたら 来年[らいねん] 転勤[てんきん]に<k> 成[な]る</k>かも<k> 知[し]れない</k>。",
+        "若[も]しかしたら",
+        (
+            "<b>もしかしたら</b> 来年[らいねん] 転勤[てんきん]に<k> 成[な]る</k>かも<k>"
+            " 知[し]れない</k>。"
+        ),
+        id="Reading - the whole word is kana in the text, several words to MeCab",
+    ),
+    pytest.param(
+        "カップラーメンは 健康[けんこう]に 悪[わる]い。",
+        "拉麺[らーめん]",
+        "カップ<b>ラーメン</b>は 健康[けんこう]に 悪[わる]い。",
+        id="Reading - four kana at the end of a longer word of MeCab's are the word",
+    ),
+    pytest.param(
+        "これがいちばん 好[す]きだ",
+        "市場[いちば]",
+        "これがいちばん 好[す]きだ",
+        id="Reading - three kana at the start of a longer word of MeCab's are not the word",
+    ),
+    pytest.param(
+        "でこぼこの 道[みち]を 歩[ある]く",
+        "凸[でこ]",
+        "でこぼこの 道[みち]を 歩[ある]く",
+        id="Reading - two kana inside another word are not the word",
+    ),
+    pytest.param(
+        "新聞社[しんぶんしゃ]に 何千[なんぜん]ものメールが 寄[よ]せられたよ。",
+        "物[もの]",
+        "新聞社[しんぶんしゃ]に 何千[なんぜん]ものメールが 寄[よ]せられたよ。",
+        id="Reading - two kana that are two words to MeCab are not the word",
+    ),
+    pytest.param(
+        "<k> 何事[なにごと]</k>であれ、<k> 遣[や]る</k>からには",
+        "彼[あれ]",
+        "<k> 何事[なにごと]</k>であれ、<k> 遣[や]る</k>からには",
+        id="Reading - two kana that are a form of another word are not the word",
+    ),
+    pytest.param(
+        "芸術[げいじゅつ]の 高[たか]みから 見[み]る",
+        "味[み]",
+        "芸術[げいじゅつ]の 高[たか]みから 見[み]る",
+        id="Reading - one kana is never the word",
+    ),
+    # An inflecting kanji word the text has in kana is the kana path's to find: its stem's kana
+    # prove nothing (the い of 言う begins いる), so a MeCab token has to have the word for its
+    # headword.
+    pytest.param(
+        "垂[タ]レを 付[つ]けて 焼[や]いてみるか",
+        "見[み]る",
+        "垂[タ]レを 付[つ]けて 焼[や]いて<b>みる</b>か",
+        id="Reading - a verb is kana in the text, in its dictionary form",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 本[ほん]、<k> 貴方[あなた]</k>にあげます。",
+        "上[あ]げる",
+        "<k> 此[こ]の</k> 本[ほん]、<k> 貴方[あなた]</k>に<b>あげます</b>。",
+        id="Reading - a verb is kana in the text, inflected",
+    ),
+    pytest.param(
+        "一切[いっさい] 着色[ちゃくしょく]<k> 為[し]ておりません</k>。",
+        "居[お]る",
+        "一切[いっさい] 着色[ちゃくしょく]<k> 為[し]て<b>おりません</b></k>。",
+        id="Reading - a verb is kana in the text, inflected, inside a k tag",
+    ),
+    pytest.param(
+        "「<k> 否[いや]</k>テンパってた<k> 丈[だけ]</k>で…」",
+        "聴牌[テンパ]る",
+        "「<k> 否[いや]</k><b>テンパってた</b><k> 丈[だけ]</k>で…」",
+        id="Reading - a verb MeCab does not know is katakana in the text, inflected",
+    ),
+    pytest.param(
+        "<k> 蛙[カエル]</k>が<k> 跳[は]ねている</k>ね。",
+        "言[い]う",
+        "<k> 蛙[カエル]</k>が<k> 跳[は]ねている</k>ね。",
+        id="Reading - the kana of a verb's stem are not the verb",
+    ),
+    # A kana word the text has in kanji needs one of its kana written out in the text as well:
+    # a reading in a bracket alone is not the word occurring (see "Kana only - a kana word is
+    # not the reading in a bracket").
+    pytest.param(
+        "斯[か]く<k> 在[あ]る 可[べ]き</k>だ。",
+        "べき",
+        "斯[か]く<k> 在[あ]る<b> 可[べ]き</b></k>だ。",
+        id="Reading - the first kana of a kana word is kanji in the text",
+    ),
+    pytest.param(
+        "女子[じょし]…。って<k> 言[い]う</k>か<k> 御[ご] 免[めん]</k>",
+        "っていうか",
+        "女子[じょし]…。<b>って<k> 言[い]う</k>か</b><k> 御[ご] 免[めん]</k>",
+        id="Reading - a kana in the middle of a kana word is kanji in the text",
+    ),
+    pytest.param(
+        "困難[こんなん]も<k> 然[さ]る 事[こと] 乍[なが]ら</k> 市場[しじょう]の",
+        "さることながら",
+        "困難[こんなん]も<k><b> 然[さ]る 事[こと] 乍[なが]ら</b></k> 市場[しじょう]の",
+        id="Reading - most of a kana word is kanji in the text",
+    ),
+    pytest.param(
+        "<k> 可成[かな]り</k>ごちゃ<k> 付[つ]いて</k>んだよねぇ。",
+        "ごちゃつく",
+        "<k> 可成[かな]り</k><b>ごちゃ<k> 付[つ]いて</k></b>んだよねぇ。",
+        id="Reading - a kana of a kana verb is kanji in the text, inflected",
+    ),
+    pytest.param(
+        "<k> 麦酒[ビール]</k>を 飲[の]む",
+        "ビール",
+        "<k> 麦酒[ビール]</k>を 飲[の]む",
+        id="Reading - a kana word is not the reading in a bracket, three kana",
+    ),
+    pytest.param(
+        "欲[よく]に<k> 駆[か]られて</k> 大局[たいきょく]を 誤[あやま]る",
+        "かる",
+        "欲[よく]に<k> 駆[か]られて</k> 大局[たいきょく]を 誤[あやま]る",
+        id="Reading - a kana verb is not the reading in a bracket and an ending",
+    ),
+    # Width, kana type and spaces are not part of how a word reads.
+    pytest.param(
+        "<k> 此[こ]の</k>ケースにはＣＤが５０ 枚[まい] 入[はい]ります。",
+        "CD",
+        "<k> 此[こ]の</k>ケースには<b>ＣＤ</b>が５０ 枚[まい] 入[はい]ります。",
+        id="Reading - half-width letters in the word, full-width in the text",
+    ),
+    pytest.param(
+        "<k> 内[うち]</k> 2人[ふたり]は 重体[じゅうたい]です。",
+        "２人[ふたり]",
+        "<k> 内[うち]</k><b> 2人[ふたり]</b>は 重体[じゅうたい]です。",
+        id="Reading - a full-width digit in the word, half-width in the text",
+    ),
+    pytest.param(
+        "<k> 通[どお]り</k> ノーダメージ ノーデスだぜ。",
+        "ノーダメージノーデス",
+        "<k> 通[どお]り</k> <b>ノーダメージ ノーデス</b>だぜ。",
+        id="Reading - a space in the text where the word has none",
+    ),
+    pytest.param(
+        "ちーずを 一切[ひとき]れ 下[くだ]さい。",
+        "チーズ",
+        "<b>ちーず</b>を 一切[ひとき]れ 下[くだ]さい。",
+        id="Reading - a katakana word is hiragana in the text",
     ),
 ]
 
