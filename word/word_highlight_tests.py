@@ -1673,7 +1673,7 @@ CASES = [
     # on one side and written out on the other. Such a place is found by its reading
     # (reading_highlight.py), and only where the word as written was found nowhere.
     #
-    # A kanji that both sides write settles it, however the rest is spelled.
+    # A kanji that both sides write is most of what it takes, however the rest is spelled.
     pytest.param(
         "<k> 眼鏡[メガネ]</k>が 見[み]つかりません。",
         "見付[みつ]かる",
@@ -1777,6 +1777,26 @@ CASES = [
         "情[なさ]け 無[な]い",
         "知[し]らないとは<b> 情[なさ]けなくて</b> 困[こま]る。",
         id="Reading - the kanji of an adjective's ending is kana in the text, inflected",
+    ),
+    # Kana the text has for the word's last kanji are only all there is of that kanji; MeCab
+    # says whether they end where the word does, or what word they are when they inflect.
+    pytest.param(
+        "<k> 此[こ]の</k> 話[はなし]は 真実[しんじつ]に 基[もと]づいています。",
+        "基付[もとづ]く",
+        "<k> 此[こ]の</k> 話[はなし]は 真実[しんじつ]に<b> 基[もと]づいています</b>。",
+        id="Reading - the last kanji of a verb's stem is kana in the text, inflected",
+    ),
+    pytest.param(
+        "試[ため]しに<k> 遣[や]ってみて</k>。",
+        "遣[や]って 見[み]る",
+        "試[ため]しに<k><b> 遣[や]ってみて</b></k>。",
+        id="Reading - the last verb of a phrase is kana in the text, inflected",
+    ),
+    pytest.param(
+        "<k> 飽[あ]くまで</k>も 努力[どりょく]<k> 為[し]て</k>",
+        "飽[あ]く 迄[まで]",
+        "<k><b> 飽[あ]くまで</b></k>も 努力[どりょく]<k> 為[し]て</k>",
+        id="Reading - the word's last kanji is kana in the text, a particle after it",
     ),
     pytest.param(
         "「 吝[やぶさ]かではない… 吝[やぶさ]かではないけど…」",

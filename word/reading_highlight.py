@@ -27,9 +27,9 @@ The two spellings of a place have to be compatible. They are compared in cells: 
 cut wherever an atom ends on both sides at the same point of the reading, which is the finest
 cut that needs no bracket's reading split (住[すま]居[い] against 住[す]まい is the cells すま and
 い: the text's 住[す] ends where the word's 住[すま] does not). In a cell, either both sides are
-written alike, or one side has no kanji, or both have kanji and one side's are the other's
-with some left out (見付 and 見つ). Different kanji with the same reading are a homophone and
-never the word (紬 is not 紡ぎ).
+written alike, or they are the same kana in the two types, or one side has no kanji, or both
+have kanji and one side's are the other's with some left out (見付 and 見つ). Different kanji
+with the same reading are a homophone and never the word (紬 is not 紡ぎ).
 
 How much makes a place the word
 -------------------------------
@@ -37,10 +37,14 @@ A reading is weak evidence by itself, the weaker the shorter, and the word may n
 text at all. So what else the two spellings share decides how much more is asked, and where
 the spellings share too little MeCab is asked what words the text has there:
 
-1. A kanji is written on both sides: the place is the word. Where the place starts with kana
-   the text has for a kanji of the word, MeCab has to start a token there too: kana after a
-   kanji are its okurigana as a rule, and the ね of 捏[こ]ね 上[あ]げた is not the 値 of
-   値上[ねあ]げ.
+1. A kanji is written on both sides: the place is the word, as far as kanji and the word's
+   own kana go. Where the place starts or ends with kana the text has for a kanji of the
+   word, those kana are all there is to say where the word starts or ends, and MeCab has to
+   start or end a token there too. Kana after a kanji are its okurigana as a rule (the ね of
+   捏[こ]ね 上[あ]げた is not the 値 of 値上[ねあ]げ), and kana before a particle may begin the
+   particle (the ま of 手[て]まで is not the 間 of 手間[てま]). An end may also be inside the
+   one token the place starts, where MeCab has the word and a particle as one (飽くまで in
+   飽くまでも), if the place is long enough for rule 4 to take as part of a token.
 2. Nothing differs but width, case or spacing: the place is the word, as any occurrence of a
    kana word is to the as-written search. Kana of the other type are not this: the as-written
    search has its own ways with those, and one katakana of a word is not every hiragana of
@@ -72,6 +76,12 @@ with the word's. Where a kanji is shared and the check finds no inflection the s
 highlighted, again as for a word found as written. A kana word in a place the text writes
 kanji in (3) is only taken with an inflection the check accepts, and with a stem of three
 kana or more: いきる has the stem of 行[い]きます, and the check has no way to tell.
+
+The check takes any ending for the stem's, so a stem that ends in kana the text has for a
+kanji of the word (1) is not safe with it: 出[で]てく of 出[で]て 来[く]る is in 出[で]てくれた.
+Where MeCab has a kana token start in those kana, its headword has to be what the word reads
+from there on (くれる is not くる). Where it has them inside a token with the kanji before
+them (基づい of 基[もと]づいて, for 基付[もとづ]く), there is no other word for them to be.
 
 A stem that the text has in kana (4) proves nothing: the い of 言う begins いる, and the check
 would read the る as its ending. For such a word MeCab's headwords are asked instead, by
@@ -178,6 +188,9 @@ class SpellingEvidence(NamedTuple):
     :param word_kanji_as_kana: Whether the text has only kana somewhere the word has kanji
     :param text_kanji_as_kana: Whether the word has only kana somewhere the text has kanji
     :param other_kana_type: Whether one side has hiragana somewhere the other has katakana
+    :param starts_in_kana_for_kanji: Whether the text's spelling starts with kana that stand
+        for a kanji the word starts with and the text does not write
+    :param ends_in_kana_for_kanji: The same for where the two spellings end
     """
 
     shared_kanji: int
@@ -185,6 +198,8 @@ class SpellingEvidence(NamedTuple):
     word_kanji_as_kana: bool
     text_kanji_as_kana: bool
     other_kana_type: bool
+    starts_in_kana_for_kanji: bool
+    ends_in_kana_for_kanji: bool
 
 
 class Place(NamedTuple):
@@ -232,8 +247,8 @@ def read_atoms(text: str) -> list[Atom]:
         if match.group("furigana"):
             written, reading = match.group("kanji"), fold(match.group("reading"))
         else:
-            # A bracket reads as itself too, which no word does, so it is never part of a
-            # place. It stays an atom so that nothing is found across it.
+            # Anything else reads as itself. For a bracket that is a reading no word has, so
+            # it is never part of a place; it stays an atom so that nothing is found across it.
             written = match.group(0)
             reading = fold(written)
         atoms.append(Atom(written, reading, match.start(), match.end()))
@@ -258,6 +273,8 @@ def compare_spellings(
     """
     shared_kanji = shared_kana = 0
     word_kanji_as_kana = text_kanji_as_kana = other_kana_type = False
+    starts_in_kana_for_kanji = ends_in_kana_for_kanji = False
+    is_first_cell = True
     word_index = text_index = 0
     word_cell: list[Atom] = []
     text_cell: list[Atom] = []
@@ -283,6 +300,9 @@ def compare_spellings(
         word_written = "".join(atom.written for atom in word_cell)
         text_written = "".join(atom.written for atom in text_cell)
         word_kanji, text_kanji = kanji_in(word_written), kanji_in(text_written)
+        # Whether this cell's kana in the text stand for a kanji the word has and the text
+        # does not, at the cell's start and at its end
+        kana_for_kanji_first = kana_for_kanji_last = False
         if fold_width(word_written) == fold_width(text_written):
             shared_kanji += len(word_kanji)
             shared_kana += len(word_written) - len(word_kanji)
@@ -297,17 +317,31 @@ def compare_spellings(
             ):
                 return None
             shared_kanji += min(len(word_kanji), len(text_kanji))
+            if len(word_kanji) > len(text_kanji):
+                kana_for_kanji_first = not kanji_in(text_cell[0].written)
+                kana_for_kanji_last = not kanji_in(text_cell[-1].written)
         elif word_kanji:
             word_kanji_as_kana = True
+            kana_for_kanji_first = kana_for_kanji_last = True
         else:
             # Two spellings that read the same and are not written alike differ by a kanji,
             # so this is the text's
             text_kanji_as_kana = True
+        if is_first_cell:
+            starts_in_kana_for_kanji = kana_for_kanji_first
+            is_first_cell = False
+        ends_in_kana_for_kanji = kana_for_kanji_last
         word_cell, text_cell = [], []
     if word_cell or text_cell:
         return None
     return SpellingEvidence(
-        shared_kanji, shared_kana, word_kanji_as_kana, text_kanji_as_kana, other_kana_type
+        shared_kanji,
+        shared_kana,
+        word_kanji_as_kana,
+        text_kanji_as_kana,
+        other_kana_type,
+        starts_in_kana_for_kanji,
+        ends_in_kana_for_kanji,
     )
 
 
@@ -442,26 +476,75 @@ def is_whole_tokens(place: Place, text_atoms: Sequence[Atom]) -> bool:
     return starts_a_token and ends_a_token
 
 
-def starts_inside_a_word(
-    place: Place, text_atoms: Sequence[Atom], needle_atoms: Sequence[Atom]
-) -> bool:
+def kana_edges_are_word_edges(place: Place, text_atoms: Sequence[Atom]) -> bool:
     """
-    Decide whether a place starts with kana that are the end of the word before it.
+    Decide whether a place starts and ends where a word does, where kana are all it has to
+    say so.
 
-    Only a place that starts with kana the text has for a kanji of the word is asked about:
-    those kana are all there is to say where the word starts, and kana after a kanji are that
-    kanji's okurigana as a rule (the ね of 捏[こ]ね 上[あ]げた is not the 値 of 値上[ねあ]げ).
-    MeCab has to start a token there. A place that starts at a kanji run starts where
-    furigana syntax starts a word, and one that starts with the word's own kana is found
-    wherever those are, as on the as-written search.
+    That is where the place starts or ends with kana the text has for a kanji of the word:
+    kana after a kanji are that kanji's okurigana as a rule (the ね of 捏[こ]ね 上[あ]げた is
+    not the 値 of 値上[ねあ]げ), and kana before a particle may be the start of the particle
+    (the ま of 手[て]まで is not the 間 of 手間[てま]). MeCab has to start, or end, a token
+    there. An end may also be inside the one token the place starts, where MeCab has the
+    word and a particle as one (飽くまで in 飽くまでも) and the place is long enough for rule 4
+    to take as part of a token.
+
+    A place that starts or ends at a kanji run does so where furigana syntax has a word do
+    it, and one that starts or ends with the word's own kana is found wherever those are, as
+    on the as-written search. The end of a stem is not asked about: an inflection follows.
     """
-    if kanji_in(text_atoms[place.first].written) or not kanji_in(needle_atoms[0].written):
-        return False
+    evidence = place.evidence
+    check_start = evidence.starts_in_kana_for_kanji
+    check_end = evidence.ends_in_kana_for_kanji and not place.by_stem
+    if not check_start and not check_end:
+        return True
     tokens = mecab_tokens(text_atoms)
     if tokens is None:
-        return True
-    _covering, starts_a_token, _ends_a_token = tokens_over(place, tokens)
-    return not starts_a_token
+        return False
+    covering, starts_a_token, ends_a_token = tokens_over(place, tokens)
+    if check_start and not starts_a_token:
+        return False
+    if check_end and not ends_a_token:
+        return (
+            len(covering) == 1
+            and starts_a_token
+            and place_reading_length(place, text_atoms) >= MIN_KANA_AS_PART_OF_A_TOKEN
+        )
+    return True
+
+
+def stem_ends_in_another_word(
+    place: Place, text_atoms: Sequence[Atom], word_atoms: Sequence[Atom]
+) -> bool:
+    """
+    Decide whether the kana a stem ends in are the start of another word than the word's.
+
+    Asked where those kana stand for a kanji of the word, so that nothing written says they
+    are the word's: the く that 出[で]てくれた has after 出[で]て is not the 来[く] of
+    出[で]て 来[く]る, and the okurigana check would take れた for an ending all the same.
+    Where MeCab has a kana token start in those kana, the token's headword has to be what the
+    word reads from there on (くれる is not くる; the み of 遣[や]ってみて is みる). Where it
+    has them inside a token that holds the kanji before them (基づい of 基[もと]づいて for
+    基付[もとづ]く), there is no other word for them to be.
+    """
+    tokens = mecab_tokens(text_atoms)
+    if tokens is None:
+        return False
+    stem_end = tokens.atom_offsets[place.last - 1]
+    over_stem_end = [
+        (start, token) for start, end, token in tokens.spans if start <= stem_end < end
+    ]
+    if not over_stem_end:
+        return False
+    start, token = over_stem_end[0]
+    if kanji_in(token.word) or start not in tokens.atom_offsets:
+        return False
+    first = tokens.atom_offsets.index(start)
+    if first < place.first:
+        return False
+    read_before = sum(len(atom.reading) for atom in text_atoms[place.first : first])
+    word_reading = "".join(atom.reading for atom in word_atoms)
+    return fold(token.headword) != word_reading[read_before:]
 
 
 def from_last_kanji(atoms: Sequence[Atom]) -> Sequence[Atom]:
@@ -537,12 +620,17 @@ def end_of_word_at(
     evidence = place.evidence
     word_stem_atoms = word_atoms[:-1]
     if evidence.shared_kanji:
-        # Rule 1. Without an inflection the check accepts, the stem is still the word
-        if starts_inside_a_word(place, text_atoms, word_atoms):
+        # Rule 1
+        if not kana_edges_are_word_edges(place, text_atoms):
             return None
-        if place.by_stem:
-            return inflection_end(text_atoms, place, word_stem_atoms) or place.last
-        return place.last
+        if not place.by_stem:
+            return place.last
+        if evidence.ends_in_kana_for_kanji and stem_ends_in_another_word(
+            place, text_atoms, word_atoms
+        ):
+            return None
+        # Without an inflection the check accepts, the stem is still the word
+        return inflection_end(text_atoms, place, word_stem_atoms) or place.last
     if not evidence.word_kanji_as_kana and not evidence.text_kanji_as_kana:
         # Rule 2. A stem written alike is what the as-written search looked for already, with
         # the checks an inflected kana word needs; so is a kana word in the other kana
@@ -643,6 +731,10 @@ def find_by_last_headword(
                 first = fronts[0].first
             elif get_word_type_from_mecab_token(token) != word_type:
                 # ます is the headword of every polite verb's ending, and no form of 増[ま]す
+                continue
+            if found and first < found[-1][1]:
+                # A front that reaches back into the place before it; two highlights cannot
+                # share text
                 continue
             # The tokens after it that are its conjugation, as far as they are whole atoms
             for next_start, next_end, next_token in tokens.spans[token_index + 1 :]:

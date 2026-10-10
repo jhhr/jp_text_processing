@@ -88,85 +88,98 @@ def test_atoms_know_where_they_are_in_the_text():
     ]
 
 
-# Two spellings of one reading: `(shared_kanji, shared_kana, word_kanji_as_kana,
-# text_kanji_as_kana, other_kana_type)`, or None where they cannot be the same word.
+# Two spellings of one reading, or None where they cannot be the same word. The seven values
+# are `SpellingEvidence`'s fields in order: shared_kanji, shared_kana, word_kanji_as_kana,
+# text_kanji_as_kana, other_kana_type, starts_in_kana_for_kanji, ends_in_kana_for_kanji.
 SPELLING_CASES = [
     pytest.param(
         "見付[みつ]か",
         "見[み]つか",
-        SpellingEvidence(1, 1, False, False, False),
+        SpellingEvidence(1, 1, False, False, False, False, False),
         id="one of two kanji in kana on the other side",
+    ),
+    pytest.param(
+        "基付[もとづ]",
+        "基[もと]づ",
+        SpellingEvidence(1, 0, False, False, False, False, True),
+        id="the second of two kanji in kana on the other side, at the end",
     ),
     pytest.param(
         "微風[そよかぜ]",
         "そよ 風[かぜ]",
-        SpellingEvidence(1, 0, False, False, False),
+        SpellingEvidence(1, 0, False, False, False, True, False),
         id="the first of two kanji in kana on the other side",
     ),
     pytest.param(
         "有様[ありさま]",
         "有[あ]り 様[さま]",
-        SpellingEvidence(2, 0, False, False, False),
+        SpellingEvidence(2, 0, False, False, False, False, False),
         id="okurigana inside the bracket on one side",
+    ),
+    pytest.param(
+        "並[なみ]",
+        "並[な]み",
+        SpellingEvidence(1, 0, False, False, False, False, False),
+        id="okurigana inside the bracket on one side, at the end: kana for no kanji",
     ),
     pytest.param(
         "住[すま]居[い]",
         "住[す]まい",
-        SpellingEvidence(1, 0, True, False, False),
+        SpellingEvidence(1, 0, True, False, False, False, True),
         id="a kanji's reading that the other side ends in kana, and a kanji in kana",
     ),
     pytest.param(
         "お 詫[わ]び",
         "御[お] 詫[わ]び",
-        SpellingEvidence(1, 1, False, True, False),
+        SpellingEvidence(1, 1, False, True, False, False, False),
         id="a kanji shared, another the word has in kana",
     ),
     pytest.param(
         "罰[ばつ]",
         "バツ",
-        SpellingEvidence(0, 0, True, False, False),
+        SpellingEvidence(0, 0, True, False, False, True, True),
         id="the word's kanji in kana, nothing shared",
     ),
     pytest.param(
         "若[も]しも",
         "もしも",
-        SpellingEvidence(0, 2, True, False, False),
+        SpellingEvidence(0, 2, True, False, False, True, False),
         id="the word's kanji in kana, its kana shared",
     ),
     pytest.param(
         "べき",
         "可[べ]き",
-        SpellingEvidence(0, 1, False, True, False),
+        SpellingEvidence(0, 1, False, True, False, False, False),
         id="the text's kanji in kana in the word",
     ),
     pytest.param(
         "ビール",
         "麦酒[ビール]",
-        SpellingEvidence(0, 0, False, True, False),
+        SpellingEvidence(0, 0, False, True, False, False, False),
         id="the whole word a reading in the text",
     ),
     pytest.param(
         "其[そ]のまま",
         "その 儘[まま]",
-        SpellingEvidence(0, 1, True, True, False),
+        SpellingEvidence(0, 1, True, True, False, True, False),
         id="each side has a kanji the other has in kana",
     ),
     pytest.param(
         "CD",
         "ＣＤ",
-        SpellingEvidence(0, 2, False, False, False),
+        SpellingEvidence(0, 2, False, False, False, False, False),
         id="written alike but for the width",
     ),
     pytest.param(
         "チーズ",
         "ちーず",
-        SpellingEvidence(0, 1, False, False, True),
+        SpellingEvidence(0, 1, False, False, True, False, False),
         id="the same kana in the other type are compatible and not shared",
     ),
     pytest.param(
         "豚[とん]カツ",
         "とんかつ",
-        SpellingEvidence(0, 0, True, False, True),
+        SpellingEvidence(0, 0, True, False, True, True, False),
         id="a kanji in kana and the word's kana in the other type",
     ),
     pytest.param(
@@ -190,7 +203,7 @@ SPELLING_CASES = [
     pytest.param(
         "御存[ごぞん]じ",
         "御[ご] 存知[ぞんじ]",
-        SpellingEvidence(2, 0, False, False, False),
+        SpellingEvidence(2, 0, False, False, False, False, False),
         id="brackets that end at different places are compared over both",
     ),
 ]
@@ -315,8 +328,40 @@ HIGHLIGHT_CASES = [
         "準備[じゅんび]に 愚図[ぐず]ついて、 結局[けっきょく] 遅[おく]れた。",
         id="not there: another verb whose headword is the kana of a verb's stem",
     ),
-    # The price of the last two: a verb MeCab does not know is not found by its kana, which
-    # the kana path's stem guess would do.
+    # Kana the text has for the word's last kanji say nothing by themselves, and what comes
+    # after them can make them another word's.
+    pytest.param(
+        "やっと 出[で]てくれた。",
+        "出[で]て 来[く]る",
+        "やっと 出[で]てくれた。",
+        id="not there: another verb that begins as the word's last one does",
+    ),
+    pytest.param(
+        "誰[だれ]も 見[み]ていなかった。",
+        "見[み]て 行[い]く",
+        "誰[だれ]も 見[み]ていなかった。",
+        id="not there: another verb that begins as the word's last one does /2",
+    ),
+    pytest.param(
+        "一口[ひとくち] 食[た]べてみせた。",
+        "食[た]べて 見[み]る",
+        "一口[ひとくち] 食[た]べてみせた。",
+        id="not there: another verb that begins as the word's last one does /3",
+    ),
+    pytest.param(
+        "手[て]まで 汚[よご]れた。",
+        "手間[てま]",
+        "手[て]まで 汚[よご]れた。",
+        id="not there: a particle that begins as the word's last kanji reads",
+    ),
+    pytest.param(
+        "手[て]まが 掛[か]かる。",
+        "手間[てま]",
+        "<b>手[て]ま</b>が 掛[か]かる。",
+        id="the kana for the word's last kanji end where a token of MeCab's does",
+    ),
+    # The price of the stem guess not being asked: a verb MeCab does not know is not found
+    # by its kana.
     pytest.param(
         "「<k> 否[いや]</k>テンパってた<k> 丈[だけ]</k>で…」",
         "聴牌[テンパ]る",
