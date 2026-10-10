@@ -16,6 +16,7 @@ from .reading_variants import (
     last_kanji_agreement,
     reading_agreement,
 )
+from .text_spelling import spelled_as_in_text, whole_number_pattern
 from .use_tag_cleaning import (
     FURIGANA_PART_RE,
     SPLITTER_DOT_RE,
@@ -30,10 +31,10 @@ KANJI_AND_MAYBE_FURIGANA_AND_OKURIGANA_RE = (
     rf"([\d々{KANJI_RANGES}ヶヵ]+)(?:\[([^\]]*?)\])?([ぁ-ん]*)$"
 )
 # The last kanji of a word that was split into one reading per kanji: (1) the kanji, which is
-# anything a kanji run can hold, a digit included, (2) the repeater sharing its bracket, if
-# there is one, and (3) the reading. A bare repeater, which only a degenerate word has, is
-# taken as (1).
-LAST_KANJI_FURIGANA_RE = rf"([\d々{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
+# anything a kanji run can hold, or a number with all its digits, which the splitting keeps
+# under one reading, (2) the repeater sharing its bracket, if there is one, and (3) the
+# reading. A bare repeater, which only a degenerate word has, is taken as (1).
+LAST_KANJI_FURIGANA_RE = rf"(\d+|[々{KANJI_RANGES}ヶヵ])(々?)(?:\[([^\]]*?)\])?$"
 
 CONSECUTIVE_FURI_WORD_RE = (
     rf"(?: ([\d々{KANJI_RANGES}ヶヵ]+)\[([^\]]*?)\])(?:"
@@ -82,6 +83,9 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     also matches the reading the text has for it, together with the space furigana syntax
     puts before the kanji and the rest of the text's kanji run that reading covers. Where the
     word has okurigana after its last kanji, the text's run has to end at that kanji.
+
+    Digits are part of a kanji run, and a number among them is the text's whole number or
+    nothing: ２ does not match in １２, whatever else the run it stands in may take along.
     """
     # Remove first space
     word = re.sub(r"^ ", "", word)
@@ -95,12 +99,14 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
             pattern_parts.append(r"\s?")
         kanji, kanji_furigana = match.group(1), match.group(2)
         if kanji_furigana:
-            pattern_parts.append(re.escape(kanji))
+            pattern_parts.append(whole_number_pattern(kanji))
             pattern_parts.append(replace_hiragana_in_pattern(re.escape(kanji_furigana)))
         else:
             run_ends_word = followed_by_okurigana and index == len(kanji_matches) - 1
             pattern_parts.append(
-                kanji_run_with_maybe_furigana(re.escape(kanji), run_may_continue=not run_ends_word)
+                kanji_run_with_maybe_furigana(
+                    whole_number_pattern(kanji), run_may_continue=not run_ends_word
+                )
             )
         cursor = match.end()
     literal_suffix = word[cursor:]
@@ -119,6 +125,9 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReadin
 
     A text written without furigana has neither the brackets nor the space before a kanji, so
     both are optional; a bracket that is there still has to agree with the word's reading.
+
+    A number of the word, which the splitting leaves as one token under one reading, matches
+    the same number of the text in digits of either width and no part of a longer one.
     """
     word = re.sub(r"^ ", "", word)
     expected_readings: list[WordKanjiReading] = []
@@ -129,7 +138,9 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReadin
         if literal_prefix:
             without_space = literal_prefix.rstrip(" ")
             if without_space:
-                pattern_parts.append(replace_hiragana_in_pattern(re.escape(without_space)))
+                pattern_parts.append(
+                    replace_hiragana_in_pattern(whole_number_pattern(without_space))
+                )
             if without_space != literal_prefix:
                 pattern_parts.append(r"\s?")
         kanji = match.group(1)
@@ -140,11 +151,11 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReadin
                 begins_word=not word[: match.start()].strip(),
             )
         )
-        pattern_parts.append(rf"{re.escape(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
+        pattern_parts.append(rf"{whole_number_pattern(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
         cursor = match.end()
     literal_suffix = word[cursor:]
     if literal_suffix:
-        pattern_parts.append(replace_hiragana_in_pattern(re.escape(literal_suffix)))
+        pattern_parts.append(replace_hiragana_in_pattern(whole_number_pattern(literal_suffix)))
     return "".join(pattern_parts), expected_readings
 
 
@@ -345,8 +356,26 @@ def highlight_as_written(text: str, word: str) -> str:
     katakana taken as the same. Which of the two has furigana is free, and so is how the
     word is inflected; see word_highlight for what counts as an occurrence.
 
+    A word that is not found so is looked for once more spelled as the text spells it, where
+    the two spellings are the same word by rule: a number in digits on one side and in kanji
+    numerals on the other. text_spelling has the rules.
+
     Returns the text with the occurrences in <b> tags. Without one the text can still come
     back with its furigana grouped differently, which the caller has to tell apart.
+    """
+    result = highlight_spelling(text, word)
+    if bold_count(result) > bold_count(text):
+        return result
+    respelled = spelled_as_in_text(word, text)
+    if respelled == word:
+        return result
+    return highlight_spelling(text, respelled)
+
+
+def highlight_spelling(text: str, word: str) -> str:
+    """Highlight the word where the text has it in the one spelling the word is given in.
+
+    This is the search highlight_as_written describes, and it returns what that one does.
     """
     # A splitter dot the word is written with (ヘレン・ケラー, 報・連・相) is no more a character
     # to match than one in the text is. The searches below store the text's dots away before
@@ -681,7 +710,7 @@ def highlight_as_written(text: str, word: str) -> str:
         # Replace the furigana part for the last kanji in the regex pattern so that all
         # kana are allowed, this allows for matching inflected forms where the base reading
         # changes, like rendaku, small tsu, vowel changes etc.
-        pattern += rf"{last_kanji}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
+        pattern += rf"{whole_number_pattern(last_kanji)}{repeater}(?:\[(?P<furigana>[^\]]+)\])?"
         pattern += rf"(?P<maybe_okuri>(?:{ending_okurigana})|(?:[ぁ-んア-ン]*))"
         logger.debug("Regex pattern for matching: '%s'", pattern)
 

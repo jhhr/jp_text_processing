@@ -424,6 +424,154 @@ CASES = [
         "私[わたし]への<b> 報[ほう]・ 連[れん]・ 相[そう]</b>を 行[おこな]っていただきます",
         id="Furigana word split by ・ in text",
     ),
+    # A number is the same number in digits of either width and in kanji numerals, and a note's
+    # word and its sentence do not always write it the same way. A word that is not found as
+    # written is looked for with its numbers written as the text writes them
+    # (`text_spelling_tests.py` has the rewriting on its own). The reading a digit has in the
+    # text still has to be the word's; a digit without one has nothing to disagree with.
+    pytest.param(
+        "海賊[かいぞく]<k> 達[たち]</k>は ７[なな]つの 海[うみ]を 航海[こうかい]<k> 為[し]た</k>。",
+        " 七[なな]つの 海[うみ]",
+        "海賊[かいぞく]<k> 達[たち]</k>は<b> ７[なな]つの 海[うみ]</b>を 航海[こうかい]<k> 為[し]た</k>。",
+        id="Number - numeral in the word, a digit with the same reading in the text",
+    ),
+    pytest.param(
+        "海賊[かいぞく]<k> 達[たち]</k>は ７[なな]つの 海[うみ]を 航海[こうかい]<k> 為[し]た</k>。",
+        "七[なな]つ",
+        "海賊[かいぞく]<k> 達[たち]</k>は<b> ７[なな]つ</b>の 海[うみ]を 航海[こうかい]<k> 為[し]た</k>。",
+        id="Number - numeral with okurigana in the word, a digit with the same reading in the text",
+    ),
+    pytest.param(
+        "私[わたし]は４つの 会社[かいしゃ]に 投資[とうし]<k> 為[し]ています</k>。",
+        " 四[よっ]つ",
+        "私[わたし]は<b>４つ</b>の 会社[かいしゃ]に 投資[とうし]<k> 為[し]ています</k>。",
+        id="Number - numeral with okurigana in the word, a digit without a reading in the text",
+    ),
+    pytest.param(
+        "罰金[ばっきん]を３ 万[まん] 円[えん]も<k> 取[と]られた</k>よ。",
+        " 三[さん]",
+        "罰金[ばっきん]を<b>３</b> 万[まん] 円[えん]も<k> 取[と]られた</k>よ。",
+        id="Number - one numeral in the word, a digit without a reading in the text",
+    ),
+    pytest.param(
+        "グレゴリオ 暦[れき]の 7[しち] 月[がつ] 7日[なのか]は 夏[なつ]だが、 古来[こらい]の 七夕[たなばた]は 秋[あき]の 季語[きご]である。",
+        "七[しち]",
+        "グレゴリオ 暦[れき]の<b> 7[しち]</b> 月[がつ] 7日[なのか]は 夏[なつ]だが、 古来[こらい]の 七夕[たなばた]は 秋[あき]の 季語[きご]である。",
+        id="Number - a half-width digit, and the same digit read otherwise is not the word",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]２０ ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        " 二十[にじゅう]",
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]<b>２０</b> ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        id="Number - two numerals in the word, two digits in the text",
+    ),
+    pytest.param(
+        "テスト 期間[きかん]は１０ 日[か]から１５ 日[にち]<k> 迄[まで]</k>だ。",
+        "十日[とおか]",
+        "テスト 期間[きかん]は<b>１０ 日[か]</b>から１５ 日[にち]<k> 迄[まで]</k>だ。",
+        id="Number - one numeral in the word, two digits in the text, a counter after them",
+    ),
+    pytest.param(
+        "火事[かじ]です。１１９ 番[ばん]に 電話[でんわ]<k> 為[し]て 下[くだ]さい</k>。",
+        " 百十九番[ひゃくじゅうきゅうばん]",
+        "火事[かじ]です。<b>１１９ 番[ばん]</b>に 電話[でんわ]<k> 為[し]て 下[くだ]さい</k>。",
+        id="Number - three numerals in the word, three digits in the text",
+    ),
+    pytest.param(
+        "牛[うし]の 胆石[たんせき]。 １０００[せん]<k> 居[い]る 内[うち]</k>の １頭[いっとう]しか<k> 無[な]い</k>",
+        " 千[せん]",
+        "牛[うし]の 胆石[たんせき]。<b> １０００[せん]</b><k> 居[い]る 内[うち]</k>の １頭[いっとう]しか<k> 無[な]い</k>",
+        id="Number - one numeral in the word, four digits with the same reading in the text",
+    ),
+    pytest.param(
+        "牛[うし]の 胆石[たんせき]。 １０００[せん]<k> 居[い]る 内[うち]</k>の １頭[いっとう]しか<k> 無[な]い</k>",
+        " 一頭[いっとう]",
+        "牛[うし]の 胆石[たんせき]。 １０００[せん]<k> 居[い]る 内[うち]</k>の<b> １頭[いっとう]</b>しか<k> 無[な]い</k>",
+        id="Number - a digit sharing its bracket with a kanji in the text",
+    ),
+    pytest.param(
+        "収賄事件[しゅうわいじけん]の 審問[しんもん]が 10日[とおか]に 開[ひら]かれる。",
+        " 十[とお]",
+        "収賄事件[しゅうわいじけん]の 審問[しんもん]が<b> 10[とお]</b> 日[か]に 開[ひら]かれる。",
+        id="Number - digits sharing their bracket with a kanji the word does not have",
+    ),
+    # 万 and the units above it are written out after digits too, so the numerals before one
+    # are a number of their own
+    pytest.param(
+        "<k> 此[こ]の</k> 仕事[しごと]は 日給[にっきゅう]1 万[まん] 円[えん]だ。",
+        " 一万円[いちまんえん]",
+        "<k> 此[こ]の</k> 仕事[しごと]は 日給[にっきゅう]<b>1 万[まん] 円[えん]</b>だ。",
+        id="Number - a digit before 万 in the text",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 本[ほん]の 第[だい]６ 章[しょう]が 特[とく]に 好[す]きです。",
+        " 第六[だいろく]",
+        "<k> 此[こ]の</k> 本[ほん]の<b> 第[だい]６</b> 章[しょう]が 特[とく]に 好[す]きです。",
+        id="Number - a digit after a kanji of the word",
+    ),
+    pytest.param(
+        "来月[らいげつ]の 二十日[はつか]に 会[あ]いましょう。",
+        "20日[はつか]",
+        "来月[らいげつ]の<b> 二十日[はつか]</b>に 会[あ]いましょう。",
+        id="Number - digits in the word, numerals in the text",
+    ),
+    pytest.param(
+        "あの 頃[ころ]は２ちゃんねるを 見[み]ていた",
+        " 2[に]ちゃんねる",
+        "あの 頃[ころ]は<b>２ちゃんねる</b>を 見[み]ていた",
+        id="Number - a half-width digit in the word, the full-width one in the text",
+    ),
+    # A number is all of its digits: 1 is not in 10, nor 十 in 20
+    pytest.param(
+        "１ 月[がつ]１０ 日[か]に１１９ 番[ばん]に 電話[でんわ]した",
+        " 一[いち]",
+        "<b>１</b> 月[がつ]１０ 日[か]に１１９ 番[ばん]に 電話[でんわ]した",
+        id="Number - a digit is not found inside a longer number",
+    ),
+    pytest.param(
+        "明朝[みょうちょう]１０ 時[じ]に１１９ 番[ばん]に 電話[でんわ]する",
+        " 一[いち]",
+        "明朝[みょうちょう]１０ 時[じ]に１１９ 番[ばん]に 電話[でんわ]する",
+        id="Number - a digit is not found inside a longer number, and nowhere else",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]２０ ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        " 十[じゅう]",
+        "<k> 此[こ]の</k> 綱[つな]は 直径[ちょっけい]２０ ｃｍ[せんち]<k> 有[あ]るそうです</k>。",
+        id="Number - a numeral is not found in the digits of a number it is part of",
+    ),
+    pytest.param(
+        "富士山[ふじさん]の 高[たか]さは３，７７６メートルです。",
+        " 三[さん]",
+        "富士山[ふじさん]の 高[たか]さは３，７７６メートルです。",
+        id="Number - a digit is not found in a number written with a separator",
+    ),
+    pytest.param(
+        "あの 頃[ころ]は１２ちゃんねるを 見[み]ていた",
+        " 2[に]ちゃんねる",
+        "あの 頃[ころ]は１２ちゃんねるを 見[み]ていた",
+        id="Number - a digit of the word is not found inside a longer number either",
+    ),
+    # The digit's reading is the numeral's reading where the text gives one
+    pytest.param(
+        "海賊[かいぞく]<k> 達[たち]</k>は ７[なな]つの 海[うみ]を 航海[こうかい]<k> 為[し]た</k>。",
+        "七[しち]",
+        "海賊[かいぞく]<k> 達[たち]</k>は ７[なな]つの 海[うみ]を 航海[こうかい]<k> 為[し]た</k>。",
+        id="Number - a digit the text reads otherwise is not the word",
+    ),
+    pytest.param(
+        "学級委員[がっきゅういいん] 私[わたし] １人[ひとり]だったって<k> 事[こと]</k>に<k> 出来[でき]ない</k>かな…",
+        " 一人[いちにん]",
+        "学級委員[がっきゅういいん] 私[わたし] １人[ひとり]だったって<k> 事[こと]</k>に<k> 出来[でき]ない</k>かな…",
+        id="Number - a digit and its kanji the text reads otherwise are not the word",
+    ),
+    # Only a word that is not in the text as written is looked for in another spelling
+    pytest.param(
+        "一人[ひとり]で１ 個[こ] 食[た]べた",
+        "一[ひと]",
+        "<b>一[ひと]</b> 人[り]で１ 個[こ] 食[た]べた",
+        id="Number - a word found as written is not looked for in digits as well",
+    ),
     pytest.param(
         "家で居る、家出はしない",
         "家",
