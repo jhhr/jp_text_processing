@@ -12,6 +12,12 @@ Where an occurrence starts
    inflect the way the word does: a verb for a word ending in an う-row kana and an adjective
    for one ending in い, or what MeCab calls an auxiliary (助動詞), which is its name for the
    job a word does and not for how it inflects. ある is an auxiliary to it after で and じゃ.
+
+   A word can be several tokens: a phrase (ピントがずれる, である), or a verb MeCab does not
+   know and cuts in pieces (ぼっ/た/くら/れ/た). Then a token's headword is the end of the word,
+   and the text before that token, from the start of a token on, is the rest of it: ずれ in
+   ピントがずれています, あっ in であった, くら in ぼったくられた. A word MeCab knows as one
+   word is not put together like that. は and いない spell a form of はいる and are not one.
 2. A token whose headword is the word's stem, with a conjugation of the word after it. This is
    how MeCab cuts a verb it does not know when it cuts it at the stem: バズ/っ/た.
 
@@ -204,12 +210,45 @@ def inflects_as(token: MecabParsedToken, word: InflectingWord) -> bool:
     )
 
 
+def is_one_word_to_mecab(word: InflectingWord) -> bool:
+    """Whether MeCab, given the word alone, reads it as a single word that inflects."""
+    tokens = mecab.translate(word.dictionary_form)
+    return (
+        len(tokens) == 1
+        and to_hiragana(tokens[0].headword) == word.dictionary_form
+        and inflects_as(tokens[0], word)
+    )
+
+
 def headword_occurrence(parsed: ParsedText, word: InflectingWord, index: int) -> Occurrence | None:
-    """Rule 1: the word begins at this token when the token has it for a headword."""
-    token = parsed.tokens[index]
-    if to_hiragana(token.headword) != word.dictionary_form or not inflects_as(token, word):
-        return None
-    return Occurrence(parsed.spans[index][1], word.word_type, "headword")
+    """
+    Rule 1: the word begins at this token when a token here has it for a headword.
+
+    For a word of one token that is this token. A word of several has its last word for the
+    headword of a later token, and before that token the text spells the rest of the word
+    from this token on. Only that last token is asked for its headword: the ones before it do
+    not inflect, and MeCab cuts them differently from text to text (な/の/で or なの/で).
+
+    A word MeCab knows as one word is not looked for in several tokens. Its forms are its own
+    and not those of a shorter word it ends in: はいる is は and いる to the eye, and はいない is
+    no form of it.
+    """
+    start = parsed.spans[index][0]
+    for head_index in range(index, len(parsed.tokens)):
+        written_before = parsed.folded[start : parsed.spans[head_index][0]]
+        if len(written_before) >= len(word.dictionary_form) or not word.dictionary_form.startswith(
+            written_before
+        ):
+            return None
+        head = parsed.tokens[head_index]
+        if written_before + to_hiragana(head.headword) != word.dictionary_form or not inflects_as(
+            head, word
+        ):
+            continue
+        if written_before and is_one_word_to_mecab(word):
+            return None
+        return Occurrence(parsed.spans[head_index][1], word.word_type, "headword")
+    return None
 
 
 def stem_token_occurrence(

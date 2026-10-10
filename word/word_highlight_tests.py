@@ -1068,6 +1068,70 @@ CASES = [
         "そう<b>でした</b>",
         id="Kana only - an auxiliary is found as a word too",
     ),
+    # A word of several words is several tokens, the last of which inflects
+    pytest.param(
+        "<k> 此[こ]の</k> 写真[しゃしん]はピントがずれています。",
+        "ピントがずれる",
+        "<k> 此[こ]の</k> 写真[しゃしん]は<b>ピントがずれています</b>。",
+        id="Kana only - phrase whose last word is inflected",
+    ),
+    pytest.param(
+        "性的[せいてき]な 犯罪[はんざい]が 増[ふ]えつつあります。",
+        "つつある",
+        "性的[せいてき]な 犯罪[はんざい]が 増[ふ]え<b>つつあります</b>。",
+        id="Kana only - phrase whose last word is inflected /2",
+    ),
+    pytest.param(
+        "捜索[そうさく]の 責任者[せきにんしゃ]でもあった。",
+        "でもある",
+        "捜索[そうさく]の 責任者[せきにんしゃ]<b>でもあった</b>。",
+        id="Kana only - phrase whose last word is inflected /3",
+    ),
+    pytest.param(
+        "液体[えきたい]は硫酸[りゅうさん]であった。",
+        "である",
+        "液体[えきたい]は硫酸[りゅうさん]<b>であった</b>。",
+        id="Kana only - phrase whose last word MeCab tags as an auxiliary",
+    ),
+    pytest.param(
+        "<k> 此[こ]の</k> 四[よん] 本[ほん]の 紐[ひも]なのであって、 手[て]や 足[あし]は",
+        "なのである",
+        "<k> 此[こ]の</k> 四[よん] 本[ほん]の 紐[ひも]<b>なのであって</b>、 手[て]や 足[あし]は",
+        id="Kana only - phrase of four tokens, the last one inflected",
+    ),
+    pytest.param(
+        "びっくりしたよ",
+        "びっくりする",
+        "<b>びっくりした</b>よ",
+        id="Kana only - する verb written in kana",
+    ),
+    pytest.param(
+        "写真[しゃしん]の 位置[いち]がずれています。",
+        "ピントがずれる",
+        "写真[しゃしん]の 位置[いち]がずれています。",
+        id="Kana only - the last word of a phrase without the rest of it is not the phrase",
+    ),
+    pytest.param(
+        "歩[ある]きつつ 話[はなし]があります。",
+        "つつある",
+        "歩[ある]きつつ 話[はなし]があります。",
+        id="Kana only - the words of a phrase apart from each other are not the phrase",
+    ),
+    # A verb MeCab does not know comes back in pieces, the last of which still inflects as
+    # the word's ending does
+    pytest.param(
+        "性悪[しょうわる] 天使[てんし]に ぼったくられたぜ。",
+        "ぼったくる",
+        "性悪[しょうわる] 天使[てんし]に <b>ぼったくられた</b>ぜ。",
+        id="Kana only - verb MeCab cuts into several tokens, the last one inflected",
+    ),
+    # は and いる spell はいる, which is a verb of its own and goes はいらない
+    pytest.param(
+        "彼[かれ]はいないよ",
+        "はいる",
+        "彼[かれ]はいないよ",
+        id="Kana only - a particle and a shorter verb are not the verb they spell together",
+    ),
     pytest.param(
         "こんな 見[み]たら 観客[かんきゃく] 座[すわ]ってるのに 総[そう]勃ち だよ",
         "総[そう]勃ち",
