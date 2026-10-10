@@ -297,18 +297,42 @@ def word_highlight(text: str, word: str) -> str:
     word_highlight("安[やす]くて 良[い]いな～", "安[やす]い") --> "<b>安[やす]くて</b> 良[い]いな～"
     word_highlight("高[たか]いでも 良[よ]かろう", "良[い]い") --> "高[たか]いでも<b> 良[よ]かろう</b>"
 
+    A text the word does not occur in comes back exactly as it was given.
+
     Args:
         text (str): The input text where the word needs to be highlighted.
         word (str): The word to highlight.
 
     Returns:
-        list[tuple[int,int]]: A list of tuples containing the start and end indices of the
-        word occurrences in the text.
+        str: The text with <b> tags around each occurrence of the word.
     """
     logger.debug("word_highlight: text='%s', word='%s'", text, word)
     if not text or not word or not word.strip():
         return text
 
+    result = highlight_as_written(text, word)
+    if bold_count(result) > bold_count(text):
+        return result
+    # Looking for the word can regroup the text's furigana on the way, which is the price of
+    # a highlight and nothing a text without one should pay
+    return text
+
+
+def bold_count(text: str) -> int:
+    """Count the highlights in the text, to tell whether one was added to it."""
+    return len(re.findall(r"<b>", text))
+
+
+def highlight_as_written(text: str, word: str) -> str:
+    """Highlight the word where the text writes it with the characters the word is given in.
+
+    The word's kanji have to be the text's kanji and its kana the text's kana, hiragana and
+    katakana taken as the same. Which of the two has furigana is free, and so is how the
+    word is inflected; see word_highlight for what counts as an occurrence.
+
+    Returns the text with the occurrences in <b> tags. Without one the text can still come
+    back with its furigana grouped differently, which the caller has to tell apart.
+    """
     if is_kana_str(word):
         logger.debug("Word is kana only, use highlight_inflected_words_with_mecab")
         # This is either a simple case or a complex one needing inflection matching
