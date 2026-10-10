@@ -2,7 +2,6 @@ import re
 
 from ..all_types.main_types import OkuriResults
 from ..kana.kana_highlight import WithTagsDef, kana_highlight
-from ..kana.reading_matcher import check_reading_match
 from ..mecab_controller.kana_conv import is_kana_str, to_hiragana, to_katakana
 from ..okuri.get_conjugated_okuri_with_mecab import get_conjugated_okuri_with_mecab
 from ..regex.kanji_furi import KANJI_RANGES
@@ -10,6 +9,7 @@ from ..utils.logger import package_logger as logger
 from .highlight_inflected_words_with_mecab import (
     highlight_inflected_words_with_mecab,
 )
+from .reading_variants import ReadingAgreement, WordKanjiReading, reading_agreement
 from .use_tag_cleaning import (
     FURIGANA_PART_RE,
     SPLITTER_DOT_RE,
@@ -103,18 +103,19 @@ def make_word_pattern(word: str, followed_by_okurigana: bool = False) -> str:
     return "".join(pattern_parts)
 
 
-def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
+def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[WordKanjiReading]]:
     """Create a regex pattern that captures furigana sections for variant checking.
 
     The generated pattern keeps kanji and separators strict, but allows the furigana
     inside brackets to vary. Captured furigana values can then be validated via
-    check_reading_match (rendaku/small-tsu/vowel-change, etc.).
+    reading_agreement (rendaku/small-tsu/vowel-change, etc.), which is given each kanji as
+    the word reads it; those come back in the order of the pattern's furi_ groups.
 
     A text written without furigana has neither the brackets nor the space before a kanji, so
     both are optional; a bracket that is there still has to agree with the word's reading.
     """
     word = re.sub(r"^ ", "", word)
-    expected_readings: list[str] = []
+    expected_readings: list[WordKanjiReading] = []
     pattern_parts: list[str] = [r"\s?"]
     cursor = 0
     for idx, match in enumerate(re.finditer(FURIGANA_TOKEN_RE, word)):
@@ -126,7 +127,13 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
             if without_space != literal_prefix:
                 pattern_parts.append(r"\s?")
         kanji = match.group(1)
-        expected_readings.append(to_hiragana(match.group(2)))
+        expected_readings.append(
+            WordKanjiReading(
+                kanji=kanji,
+                reading=to_hiragana(match.group(2)),
+                begins_word=not word[: match.start()].strip(),
+            )
+        )
         pattern_parts.append(rf"{re.escape(kanji)}(?:\[(?P<furi_{idx}>[^\]]+)\])?")
         cursor = match.end()
     literal_suffix = word[cursor:]
@@ -137,7 +144,7 @@ def make_furigana_agnostic_pattern(word: str) -> tuple[str, list[str]]:
 
 def furigana_captures_match_readings(
     match: re.Match,
-    expected_readings: list[str],
+    expected_readings: list[WordKanjiReading],
 ) -> bool:
     """Validate captured furigana readings against expected readings with variants.
 
@@ -147,13 +154,7 @@ def furigana_captures_match_readings(
         captured = match.group(f"furi_{idx}")
         if captured is None:
             continue
-        observed = to_hiragana(captured)
-        _, reading_match_type = check_reading_match(
-            reading=expected,
-            mora_string=observed,
-            okurigana="",
-        )
-        if reading_match_type == "none":
+        if reading_agreement(expected, to_hiragana(captured)) == "none":
             return False
     return True
 
@@ -487,28 +488,26 @@ def highlight_as_written(text: str, word: str) -> str:
 
         def replace_match(match: re.Match) -> str:
             nonlocal b_tags_inserted
-            has_variant = False
+            has_sound_change = False
             for idx, expected in enumerate(expected_readings):
                 captured = match.group(f"furi_{idx}")
                 if captured is None:
                     # No furigana in the text for this kanji, so nothing to disagree about
                     continue
-                observed = to_hiragana(captured)
-                _, reading_match_type = check_reading_match(
-                    reading=expected,
-                    mora_string=observed,
-                    okurigana="",
-                )
-                if reading_match_type == "none":
+                agreement = reading_agreement(expected, to_hiragana(captured))
+                if agreement == "none":
                     return match.group(0)
-                if reading_match_type != "plain":
-                    has_variant = True
+                if agreement == "sound_change":
+                    has_sound_change = True
 
             match_text = match.group(0)
             split_start = match.start(0)
             split_end = match.end(0)
             leading_ws = ""
-            if has_variant and split_start > 0 and match_text[:1].isspace():
+            # A reading the text changed (及び 腰[ごし] for 腰[こし]) leaves the space before the
+            # word outside the highlight. Only that kind of difference does; the ones that are
+            # the word's own doing keep the space inside, where every other path has it
+            if has_sound_change and split_start > 0 and match_text[:1].isspace():
                 leading_ws = match_text[0]
                 match_text = match_text[1:]
                 split_start += 1
@@ -635,7 +634,7 @@ def highlight_as_written(text: str, word: str) -> str:
             nonlocal last_kanji, repeater, last_kanji_furigana
             last_kanji = match.group(1) if match else ""
             repeater = match.group(2) if match else ""
-            last_kanji_furigana = match.group(3) if match else ""
+            last_kanji_furigana = (match.group(3) if match else "") or ""
             logger.debug(
                 "Found last kanji in split word: '%s', repeater: '%s', last_kanji_furigana: '%s'",
                 last_kanji,
@@ -662,6 +661,11 @@ def highlight_as_written(text: str, word: str) -> str:
             # and the pattern would have no furigana group to read, so it is not found
             logger.debug("The split word does not end in a kanji, nothing to match")
             return text
+        last_word_kanji = WordKanjiReading(
+            kanji=f"{last_kanji}{repeater}",
+            reading=last_kanji_furigana,
+            begins_word=not word_with_readings_split.strip(),
+        )
         # Split the whole text similarly
         text_with_readings_split = split_furi_text_into_individual_kanji_furigana(text)
         logger.debug("text_with_readings_split: %s", text_with_readings_split)
@@ -694,15 +698,13 @@ def highlight_as_written(text: str, word: str) -> str:
             # reading for it is the one to inflect with
             furigana = m.group("furigana") or last_kanji_furigana
             maybe_okuri = m.group("maybe_okuri")
-            reading_match_type = "plain"
-            if last_kanji and furigana:
-                _, reading_match_type = check_reading_match(
-                    reading=last_kanji_furigana,
-                    mora_string=to_hiragana(furigana),
-                    okurigana=to_hiragana(maybe_okuri),
+            agreement: ReadingAgreement = "same"
+            if furigana:
+                agreement = reading_agreement(
+                    last_word_kanji, to_hiragana(furigana), to_hiragana(maybe_okuri)
                 )
             if maybe_okuri == ending_okurigana:
-                if reading_match_type == "none":
+                if agreement == "none":
                     logger.debug(
                         "Skipping exact okuri match; furigana '%s' does not match last kanji"
                         " reading '%s'",
@@ -719,7 +721,7 @@ def highlight_as_written(text: str, word: str) -> str:
                 result_indices.append((m.start(0), m.end(0)))
                 continue
             na_okuri = adnominal_na_okuri(ending_okurigana, to_hiragana(maybe_okuri))
-            if na_okuri and reading_match_type != "none":
+            if na_okuri and agreement != "none":
                 # MeCab reads the whole な form as one adnominal word, so the stem is checked
                 # against the word's own okurigana instead
                 logger.debug("Found the word's な form, okurigana: '%s'", na_okuri)
@@ -746,7 +748,7 @@ def highlight_as_written(text: str, word: str) -> str:
                 okurigana="",
                 rest_kana="",
             )
-            if last_kanji and furigana and reading_match_type != "none":
+            if furigana and agreement != "none":
                 kanji_okuri_result, _ = get_conjugated_okuri_with_mecab(
                     word=last_kanji,
                     reading=last_kanji_furigana,

@@ -1301,6 +1301,111 @@ CASES = [
         "これは 独[x]りだった",
         id="Crash test - a word whose bracket holds no kana, with kana after it",
     ),
+    # ず and づ are one sound, and which of them a reading is spelled with is not a difference.
+    pytest.param(
+        "動機[どうき] 付[づ]けと<k> 言[い]う</k>のは 因子[いんし]の<k> 一[ひと]つ</k>です。",
+        "動機付[どうきず]け",
+        "<b>動機[どうき] 付[づ]け</b>と<k> 言[い]う</k>のは 因子[いんし]の<k> 一[ひと]つ</k>です。",
+        id="Reading variant - ず in the word, づ in the text",
+    ),
+    # Rendaku the other way round: the word holds the voiced form of a kanji that is not its
+    # first, and the text says the same compound without the voicing.
+    pytest.param(
+        "<k> 彼[あ]の</k> 人[ひと]は 欲[よく] 深[ふか]い。",
+        "欲[よく] 深[ぶか]い",
+        "<k> 彼[あ]の</k> 人[ひと]は<b> 欲[よく] 深[ふか]い</b>。",
+        id="Reading variant - the word's rendaku is not in the text",
+    ),
+    pytest.param(
+        "動[うご]きは 読[よ]み<k> 易[やす]く</k> 初見殺[しょけんころ]しな… 行動[こうどう]も",
+        "初見殺[しょけんごろ]し",
+        "動[うご]きは 読[よ]み<k> 易[やす]く</k><b> 初見殺[しょけんころ]し</b>な… 行動[こうどう]も",
+        id="Reading variant - the word's rendaku is not in the text, inside one kanji run",
+    ),
+    pytest.param(
+        "「 物販[ぶっぱん]で500 円[えん]で 売[う]ろう」「ぼっ 手繰[たく]り」",
+        "ぼっ 手繰[たぐ]り",
+        "「 物販[ぶっぱん]で500 円[えん]で 売[う]ろう」「<b>ぼっ 手繰[たく]り</b>」",
+        id="Reading variant - the word's rendaku is not in the text, kana before the kanji",
+    ),
+    # A word that begins voiced is not a rendaku form of anything: 顔[がお] is the suffix and
+    # 顔[かお] the noun, 降伏[ごうぶく] and 降伏[こうふく] are two words.
+    pytest.param(
+        "まこっち 顔[かお]<k> 丈[だけ]</k> 誠実[せいじつ]で 優[やさ]しそうだ",
+        " 顔[がお]",
+        "まこっち 顔[かお]<k> 丈[だけ]</k> 誠実[せいじつ]で 優[やさ]しそうだ",
+        id="Reading variant - a word that begins voiced is not the unvoiced word",
+    ),
+    pytest.param(
+        "白旗[しろはた]は 降伏[こうふく]の 合図[あいず]だ。",
+        " 降伏[ごうぶく]",
+        "白旗[しろはた]は 降伏[こうふく]の 合図[あいず]だ。",
+        id="Reading variant - a word that begins voiced is not the unvoiced word /2",
+    ),
+    # A voiced reading the kanji lists for itself is a reading, not a sound change, and tells
+    # words apart: 中 is チュウ and ジュウ, 見 is ケン and ゲン.
+    pytest.param(
+        "心中[しんちゅう]<k> 御[お]</k> 察[さっ]しします。",
+        "心中[しんじゅう]",
+        "心中[しんちゅう]<k> 御[お]</k> 察[さっ]しします。",
+        id="Reading variant - a voiced reading of its own is not the unvoiced one",
+    ),
+    pytest.param(
+        "一見[いっけん]して 分[わ]かる。",
+        "一見[いちげん]",
+        "一見[いっけん]して 分[わ]かる。",
+        id="Reading variant - a voiced reading of its own is not the unvoiced one /2",
+    ),
+    # A stem said two ways: 良い is よい and いい, 行く is いく and ゆく, 得る is える and うる.
+    pytest.param(
+        "「 体温[たいおん]も 正常値[せいじょうち]ですね。もう<k> 良[い]い</k>ですよ。」",
+        "良[よ]い",
+        "「 体温[たいおん]も 正常値[せいじょうち]ですね。もう<k><b> 良[い]い</b></k>ですよ。」",
+        id="Reading variant - よい found as いい",
+    ),
+    pytest.param(
+        "虫[むし]の 良[い]い 話[はなし]だ。",
+        "虫[むし]の 良[よ]い",
+        "<b>虫[むし]の 良[い]い</b> 話[はなし]だ。",
+        id="Reading variant - よい found as いい, at the end of an expression",
+    ),
+    pytest.param(
+        "台風[たいふう]に 行[ゆ]く 手[て]を 阻[はば]まれました。",
+        " 行[い]く 手[て]",
+        "台風[たいふう]に<b> 行[ゆ]く 手[て]</b>を 阻[はば]まれました。",
+        id="Reading variant - いく found as ゆく, before the word's last kanji",
+    ),
+    pytest.param(
+        "母[はは]が<k> 余所[よそ]</k>行[ゆ]き 用[よう]の 服[ふく]を 買[か]ってくれた。",
+        "余所行[よそい]き",
+        "母[はは]が<b><k> 余所[よそ]</k> 行[ゆ]き</b> 用[よう]の 服[ふく]を 買[か]ってくれた。",
+        id="Reading variant - いき found as ゆき, in a noun",
+    ),
+    pytest.param(
+        "テロ 攻撃[こうげき]の 標的[ひょうてき]に<k> 成[な]り 得[う]る</k>。",
+        "得[え]る",
+        "テロ 攻撃[こうげき]の 標的[ひょうてき]に<k> 成[な]り<b> 得[う]る</b></k>。",
+        id="Reading variant - える found as うる",
+    ),
+    pytest.param(
+        "あの 人[ひと]は 行[ゆ]きたくないと 言[ゆ]った",
+        "言[い]う",
+        "あの 人[ひと]は 行[ゆ]きたくないと<b> 言[ゆ]った</b>",
+        id="Reading variant - いう found as ゆう, inflected",
+    ),
+    pytest.param(
+        "鏡[かがみ]に 映[うつ]る 顔[かお]が 歪[ゆが]む。",
+        "歪[いが]む",
+        "鏡[かがみ]に 映[うつ]る 顔[かお]が<b> 歪[ゆが]む</b>。",
+        id="Reading variant - いがむ found as ゆがむ, a stem of two kana",
+    ),
+    # Two readings that only happen to take the same okurigana are still two words.
+    pytest.param(
+        "米[こめ]は<k> 其処[そこ]</k>なら<k> 直[す]ぐ 捌[さば]ける</k>。",
+        "捌[は]ける",
+        "米[こめ]は<k> 其処[そこ]</k>なら<k> 直[す]ぐ 捌[さば]ける</k>。",
+        id="Reading variant - another stem with the same okurigana is not the word",
+    ),
     # Without the word's own reading the text's reading cannot be split between the kanji it
     # covers, so a word that is only part of a kanji run takes the whole run and its bracket.
     pytest.param(
