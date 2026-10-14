@@ -585,6 +585,31 @@ CASES = [
         id="Should be able to clean furigana that bridges over some okurigana 2/",
     ),
     pytest.param(
+        "嫌",
+        # The き after 好 can sit in two places in すききらい, and 好 reads すき as well as す, so it
+        # is 嫌 that settles it: it reads きら, not ら
+        "好き嫌い[すききらい]が 激[はげ]しい。",
+        True,
+        {
+            "furigana": " 好[す]き<b> 嫌[きら]い</b>が 激[はげ]しい。",
+            "furikanji": " す[好]き<b> きら[嫌]い</b>が はげ[激]しい。",
+            "kana_only": "すき<b>きらい</b>が はげしい。",
+            "furigana split": "<kun> 好[す]</kun><oku>き</oku><b><kun> 嫌[きら]</kun><oku>い</oku></b>が"
+            "<kun> 激[はげ]</kun><oku>しい</oku>。",
+            "furigana merged": "<kun> 好[す]</kun><oku>き</oku><b><kun> 嫌[きら]</kun><oku>い</oku></b>が"
+            "<kun> 激[はげ]</kun><oku>しい</oku>。",
+            "furikanji split": "<kun> す[好]</kun><oku>き</oku><b><kun> きら[嫌]</kun><oku>い</oku></b>が"
+            "<kun> はげ[激]</kun><oku>しい</oku>。",
+            "furikanji merged": "<kun> す[好]</kun><oku>き</oku><b><kun> きら[嫌]</kun><oku>い</oku></b>が"
+            "<kun> はげ[激]</kun><oku>しい</oku>。",
+            "kana_only split": "<kun>す</kun><oku>き</oku><b><kun>きら</kun><oku>い</oku></b>が"
+            " <kun>はげ</kun><oku>しい</oku>。",
+            "kana_only merged": "<kun>す</kun><oku>き</oku><b><kun>きら</kun><oku>い</oku></b>が"
+            " <kun>はげ</kun><oku>しい</oku>。",
+        },
+        id="Should not give the first kanji the kana the second kanji's reading opens with",
+    ),
+    pytest.param(
         "",
         # Can in fact use kana_highlight to generate correct furigana by simply putting the full kana
         # reading into brackets after text

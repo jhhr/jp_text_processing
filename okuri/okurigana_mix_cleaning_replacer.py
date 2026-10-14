@@ -1,6 +1,7 @@
 import re
 
-from ..kana.mora_alignment import find_first_complete_alignment
+from ..all_types.main_types import MoraAlignment
+from ..kana.mora_alignment import find_first_complete_alignment, matched_chars, path_cost
 from ..kana.mora_splitter import split_to_mora_list
 from ..mecab_controller.kana_conv import to_hiragana
 from ..regex.kanji_furi import KANJI_CHAR_RE
@@ -54,6 +55,23 @@ LEADING_KANA_CLEANING_REC = re.compile(
 SELF_READING_PREFIX_REC = re.compile(r"^(?:[おご]|御|[ァ-ヶー]+|[ぁ-んァ-ヶー]{2,})$")
 
 
+def probe_alignment(kanji: str, furigana: str, okurigana: str = "") -> MoraAlignment:
+    """
+    The alignment the main pass would make of `kanji` if `furigana` were their whole reading and
+    `okurigana` the kana after them.
+    """
+    mora_result = split_to_mora_list(furigana, len(kanji))
+    # Probing a reading the writer may not have meant is expected to fail, so the alignment's
+    # complaints about it are not the caller's business.
+    with silenced():
+        return find_first_complete_alignment(
+            word=kanji,
+            furigana=furigana,
+            maybe_okuri=okurigana,
+            mora_list=mora_result["mora_list"],
+        )
+
+
 def unread_kanji_count(kanji: str, furigana: str) -> int:
     """
     How many of `kanji` no listed reading can account for if `furigana` is their whole reading.
@@ -61,17 +79,7 @@ def unread_kanji_count(kanji: str, furigana: str) -> int:
     Zero means every kanji was matched to a reading of its own, which is the alignment the main
     pass is looking for; a higher count means that many were left to be guessed at as jukujikun.
     """
-    mora_result = split_to_mora_list(furigana, len(kanji))
-    # Probing a reading the writer may not have meant is expected to fail, so the alignment's
-    # complaints about it are not the caller's business.
-    with silenced():
-        alignment = find_first_complete_alignment(
-            word=kanji,
-            furigana=furigana,
-            maybe_okuri="",
-            mora_list=mora_result["mora_list"],
-        )
-    return len(alignment["jukujikun_positions"])
+    return len(probe_alignment(kanji, furigana)["jukujikun_positions"])
 
 
 def leading_kana_cleaning_replacer(match):
@@ -169,7 +177,11 @@ OKURIGANA_MIX_CLEANING_REC = re.compile(
 # `furi1` is greedy because hira1 is the okurigana that *follows* kanji1, so it is the last
 # place that run of kana can sit in the reading, not the first. Taking the first turned
 # 勿体無い[もったいない] into 勿体無[もった]い[ない] - the い matched inside もったい - and the
-# reading left over came out as a bracket with no word in front of it.
+# reading left over came out as a bracket with no word in front of it. That settles a word
+# with one kanji run, where the bracket has to follow hira1, but not one with two: the kana
+# between the runs can also open the second run's reading, and then the last place can be the
+# wrong one - 好き嫌い[すききらい] gave 好[すき]き嫌[ら]い. So with two runs the match only proves
+# there is a place, and okurigana_mix_readings picks it.
 #
 # `furi2` insists on at least one character rather than being lazy, so that a second kanji
 # always gets a reading. Were it `[^\]]*?` the greedy furi1 would swallow the lot and leave
@@ -177,6 +189,70 @@ OKURIGANA_MIX_CLEANING_REC = re.compile(
 # insist on at least one character.
 # Together they mean kanji2 and furi2 always take part as a pair, so neither a word without a
 # reading nor a reading without a word can be produced here.
+
+
+def reading_fit(kanji: str, furigana: str, okurigana: str) -> tuple[int, int]:
+    """
+    How well `furigana` reads `kanji` with `okurigana` after them, by the alignment the main pass
+    would make of it: how many of the kanji are left jukujikun, and how many chars of `furigana`
+    their listed readings account for.
+    """
+    alignment = probe_alignment(kanji, furigana, okurigana)
+    return len(alignment["jukujikun_positions"]), matched_chars(alignment["kanji_matches"])
+
+
+def okurigana_mix_readings(
+    kanji1: str, hira1: str, kanji2: str, hira2: str, reading: str
+) -> tuple[str, str]:
+    """
+    The readings of the two kanji runs of a word written kanji1, hira1, kanji2, hira2, out of
+    `reading`, the bracket's kana after the ones the word opens with.
+
+    hira1 can sit anywhere in the reading with a kana or more on either side of it, and when the
+    same kana close the first run's reading or open the second's, more than one place spells the
+    word: 好き嫌い[すききらい] is 好[す]き嫌[きら]い, but 好[すき]き嫌[ら]い spells it too. Only
+    the kanji can tell them apart, so every place is weighed by the readings it gives the two
+    runs, ranked the way the alignment ranks its own splits: the most of the reading accounted
+    for by listed readings, then the fewest kanji left jukujikun (path_cost), then the earliest,
+    the one that gives the first run the shortest reading. 好 reads すき as well as す, but 嫌
+    reads きら and not ら.
+
+    The earliest is also what is right on a tie. Every place at which both runs read accounts for
+    all of the reading but the okurigana, so the tie is not rare: a verb's kanji also reads its
+    noun form, okurigana and all, and 殺し凝り[ころししこり] reads as 殺[ころし]し凝[こ]り as
+    completely as it does as 殺[ころ]し凝[しこ]り. The later place is the one that spells the
+    okurigana twice.
+    """
+    end = len(reading) - len(hira2)
+    # From the first place to the last, each leaving at least one kana to either run. The match
+    # this comes from is one of them, so there is always at least one.
+    places = [
+        (reading[:start], reading[start + len(hira1) : end])
+        for start in range(1, end - len(hira1))
+        if reading.startswith(hira1, start)
+    ]
+    if len(places) == 1:
+        # Nothing to weigh, which is most words: the probes are only paid for where they decide
+        return places[0]
+
+    def cost(readings: tuple[str, str]) -> tuple[int, int]:
+        unread1, chars1 = reading_fit(kanji1, readings[0], hira1)
+        unread2, chars2 = reading_fit(kanji2, readings[1], hira2)
+        return path_cost(unread1 + unread2, chars1 + chars2)
+
+    # min keeps the first of equals, so a tie goes to the earliest place
+    best = min(places, key=cost)
+    logger.debug(
+        "okurigana_mix_readings - %s%s%s%s[%s]: %s of %s",
+        kanji1,
+        hira1,
+        kanji2,
+        hira2,
+        reading,
+        best,
+        places,
+    )
+    return best
 
 
 def okurigana_mix_cleaning_replacer(match):
@@ -190,6 +266,7 @@ def okurigana_mix_cleaning_replacer(match):
     (4) すり下ろす[すりおろす] becomes すり下[お]ろす
     (5) かも知れない[かもしれない] becomes かも知[し]れない
     (6) 勿体無い[もったいない] becomes 勿体無[もったいな]い
+    (7) 好き嫌い[すききらい] becomes 好[す]き嫌[きら]い, see okurigana_mix_readings
     """
     pre = match.group("pre")  # kana the word opens with, which reads as itself
     kanji1 = match.group("kanji1")  # first kanji
@@ -198,6 +275,11 @@ def okurigana_mix_cleaning_replacer(match):
     kanji2 = match.group("kanji2")  # second kanji, if the word has one
     furigana2 = match.group("furi2")  # furigana for second kanji
     hiragana2 = match.group("hira2") or ""  # hiragana at the end, after the second kanji
+    if kanji2:
+        # The match put hiragana1 at the last place it can sit, which is only one of its places
+        furigana1, furigana2 = okurigana_mix_readings(
+            kanji1, hiragana1, kanji2, hiragana2, f"{furigana1}{hiragana1}{furigana2}{hiragana2}"
+        )
 
     # Return the cleaned and restructured string
     result = f"{pre}{kanji1}[{furigana1}]{hiragana1}"
