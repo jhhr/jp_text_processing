@@ -40,8 +40,8 @@ Which cut is taken
 The same kana can occur twice in a reading, and a reading can open with the very kana that
 stand before its kanji (か 家族[かぞく], where か is a particle), so that a word can be spelled
 is not yet a reason to cut it that way. The kanji's own listed readings decide, by the measure
-`okuri/okurigana_mix_cleaning_replacer.py` uses for the same question in texts: how many kanji a
-cut leaves that no listed reading accounts for.
+`okuri/okurigana_mix_cleaning_replacer.py` uses in texts for the kana a word opens with: how many
+kanji a cut leaves that no listed reading accounts for.
 
 - A word in which every kanji run has a bracket of its own that reads it with listed readings
   is ordinary and comes back as it was given, whatever else would spell it.

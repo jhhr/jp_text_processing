@@ -125,6 +125,31 @@ CASES = [
         "良[い]い塩梅[あんばい]",
         id="opening kana and a second kanji together",
     ),
+    # --- the okurigana between two kanji fits the reading in more than one place -----------
+    # The kanji's readings decide where. The last place the okurigana fits gave the first kanji
+    # the kana the second one's reading opens with: 好き嫌い[すききらい] became 好[すき]き嫌[ら]い.
+    pytest.param(
+        "好き嫌い[すききらい]",
+        "好[す]き嫌[きら]い",
+        id="okurigana whose kana the second kanji's reading opens with",
+    ),
+    pytest.param(
+        "お笑い芸人[おわらいげいにん]",
+        "お笑[わら]い芸人[げいにん]",
+        id="opening kana and okurigana whose kana a two kanji reading opens with",
+    ),
+    pytest.param(
+        "物の怪[もののけ]",
+        "物[もの]の怪[け]",
+        id="kana between the kanji that the first kanji's reading ends with",
+    ),
+    # Made up, since no word in the bundled dictionary ties: 殺 reads ころし as its noun form and
+    # 凝 reads こ as well as しこ, so both places read completely. The later one spells the し twice.
+    pytest.param(
+        "殺し凝り[ころししこり]",
+        "殺[ころ]し凝[しこ]り",
+        id="two places that both read go to the earlier one",
+    ),
     # --- left alone -------------------------------------------------------------------------
     pytest.param(
         "お金[かね]", "お金[かね]", id="a reading that omits the word's honorific is not raided"
