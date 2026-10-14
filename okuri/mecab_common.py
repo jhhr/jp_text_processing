@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal
 
 from ..mecab_controller.basic_types import (

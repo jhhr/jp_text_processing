@@ -2,7 +2,8 @@
 
 Japanese furigana, reading and word-highlighting processing, shared by the author's Anki add-ons.
 The add-ons vendor this directory as a package and import it as
-`<addon>.shared.jp_text_processing`; it is not pip-installable. Python 3.10 or newer.
+`<addon>.shared.jp_text_processing`; it is not pip-installable. Python 3.9 or newer, as old
+as the Python of any Anki the add-ons load in.
 
 Text is in Anki's furigana syntax: a reading follows its kanji in square brackets, and a space
 before the word marks where its kanji start, except at the start of the string

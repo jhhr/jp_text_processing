@@ -5,6 +5,8 @@ This module handles matching onyomi and kunyomi readings to mora portions,
 including special cases like rendaku, small tsu conversion, and vowel changes.
 """
 
+from __future__ import annotations
+
 from functools import lru_cache
 
 from ..all_types.main_types import ReadingMatchInfo, ReadingType

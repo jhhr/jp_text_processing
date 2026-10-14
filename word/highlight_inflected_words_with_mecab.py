@@ -78,6 +78,8 @@ was given (～ comes back as ~), so nothing of the output is made from its token
 which `use_tag_cleaning` closes and opens again around it.
 """
 
+from __future__ import annotations
+
 from collections.abc import Iterator
 from typing import NamedTuple
 

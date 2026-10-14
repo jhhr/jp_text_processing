@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..all_types.main_types import PartOfSpeech
 from ..regex.rendaku import RENDAKU_CONVERSION_DICT_HIRAGANA
 from ..utils.logger import package_logger as logger

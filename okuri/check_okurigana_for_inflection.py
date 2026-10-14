@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..all_types.main_types import (
     PartOfSpeech,
 )

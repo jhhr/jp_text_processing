@@ -7,6 +7,8 @@ exceptions now return a MoraAlignment dict that the main pipeline can feed into
 and word edge splitting.
 """
 
+from __future__ import annotations
+
 from typing import TypedDict
 
 from ..all_types.main_types import MatchType, ReadingMatchInfo

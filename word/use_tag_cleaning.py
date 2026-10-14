@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from ..utils.logger import package_logger as logger

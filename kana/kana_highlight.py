@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from ..all_types.main_types import (

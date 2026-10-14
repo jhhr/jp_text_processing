@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..all_types.main_types import OkuriResults, OkuriType, PartOfSpeech
 from ..okuri.okurigana_dict import get_okuri_dict_for_okurigana
 from ..utils.logger import package_logger as logger

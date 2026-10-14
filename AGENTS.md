@@ -132,9 +132,15 @@ table when it is one word.
 
 ## Code conventions
 
-- Python 3.10 is the floor (`requires-python` and ruff's `target-version`): no `NotRequired`,
-  `Self` or `ExceptionGroup`; the optional keys of a `TypedDict` are done with a `total=False`
-  base class, as `all_types/main_types.py` does.
+- Python 3.9 is the floor (`requires-python` and ruff's `target-version`). Anki's own builds
+  ran 3.9 until 25.07, and one module 3.9 cannot import stops every add-on that ships this
+  package loading. So a module whose annotations use `X | None` starts with
+  `from __future__ import annotations` (ruff's `FA` rules ask for it), and a union evaluated
+  at run time, such as an alias or an `isinstance` argument, is spelled `Optional`/`Union` or a
+  tuple. No `match`, no `zip(strict=...)`, no `NotRequired`, `Self`, `TypeAlias` or
+  `ExceptionGroup`. The optional keys of a `TypedDict` come from a `total=False` base class, as
+  `all_types/main_types.py` does. mypy stays at 3.10, the lowest version mypy 2 still checks
+  against, so it does not catch these.
 - Everything is type-annotated and mypy has to stay clean. Data that crosses module boundaries
   is a `TypedDict` or `NamedTuple` from `all_types/main_types.py`; add fields there, with the
   docstring's `:param` list kept current.

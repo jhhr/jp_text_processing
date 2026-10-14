@@ -69,6 +69,8 @@ word that the text holds character for character is not cut again; noise comes o
 same.
 """
 
+from __future__ import annotations
+
 import re
 from itertools import product
 from math import prod
@@ -209,7 +211,7 @@ def whole_readings(runs: list[Run], readings: list[str]) -> list[tuple[str, dict
         "".join(runs[i].text for i in before if not runs[i].is_kanji) for before in runs_before
     ]
     answers: list[list[bool]] = []
-    for before, kana in zip(runs_before, kana_before, strict=True):
+    for before, kana in zip(runs_before, kana_before):
         only_its_own_run = not any(runs[i].is_kanji for i in before[:-1])
         # Whether the bracket spells the kana as well: no, yes, or either
         answer = [False] if only_its_own_run else []
@@ -223,7 +225,7 @@ def whole_readings(runs: list[Run], readings: list[str]) -> list[tuple[str, dict
         whole = ""
         fixed_ends: dict[int, int] = {}
         for before, kana, reading, spells_the_kana in zip(
-            runs_before, kana_before, readings, combination, strict=True
+            runs_before, kana_before, readings, combination
         ):
             whole += reading if spells_the_kana else kana + reading
             # The run the bracket follows and the run after the bracket
@@ -285,7 +287,7 @@ def unread_kanji(runs: list[Run], cut: tuple[str, ...]) -> int:
     kanji_runs = [run.text for run in runs if run.is_kanji]
     return sum(
         unread_kanji_count(kanji, reading) if reading else len(kanji)
-        for kanji, reading in zip(kanji_runs, cut, strict=True)
+        for kanji, reading in zip(kanji_runs, cut)
     )
 
 

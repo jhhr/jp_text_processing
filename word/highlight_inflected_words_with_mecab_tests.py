@@ -12,6 +12,8 @@ taken to inflect, how far a conjugation reaches in a text, and that an occurrenc
 in the text as it was given.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from ..all_types.main_types import PartOfSpeech

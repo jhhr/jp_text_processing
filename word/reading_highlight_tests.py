@@ -11,6 +11,8 @@ one reading have in common, and what `highlight_by_reading` makes of a text on i
 `word_highlight_tests.py`, under "Reading -".
 """
 
+from __future__ import annotations
+
 import pytest
 
 from .reading_highlight import (

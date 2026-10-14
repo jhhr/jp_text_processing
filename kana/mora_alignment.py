@@ -13,6 +13,8 @@ matched once and remembered. A caller that already has one or two candidate spli
 whole-word case) hands them in as ``possible_splits`` and they are scored in the order given.
 """
 
+from __future__ import annotations
+
 from collections.abc import Iterable, Sequence
 from typing import NamedTuple
 

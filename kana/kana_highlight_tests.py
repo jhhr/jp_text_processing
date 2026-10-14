@@ -22,6 +22,8 @@ the end. The module brings mecab up once before its first case, so that its firs
 charged to setup rather than to a timed case.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from ..all_types.main_types import WithTagsDef

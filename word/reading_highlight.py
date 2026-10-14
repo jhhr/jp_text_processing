@@ -111,6 +111,8 @@ it gives them a reading of its own, which is compared as any other place is; MeC
 headword for 行った is 行く or 行う by what stands around it, whatever the bracket says.
 """
 
+from __future__ import annotations
+
 import re
 import unicodedata
 from collections.abc import Sequence

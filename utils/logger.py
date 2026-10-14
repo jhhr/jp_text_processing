@@ -8,6 +8,8 @@ There is only the one logger, so nothing is threaded through call signatures: a 
 logs takes it as `from ..utils.logger import package_logger as logger` and calls it directly.
 """
 
+from __future__ import annotations
+
 import logging
 import sys
 from collections.abc import Iterator
