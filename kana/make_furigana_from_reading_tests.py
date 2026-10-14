@@ -55,6 +55,22 @@ CASES = [
     pytest.param("泣き明かし", "なきあかし", " 泣[な]き 明[あ]かし", id="泣き明かし"),
     pytest.param("行き来", "いきき", " 行[い]き 来[き]", id="行き来"),
     pytest.param("聞き手", "ききて", " 聞[き]き 手[て]", id="聞き手"),
+    # --- a reading that cannot be split over the word ----------------------------------------
+    # It stays over the whole word, kana and all, but behind a space like any other result: the
+    # word came back without one, and Anki's furigana filter then took in whatever text came
+    # before it, so that あの泣き明かし[なきかし] put the reading over あの as well.
+    pytest.param(
+        "泣き明かし",
+        "なきかし",
+        " 泣き明かし[なきかし]",
+        id="a reading that leaves a kanji nothing stays over the whole word",
+    ),
+    pytest.param(
+        "好き",
+        "すく",
+        " 好き[すく]",
+        id="a reading that does not end with the word's okurigana stays over the whole word",
+    ),
 ]
 
 
