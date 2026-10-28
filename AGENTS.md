@@ -44,7 +44,7 @@ the highlight is placed around it rather than through it.
 | `kanji/` | `all_kanji_data.json` (about 11 000 kanji, each with its onyomi and kunyomi as strings) and the digit-to-kanji converter. |
 | `regex/` | Character classes and tables: kanji ranges, mora lists, rendaku conversions. |
 | `utils/logger.py` | The package logger. |
-| `mecab_controller/` | A git submodule, vendored from an upstream fork. **Never edit it.** mypy ignores errors inside it and ruff excludes it, on purpose. It bundles a MeCab binary per platform under `support/`, so nothing has to be installed for the tests. |
+| `mecab_controller/` | A git submodule, vendored from an upstream fork. **Never edit it.** mypy ignores errors inside it and ruff excludes it, on purpose. It bundles a MeCab binary per platform under `support/`, so nothing has to be installed for the tests. It starts MeCab as a program for each call, except on Android, where no program can be started and it loads MeCab's library into the process instead; both give the same output, and `MECAB_CONTROLLER_BACKEND=in_process` (or `subprocess`) picks one anywhere (its README). Its own `mecab_library_tests.py` is collected with the suites here. |
 | `conftest.py` | pytest configuration shared by the suites, including the `timed` marker. |
 
 The `kana_highlight` pipeline, in the order `furigana_replacer` in `kana/kana_highlight.py` runs
